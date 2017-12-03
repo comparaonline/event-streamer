@@ -1,0 +1,56 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: 'docker:stable-git'
+    working_directory: /app
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          command: |
+            apk --update add --no-cache \
+              nodejs \
+              nodejs-npm \
+              curl \
+              bash
+          name: Install dependencies
+      - restore_cache:
+          keys:
+            - 'v1-{{ .Branch }}'
+          paths:
+            - /caches/node-modules.tgz
+      - run:
+          command: |
+            set +o pipefail
+            tar xzf /caches/node-modules.tgz | true
+          name: Load modules cache
+      - run:
+          command: |
+            npm i -g n
+          name: Install n
+      - run:
+          command: |
+            n 8
+          name: Install node 8
+      - run:
+          command: |
+            npm i -g yarn
+          name: Install yarn
+      - run:
+          command: |
+            yarn install --ignore-engines
+          name: Install dependecies
+      - run:
+          command: |
+            mkdir -p /caches
+            tar czf /caches/node-modules.tgz ./node_modules
+          name: Save modules cache
+      - save_cache:
+          key: 'v1-{{ .Branch }}-{{ epoch }}'
+          paths:
+            - /caches/node-modules.tgz
+      - run:
+          command: |
+            yarn test
+          name: Run tests

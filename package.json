@@ -1,0 +1,51 @@
+{
+  "scripts": {
+    "tslint": "tslint -c tslint.json -p tsconfig.json",
+    "pretest": "yarn tslint",
+    "compile": "tsc --outDir ./build",
+    "clean": "rm -rf build/*",
+    "test": "jest",
+    "coverage": "jest --mapCoverage --coverage --coverageReporters html"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js"
+    ],
+    "transform": {
+      "\\.(ts|tsx)$": "<rootDir>/node_modules/ts-jest/preprocessor.js"
+    },
+    "testRegex": "src(/.*)?/__tests__/.*\\.(ts|tsx|js)$"
+  },
+  "name": "fw-router",
+  "version": "1.0.0",
+  "description": "Framework component to define events",
+  "keywords": [
+    "comparaonline",
+    "microservice",
+    "framework"
+  ],
+  "main": "build/index.js",
+  "types": "build/index.d.ts",
+  "private": true,
+  "author": {
+    "name": "Ezequiel Rabinovich",
+    "email": "erabinovich@gmail.com"
+  },
+  "files": [
+    "build"
+  ],
+  "repository": "comparaonline/fw-router",
+  "devDependencies": {
+    "@types/config": "^0.0.33",
+    "@types/jest": "^21.1.8",
+    "jest": "^21.2.1",
+    "nodemon": "^1.12.1",
+    "ts-jest": "^21.2.3",
+    "ts-node": "^3.3.0",
+    "tslint": "^5.8.0",
+    "tslint-config-airbnb": "^5.4.2",
+    "typescript": "^2.6.2"
+  }
+}
