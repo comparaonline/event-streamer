@@ -16,11 +16,11 @@
     "transform": {
       "\\.(ts|tsx)$": "<rootDir>/node_modules/ts-jest/preprocessor.js"
     },
-    "testRegex": "src(/.*)?/__tests__/.*\\.(ts|tsx|js)$"
+    "testRegex": "src(/.*)?/__tests__/[^/]*\\.(ts|tsx|js)$"
   },
-  "name": "fw-router",
+  "name": "event-streamer",
   "version": "1.0.0",
-  "description": "Framework component to define events",
+  "description": "Simple event-streaming framework",
   "keywords": [
     "comparaonline",
     "microservice",
@@ -36,16 +36,21 @@
   "files": [
     "build"
   ],
-  "repository": "comparaonline/fw-router",
+  "repository": "comparaonline/event-streamer",
   "devDependencies": {
     "@types/config": "^0.0.33",
     "@types/jest": "^21.1.8",
     "jest": "^21.2.1",
     "nodemon": "^1.12.1",
+    "rxjs-marbles": "^2.2.0",
     "ts-jest": "^21.2.3",
     "ts-node": "^3.3.0",
     "tslint": "^5.8.0",
     "tslint-config-airbnb": "^5.4.2",
     "typescript": "^2.6.2"
+  },
+  "dependencies": {
+    "reflect-metadata": "^0.1.10",
+    "rxjs": "^5.5.3"
   }
 }
