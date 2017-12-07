@@ -1,9 +1,9 @@
 import { BaseEvent } from './event';
-import { Action } from './action';
+import { BaseAction } from './action/base-action';
 import { Observable } from 'rxjs';
 import { Scheduler } from 'rxjs/Scheduler';
 
-export type ActionCtor = { new(): Action };
+export type ActionCtor = { new(): BaseAction };
 
 export class Handler {
   private actions: ActionCtor[] = [];

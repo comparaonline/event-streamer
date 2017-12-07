@@ -1,7 +1,7 @@
 import { Subject } from 'rxjs';
 import { BaseEvent } from '../event';
 import 'reflect-metadata';
-import { Action } from '../action';
+import { BaseAction } from './base-action';
 
 const emitters = Symbol.for('emits');
 const addEmitter = <T extends typeof BaseEvent>(klass: Function, event: T) => {
@@ -15,7 +15,7 @@ export interface Event<T> {
   code: string;
 }
 export const emitter = <T extends BaseEvent>(
-      action: Action,
+      action: BaseAction,
       event: Event<T>,
       subject: Subject<BaseEvent>
 ): Emitter<T> => {

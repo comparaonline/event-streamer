@@ -3,6 +3,7 @@
     "tslint": "tslint -c tslint.json -p tsconfig.json",
     "pretest": "yarn tslint",
     "compile": "tsc --outDir ./build",
+    "prepublish": "yarn compile",
     "clean": "rm -rf build/*",
     "test": "jest",
     "coverage": "jest --mapCoverage --coverage --coverageReporters html"
@@ -19,7 +20,7 @@
     "testRegex": "src(/.*)?/__tests__/[^/]*\\.(ts|tsx|js)$"
   },
   "name": "event-streamer",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Simple event-streaming framework",
   "keywords": [
     "comparaonline",
@@ -28,10 +29,11 @@
   ],
   "main": "build/index.js",
   "types": "build/index.d.ts",
-  "private": true,
+  "private": false,
   "author": {
     "name": "Ezequiel Rabinovich",
-    "email": "erabinovich@gmail.com"
+    "email": "erabinovich@gmail.com",
+    "url": "https://github.com/warseph"
   },
   "files": [
     "build"

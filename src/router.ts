@@ -1,5 +1,4 @@
 import { BaseServer } from './base-server';
-import { Action } from './action';
 import { BaseEvent } from './event';
 import { Handler, ActionCtor } from './handler';
 import { Scheduler } from 'rxjs/Scheduler';

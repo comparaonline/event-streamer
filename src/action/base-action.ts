@@ -3,7 +3,7 @@ import { Observable, ReplaySubject } from 'rxjs';
 import { emitter, Event } from './emitter';
 import { Scheduler } from 'rxjs/Scheduler';
 
-export abstract class Action {
+export abstract class BaseAction {
   protected result = new ReplaySubject<BaseEvent>();
 
   abstract perform(event: BaseEvent): Promise<void>;
