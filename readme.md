@@ -66,7 +66,7 @@ import { AnOutputEventClass } from './my-output-event';
 export class AnActionClass extends SequentialAction {
   private emitOutput = this.emitter(AnOutputEventClass);
 
-  perform(inputEvent: AnInputEventClass) {
+  async perform(inputEvent: AnInputEventClass) {
     if (inputEvent.someParam === 'whatever') {
       this.emitOutput(new AnOutputEventClass({
         extraParam: `${inputEvent.someParam} output`
@@ -74,4 +74,26 @@ export class AnActionClass extends SequentialAction {
     }
   }
 }
+```
+
+The action is considered finished when the `perform` promise resolves.
+
+## Testing
+
+A test server is provided to write functional tests:
+
+```js
+import { TestServer, TestEvent } from 'event-streamer/test-helpers';
+import { Router } from 'event-streamer';
+
+describe('AnActionClass', () => {
+  it('responds with AnOutputEvent to AnInputEvent', async () => {
+    const server = new TestServer()
+    const router = new Router(server);
+    loadRoutes(router);
+    server.inputEvent({ code: 'AnOutputEvent', someParam: 'whatever' });
+    const published = await server.publishedEvents();
+    expect(published[0].extraParam).toEqual('whatever output');
+  })
+});
 ```
