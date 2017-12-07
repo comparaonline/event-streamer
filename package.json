@@ -20,7 +20,7 @@
     "testRegex": "src(/.*)?/__tests__/[^/]*\\.(ts|tsx|js)$"
   },
   "name": "event-streamer",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Simple event-streaming framework",
   "keywords": [
     "comparaonline",
