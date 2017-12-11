@@ -43,6 +43,7 @@
   "devDependencies": {
     "@types/config": "^0.0.33",
     "@types/jest": "^21.1.8",
+    "@types/node": "^8.0.58",
     "jest": "^21.2.1",
     "nodemon": "^1.12.1",
     "rxjs-marbles": "^2.2.0",
