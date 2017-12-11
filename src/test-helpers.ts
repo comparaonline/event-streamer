@@ -23,5 +23,8 @@ export class TestServer extends BaseServer {
 
 export class TestEvent extends BaseEvent {
   className = this.constructor.name;
+  constructor(params = {}) {
+    super(params);
+  }
   build() { }
 }
