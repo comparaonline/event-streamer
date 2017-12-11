@@ -6,8 +6,7 @@ import { BaseAction } from './base-action';
 
 export abstract class SequentialAction extends BaseAction {
   handleEvent(event: BaseEvent): Observable<BaseEvent> {
-    this.perform(event);
-    return Observable.of(null)
+    return Observable.fromPromise(this.perform(event))
       .do(() => this.result.complete())
       .flatMap(() => this.result);
   }
