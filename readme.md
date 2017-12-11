@@ -36,6 +36,11 @@ const myServerImplementation: BaseServer = initializeMyServer();
 const router = new Router(myServerImplementation);
 ```
 
+You have two types of router available. The default `Router` will process the actions
+in parallel and return the output events as soon as they are emitted. There's also
+a `SequentialRouter` that will process events in the order they are received
+(i.e. it will not process the next event until the previous one finishes).
+
 We'll add some implementations in the following versions.
 
 Then you need to add routes to the router
@@ -56,14 +61,12 @@ export class AnInputEventClass extends BaseEvent {
 }
 ```
 
-Actions should implement the BaseAction class. A SequentialAction is currently
-provided, new actions will be added in the future. A SequentialAction handles one
-event at a time and doesn't handle any new events until the previous one is finished.
+Actions should implement the Action class.
 ```js
-import { SequentialAction } from 'event-streamer';
+import { Action } from 'event-streamer';
 import { AnOutputEventClass } from './my-output-event';
 
-export class AnActionClass extends SequentialAction {
+export class AnActionClass extends Action {
   private emitOutput = this.emitter(AnOutputEventClass);
 
   async perform(inputEvent: AnInputEventClass) {
