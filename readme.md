@@ -28,12 +28,12 @@ $ yarn add event-streamer
 
 ## Usage
 
-You need to initialize the router with a server implementation.
+You need to initialize the server with a router implementation.
 ```js
 import { Router, BaseServer } from 'event-streamer';
 
-const myServerImplementation: BaseServer = initializeMyServer();
-const router = new Router(myServerImplementation);
+const router = new Router();
+const myServerImplementation: BaseServer = new MyCustomServer(router);
 ```
 
 You have two types of router available. The default `Router` will process the actions
@@ -91,8 +91,8 @@ import { Router } from 'event-streamer';
 
 describe('AnActionClass', () => {
   it('responds with AnOutputEvent to AnInputEvent', async () => {
-    const server = new TestServer()
-    const router = new Router(server);
+    const router = new Router();
+    const server = new TestServer(router)
     loadRoutes(router);
     server.inputEvent({ code: 'AnOutputEvent', someParam: 'whatever' });
     const published = await server.publishedEvents();

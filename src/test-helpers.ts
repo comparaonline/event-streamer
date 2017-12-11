@@ -2,12 +2,14 @@ import { Subject, Observable } from 'rxjs';
 import { ReplaySubject } from 'rxjs/ReplaySubject';
 import { BaseEvent } from './event/index';
 import { BaseServer, RawEvent, BindingCallback } from './base-server';
+import { Router } from './router';
 
 export class TestServer extends BaseServer {
   private output: Observable<BaseEvent>;
-  private input = new ReplaySubject<RawEvent>();
+  private input: ReplaySubject<RawEvent>;
 
   bind(callback: BindingCallback) {
+    this.input = new ReplaySubject<RawEvent>();
     this.output = callback(this.input);
   }
 

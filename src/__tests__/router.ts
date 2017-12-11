@@ -26,8 +26,8 @@ describe('Router', () => {
           }
         }
 
-        const server = new TestServer();
-        const router = new RouterType(server);
+        const router = new RouterType();
+        const server = new TestServer(router);
         router.add(FakeInputEvent, TestAction);
 
         server.inputEvent({ code: 'FakeInputEvent' });
@@ -47,8 +47,8 @@ describe('Router', () => {
           }
         }
 
-        const server = new TestServer();
-        const router = new RouterType(server);
+        const router = new RouterType();
+        const server = new TestServer(router);
         router.add(FakeInputEvent, TestAction);
 
         server.inputEvent({ code: 'FakeInputEvent' });
@@ -85,8 +85,8 @@ describe('Router', () => {
         }
       }
 
-      const server = new TestServer();
-      const router = new SequentialRouter(server);
+      const router = new SequentialRouter();
+      const server = new TestServer(router);
       router.add(FakeInputEvent, TestAction1);
       router.add(FakeInputEvent2, TestAction2);
 
@@ -108,12 +108,14 @@ describe('Router', () => {
     }
 
     it('handles registered events', () => {
-      const router = new Router(new TestServer());
+      const router = new Router();
+      const server = new TestServer(router);
       router.add(FakeInputEvent, FakeAction);
       expect(router.willHandle({ code: 'FakeInputEvent' })).toBeTruthy();
     });
     it('does not handle unknown events', () => {
-      const router = new Router(new TestServer());
+      const router = new Router();
+      const server = new TestServer(router);
       router.add(FakeInputEvent, FakeAction);
       expect(router.willHandle({ code: 'UnknownInputEvent' })).toBeFalsy();
     });

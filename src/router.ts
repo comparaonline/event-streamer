@@ -11,7 +11,7 @@ export interface Event<T extends BaseEvent> {
 export class Router {
   private handlers = new Map<string, Handler>();
 
-  constructor(server: BaseServer) {
+  setupServer(server: BaseServer) {
     server.bind((obs: Observable<RawEvent>) => {
       const filtered = obs.filter(event => this.willHandle(event));
       return this.processEvents(filtered);
