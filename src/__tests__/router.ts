@@ -15,7 +15,8 @@ describe('Router', () => {
   describe('acceptance tests', () => {
     beforeEach(() => jest.useFakeTimers());
     afterEach(() => jest.useRealTimers());
-    it('correctly routes an event', async () => {
+
+    it('routes an event', async () => {
       class TestAction extends SequentialAction {
         emitFakeEvent = this.emitter(FakeOutputEvent);
         async perform() {
@@ -32,7 +33,7 @@ describe('Router', () => {
       expect(eventCodes).toEqual(['FakeOutputEvent']);
     });
 
-    it('correctly routes an async event', async () => {
+    it('routes an async event', async () => {
       class TestAction extends SequentialAction {
         emitFakeEvent = this.emitter(FakeOutputEvent);
         async perform() {
@@ -55,7 +56,7 @@ describe('Router', () => {
       expect(eventCodes).toEqual(['FakeOutputEvent']);
     });
 
-    it('actions are executed sequentially', async () => {
+    it('executes actions sequentially', async () => {
       class FakeInputEvent2 extends TestEvent { }
       class FakeOutputEvent2 extends TestEvent { }
       class TestAction1 extends SequentialAction {
