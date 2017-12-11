@@ -21,7 +21,7 @@
     "mapCoverage": true
   },
   "name": "event-streamer",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Simple event-streaming framework",
   "keywords": [
     "comparaonline",
