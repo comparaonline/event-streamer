@@ -7,5 +7,5 @@ export interface RawEvent {
 export type BindingCallback = (obs: Observable<RawEvent>) => Observable<BaseEvent>;
 
 export abstract class BaseServer {
-  abstract bind<T>(callback: BindingCallback);
+  abstract bind(callback: BindingCallback);
 }
