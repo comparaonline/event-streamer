@@ -6,7 +6,7 @@
     "prepublish": "yarn compile",
     "clean": "rm -rf build/*",
     "test": "jest",
-    "coverage": "jest --mapCoverage --coverage --coverageReporters html"
+    "coverage": "jest --coverage"
   },
   "jest": {
     "moduleFileExtensions": [
@@ -17,7 +17,8 @@
     "transform": {
       "\\.(ts|tsx)$": "<rootDir>/node_modules/ts-jest/preprocessor.js"
     },
-    "testRegex": "src(/.*)?/__tests__/[^/]*\\.(ts|tsx|js)$"
+    "testRegex": "src(/.*)?/__tests__/[^/]*\\.(ts|tsx|js)$",
+    "mapCoverage": true
   },
   "name": "event-streamer",
   "version": "0.0.2",
@@ -52,6 +53,7 @@
     "typescript": "^2.6.2"
   },
   "dependencies": {
+    "node-rdkafka": "^2.2.1",
     "reflect-metadata": "^0.1.10",
     "rxjs": "^5.5.3"
   }
