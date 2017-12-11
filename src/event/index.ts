@@ -1,6 +1,6 @@
 export abstract class BaseEvent {
   static get code() {
-    return this.constructor.name;
+    return this.name;
   }
 
   code = (<typeof BaseEvent>this.constructor).code;
