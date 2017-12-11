@@ -1,13 +1,13 @@
 import 'reflect-metadata';
 import { BaseEvent } from '../../event';
-import { SequentialAction } from '../sequential-action';
+import { Action } from '../index';
 
 describe('emitter', () => {
   class NewBalance extends BaseEvent {
     build(receivedEvent: Object) { }
     property = 'test';
   }
-  class Test extends SequentialAction {
+  class Test extends Action {
     async perform() { }
     emitNewBalance = this.emitter(NewBalance);
   }
