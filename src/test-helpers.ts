@@ -1,7 +1,7 @@
 import { Subject, Observable } from 'rxjs';
 import { ReplaySubject } from 'rxjs/ReplaySubject';
 import { BaseEvent } from './event/index';
-import { BaseServer, RawEvent, BindingCallback } from './base-server';
+import { BaseServer, RawEvent, BindingCallback } from './servers/base-server';
 import { Router } from './router';
 
 export class TestServer extends BaseServer {

@@ -1,4 +1,4 @@
-import { BaseServer, RawEvent } from './base-server';
+import { BaseServer, RawEvent } from './servers/base-server';
 import { BaseEvent } from './event';
 import { Handler, ActionCtor } from './handler';
 import { Scheduler, Observable } from 'rxjs';

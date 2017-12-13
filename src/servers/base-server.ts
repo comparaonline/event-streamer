@@ -1,6 +1,6 @@
 import { Observable } from 'rxjs';
-import { BaseEvent } from './event';
-import { Router } from './router';
+import { BaseEvent } from '../event';
+import { Router } from '../router';
 
 export interface RawEvent {
   code: string;

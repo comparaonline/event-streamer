@@ -1,5 +1,5 @@
 import { Router, SequentialRouter } from '../router';
-import { BaseServer, BindingCallback } from '../base-server';
+import { BaseServer, BindingCallback } from '../servers/base-server';
 import { Action } from '../action';
 import { BaseEvent } from '../event';
 import { marbles } from 'rxjs-marbles';
