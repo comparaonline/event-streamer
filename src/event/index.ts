@@ -13,6 +13,8 @@ export abstract class BaseEvent {
   abstract build(receivedEvent: Object) : void;
 
   toString() {
-    return `Event ${this.code}`;
+    return JSON.stringify({
+      code: this.code
+    });
   }
 }

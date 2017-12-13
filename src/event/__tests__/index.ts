@@ -19,6 +19,8 @@ describe('BaseEvent', () => {
       build() { }
     }
     const event = new TestEvent({});
-    expect(event.toString()).toEqual('Event TestEvent');
+    expect(JSON.parse(event.toString())).toEqual({
+      code: 'TestEvent'
+    });
   });
 });
