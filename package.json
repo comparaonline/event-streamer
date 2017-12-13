@@ -18,7 +18,12 @@
       "\\.(ts|tsx)$": "<rootDir>/node_modules/ts-jest/preprocessor.js"
     },
     "testRegex": "src(/.*)?/__tests__/[^/]*\\.(ts|tsx|js)$",
-    "mapCoverage": true
+    "mapCoverage": true,
+    "collectCoverageFrom": [
+      "src/**/*.{ts?(x),js?(x)}",
+      "!src/**/*.d.ts",
+      "!src/**/__tests__/**/*.*"
+    ]
   },
   "name": "event-streamer",
   "version": "0.0.4",
