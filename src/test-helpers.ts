@@ -8,7 +8,12 @@ export class TestServer extends BaseServer {
   private output: Observable<BaseEvent>;
   private input: ReplaySubject<RawEvent>;
 
-  bind(callback: BindingCallback) {
+  constructor(router: Router) {
+    super(router);
+    this.start();
+  }
+
+  link(callback: BindingCallback) {
     this.input = new ReplaySubject<RawEvent>();
     this.output = callback(this.input);
   }

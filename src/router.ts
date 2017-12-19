@@ -12,7 +12,7 @@ export class Router {
   private handlers = new Map<string, Handler>();
 
   setupServer(server: BaseServer) {
-    server.bind((obs: Observable<RawEvent>) => {
+    server.link((obs: Observable<RawEvent>) => {
       const filtered = obs.filter(event => this.willHandle(event));
       return this.processEvents(filtered);
     });

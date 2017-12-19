@@ -8,8 +8,9 @@ export interface RawEvent {
 export type BindingCallback = (obs: Observable<RawEvent>) => Observable<BaseEvent>;
 
 export abstract class BaseServer {
-  constructor(router: Router) {
-    router.setupServer(this);
+  constructor(private router: Router) { }
+  start() {
+    this.router.setupServer(this);
   }
-  abstract bind(callback: BindingCallback);
+  abstract link(callback: BindingCallback);
 }

@@ -7,7 +7,9 @@ describe('index', () => {
       'SequentialRouter',
       'BaseServer',
       'BaseEvent',
-      'Action'
+      'Action',
+      'KafkaEvent',
+      'KafkaServer'
     ];
     components.forEach (component => expect(index[component]).toBeDefined());
   });
