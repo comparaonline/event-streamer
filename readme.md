@@ -86,8 +86,7 @@ The action is considered finished when the `perform` promise resolves.
 A test server is provided to write functional tests:
 
 ```js
-import { TestServer, TestEvent } from 'event-streamer/test-helpers';
-import { Router } from 'event-streamer';
+import { Router, TestServer, TestEvent } from 'event-streamer';
 
 describe('AnActionClass', () => {
   it('responds with AnOutputEvent to AnInputEvent', async () => {
