@@ -41,16 +41,53 @@ in parallel and return the output events as soon as they are emitted. There's al
 a `SequentialRouter` that will process events in the order they are received
 (i.e. it will not process the next event until the previous one finishes).
 
-We'll add some implementations in the following versions.
+## KafkaServer
+
+You can use the KafkaServer implementation to consume/produce from Kafka
+```typescript
+import * as config from 'config';
+import { KafkaServer } from 'event-streamer';
+import { router } from './router';
+
+const server = new KafkaServer(router, config.get('kafka'));
+server.start();
+```
+
+The configuration options are:
+```typescript
+export interface KafkaConfiguration {
+  producer?: {
+    'client.id'?: string,
+    'metadata.broker.list'?: string,
+    'compression.codec'?: string,
+    'retry.backoff.ms'?: number,
+    'message.send.max.retries'?: number,
+    'socket.keepalive.enable'?: boolean,
+    'queue.buffering.max.messages'?: number,
+    'queue.buffering.max.ms'?: number,
+    'batch.num.messages'?: number
+  };
+  consumer?: {
+    'group.id'?: string,
+    'metadata.broker.list'?: string
+  };
+  consumerTopics: string[];
+  consumerTopicConfiguration?: {};
+  producerTopic?: string;
+  rest?: {
+    url?: string
+  };
+}
+```
 
 Then you need to add routes to the router
 
-```js
+```typescript
 router.add(AnInputEventClass, AnActionClass);
 ```
 
 Events should implement the BaseEvent class:
-```js
+```typescript
 import { BaseEvent } from 'event-streamer';
 
 export class AnInputEventClass extends BaseEvent {
@@ -62,7 +99,7 @@ export class AnInputEventClass extends BaseEvent {
 ```
 
 Actions should implement the Action class.
-```js
+```typescript
 import { Action } from 'event-streamer';
 import { AnOutputEventClass } from './my-output-event';
 
@@ -85,7 +122,7 @@ The action is considered finished when the `perform` promise resolves.
 
 A test server is provided to write functional tests:
 
-```js
+```typescript
 import { Router, TestServer, TestEvent } from 'event-streamer';
 
 describe('AnActionClass', () => {
