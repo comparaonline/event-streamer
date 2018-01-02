@@ -77,6 +77,20 @@ export class KafkaServer extends BaseServer {
       ));
   }
 
+  stop(callback?: ((err: any, data: any) => any) | undefined) {
+    console.log('Disconnecting consumer');
+    this.consumer.disconnect((err) => {
+      if (err) {
+        if (callback) {
+          callback(err, null);
+        }
+        return;
+      }
+      console.log('Disconnecting producer');
+      this.producer.disconnect(callback);
+    });
+  }
+
   private produce(event: KafkaEvent) {
     this.producer.produce(
       // Topic
