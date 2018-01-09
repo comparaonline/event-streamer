@@ -47,11 +47,11 @@ export interface RawKafkaEvent extends RawEvent {
 export class KafkaServer extends BaseServer {
   private producer: Producer;
   private consumer: KafkaConsumer;
+  private events = new Subject<RawEvent>();
   constructor(router: Router, private config: KafkaConfiguration) {
     super(router);
   }
   link(callback: (event: Observable<RawEvent>) => Observable<KafkaEvent>) {
-    const events = new Subject<RawEvent>();
     this.initProducer()
       .then(() => this.initConsumer())
       .then(() => console.log(`Consuming ${this.config.consumerTopics.join(', ')}`))
@@ -63,18 +63,22 @@ export class KafkaServer extends BaseServer {
             event.key = data.key;
             event.timestamp = data.timestamp;
           }
-          events.next(event);
+          this.events.next(event);
         } catch (error) {
           console.error(error.stack);
         }
       }))
       .then(() => new Promise((resolve: Function, reject: Function) =>
-        callback(events).subscribe(
+        callback(this.events).subscribe(
           (event: KafkaEvent) => this.produce(event),
           (error: Error) => this.error(error),
           () => this.error(new Error('Stream finished!'))
         )
       ));
+  }
+
+  trigger(event) {
+    this.events.next(event);
   }
 
   stop(callback?: ((err: any, data: any) => any) | undefined) {
