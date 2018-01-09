@@ -118,6 +118,14 @@ export class AnActionClass extends Action {
 
 The action is considered finished when the `perform` promise resolves.
 
+## Triggering events locally
+
+You can start an action locally by calling the `trigger` method on the KafkaServer
+
+```typescript
+server.trigger(new CustomEvent(someParams));
+```
+
 ## Testing
 
 A test server is provided to write functional tests:
