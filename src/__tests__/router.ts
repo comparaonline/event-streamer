@@ -107,6 +107,19 @@ describe('Router', () => {
       async perform() { }
     }
 
+    it('registers events by code', () => {
+      const EVENT_CODE = 'EventCode';
+      class FakeInputEvent extends TestEvent {
+        static get code() { return EVENT_CODE; }
+      }
+
+      const router = new Router();
+      const server = new TestServer(router);
+      router.add(FakeInputEvent, FakeAction);
+
+      expect(router.willHandle({ code: EVENT_CODE })).toBeTruthy();
+    });
+
     it('handles registered events', () => {
       const router = new Router();
       const server = new TestServer(router);

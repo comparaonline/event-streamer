@@ -19,9 +19,9 @@ export class Router {
   }
 
   add<T extends BaseEvent>(event: Event<T>, action: ActionCtor): void {
-    const handler = this.handlers.get(event.name) || new Handler(event);
+    const handler = this.handlers.get(event.code) || new Handler(event);
     handler.add(action);
-    this.handlers.set(event.name, handler);
+    this.handlers.set(event.code, handler);
   }
 
   willHandle({ code }: { code: string }): boolean {
