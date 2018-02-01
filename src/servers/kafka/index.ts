@@ -77,7 +77,7 @@ export class KafkaServer extends BaseServer {
       ));
   }
 
-  trigger(event) {
+  trigger(event: RawEvent): void {
     this.events.next(event);
   }
 

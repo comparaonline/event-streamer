@@ -13,4 +13,5 @@ export abstract class BaseServer {
     this.router.setupServer(this);
   }
   abstract link(callback: BindingCallback);
+  abstract trigger(event: RawEvent): void;
 }

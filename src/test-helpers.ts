@@ -26,6 +26,10 @@ export class TestServer extends BaseServer {
     this.input.complete();
     return this.output.toArray().toPromise();
   }
+
+  trigger(event: RawEvent): void {
+    this.inputEvent(event);
+  }
 }
 
 export class TestEvent extends BaseEvent {
