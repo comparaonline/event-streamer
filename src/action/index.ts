@@ -11,3 +11,9 @@ export abstract class Action extends BaseAction {
       .flatMap(() => this.result);
   }
 }
+export abstract class ActionAsync extends BaseAction {
+  handleEvent(event: BaseEvent): Observable<BaseEvent> {
+    this.perform(event).then(() => this.result.complete());
+    return this.result;
+  }
+}
