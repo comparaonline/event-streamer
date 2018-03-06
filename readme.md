@@ -19,11 +19,11 @@ work, you won't be able to take advantage of the type checks.
 ## Installation
 npm:
 ```
-$ npm install event-streamer
+$ npm install @comparaonline/event-streamer
 ```
 yarn:
 ```
-$ yarn add event-streamer
+$ yarn add @comparaonline/event-streamer
 ```
 
 ## Usage
