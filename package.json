@@ -25,8 +25,8 @@
       "!src/**/__tests__/**/*.*"
     ]
   },
-  "name": "event-streamer",
-  "version": "0.2.4",
+  "name": "@comparaonline/event-streamer",
+  "version": "0.2.5",
   "description": "Simple event-streaming framework",
   "keywords": [
     "comparaonline",
@@ -40,6 +40,9 @@
     "name": "Ezequiel Rabinovich",
     "email": "erabinovich@gmail.com",
     "url": "https://github.com/warseph"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "build"
