@@ -8,6 +8,7 @@ describe('index', () => {
       'BaseServer',
       'BaseEvent',
       'Action',
+      'ActionAsync',
       'KafkaEvent',
       'KafkaServer'
     ];
