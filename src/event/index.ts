@@ -24,10 +24,7 @@ export interface RawEvent {
 }
 
 export abstract class InputEvent {
-  code: string;
-
   constructor(rawEvent: RawEvent) {
-    this.code = rawEvent.code;
     this.build(rawEvent);
   }
 
