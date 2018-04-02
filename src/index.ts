@@ -1,10 +1,10 @@
 // Main Classes
-export { Router, SequentialRouter } from './router';
-export { BaseEvent } from './event';
-export { Action, ActionAsync } from './action';
-export { BaseServer } from './servers/base-server';
-export { KafkaEvent } from './servers/kafka/kafka-event';
-export { KafkaServer } from './servers/kafka';
+export { Router } from './router';
+export { InputEvent, OutputEvent } from './events';
+export { Action } from './action';
+export { Server } from './server';
+export { KafkaEvent } from './kafka/kafka-event';
+export { KafkaServer } from './kafka';
 
 // Test helpers
-export { TestEvent, TestServer } from './test-helpers';
+export { TestServer } from './test-helpers';

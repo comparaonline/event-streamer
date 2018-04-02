@@ -1,45 +1,47 @@
-import { BaseServer, RawEvent } from './servers/base-server';
-import { BaseEvent } from './event';
-import { Handler, ActionCtor } from './handler';
-import { Scheduler, Observable } from 'rxjs';
-
-export interface Event<T extends BaseEvent> {
-  code: string;
-  new(receivedEvent: {}): T;
-}
+import { Server } from './server';
+import { InputEvent, InputEventCtor, RawEvent } from './events';
+import { Action, ActionCtor } from './action';
 
 export class Router {
-  private handlers = new Map<string, Handler>();
+  private server: Server;
+  private routes = new Map<string, Route>();
 
-  setupServer(server: BaseServer) {
-    server.link((obs: Observable<RawEvent>) => {
-      const filtered = obs.filter(event => this.willHandle(event));
-      return this.processEvents(filtered);
-    });
+  setEmitter(server: Server) {
+    this.server = server;
   }
 
-  add<T extends BaseEvent>(event: Event<T>, action: ActionCtor): void {
-    const handler = this.handlers.get(event.code) || new Handler(event);
-    handler.add(action);
-    this.handlers.set(event.code, handler);
+  add(event: InputEventCtor, action: ActionCtor): void {
+    const route = this.routes.get(event.code) || new Route(event);
+    route.add(action);
+    this.routes.set(event.code, route);
   }
 
-  willHandle({ code }: { code: string }): boolean {
-    return this.handlers.has(code);
-  }
-
-  protected processEvents(filtered: Observable<RawEvent>): Observable<BaseEvent> {
-    return filtered.flatMap(event => this.handleEvent(event));
-  }
-
-  protected handleEvent(rawEvent: RawEvent) {
-    const handler = <Handler>this.handlers.get(rawEvent.code);
-    return handler.handle(rawEvent);
+  route(rawEvent: RawEvent): Promise<any> {
+    const route = this.routes.get(rawEvent.code);
+    if (!route) {
+      return Promise.resolve();
+    }
+    return route.handle(rawEvent, this.server);
   }
 }
 
-export class SequentialRouter extends Router {
-  protected processEvents(filtered: Observable<RawEvent>): Observable<BaseEvent> {
-    return filtered.concatMap(event => this.handleEvent(event));
+export class Route {
+  private actions: ActionCtor[] = [];
+
+  constructor(private event: InputEventCtor) { }
+
+  add(action: ActionCtor) {
+    this.actions.push(action);
+  }
+
+  handle(rawEvent: RawEvent, server: Server): Promise<any> {
+    const event = new this.event(rawEvent);
+    return Promise.all(this.performances(event, server));
+  }
+
+  private performances(event: InputEvent, server: Server): Promise<any>[] {
+    return this.actions
+      .map(actionCtor => new actionCtor(server))
+      .map(action => action.perform(event));
   }
 }

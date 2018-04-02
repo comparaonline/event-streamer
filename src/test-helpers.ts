@@ -1,41 +1,31 @@
-import { Subject, Observable } from 'rxjs';
-import { ReplaySubject } from 'rxjs/ReplaySubject';
-import { BaseEvent } from './event/index';
-import { BaseServer, RawEvent, BindingCallback } from './servers/base-server';
+import { Server } from './server';
 import { Router } from './router';
+import { RawEvent, OutputEvent } from './events';
 
-export class TestServer extends BaseServer {
-  private output: Observable<BaseEvent>;
-  private input: ReplaySubject<RawEvent>;
+export class TestServer extends Server {
+  private outputEvents: OutputEvent[] = [];
 
-  constructor(router: Router) {
-    super(router);
-    this.start();
+  input(rawEvent: RawEvent) {
+    return this.router.route(rawEvent);
   }
 
-  link(callback: BindingCallback) {
-    this.input = new ReplaySubject<RawEvent>();
-    this.output = callback(this.input);
+  output(event: OutputEvent): void {
+    this.outputEvents.push(event);
   }
 
-  inputEvent(event: RawEvent) {
-    this.input.next(event);
+  emitted(): OutputEvent[] {
+    return this.outputEvents;
   }
 
-  async publishedEvents(): Promise<BaseEvent[]> {
-    this.input.complete();
-    return this.output.toArray().toPromise();
-  }
-
-  trigger(event: RawEvent): void {
-    this.inputEvent(event);
+  reset() {
+    this.outputEvents.length = 0;
   }
 }
 
-export class TestEvent extends BaseEvent {
-  className = this.constructor.name;
-  constructor(params = {}) {
-    super(params);
-  }
-  build() { }
-}
+// export class TestEvent extends BaseEvent {
+//   className = this.constructor.name;
+//   constructor(params = {}) {
+//     super(params);
+//   }
+//   build() { }
+// }
