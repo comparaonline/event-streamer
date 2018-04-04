@@ -26,12 +26,12 @@ export class Router {
 }
 
 export class Route {
-  private actions: ActionCtor[] = [];
+  private actionCtors: ActionCtor[] = [];
 
   constructor(private event: InputEventCtor) { }
 
   add(action: ActionCtor) {
-    this.actions.push(action);
+    this.actionCtors.push(action);
   }
 
   handle(rawEvent: RawEvent, server: Server): Promise<any> {
@@ -40,7 +40,7 @@ export class Route {
   }
 
   private performances(event: InputEvent, server: Server): Promise<any>[] {
-    return this.actions
+    return this.actionCtors
       .map(actionCtor => new actionCtor(server))
       .map(action => action.perform(event));
   }

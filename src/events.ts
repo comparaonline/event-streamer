@@ -21,9 +21,12 @@ export abstract class OutputEvent {
   code = (<typeof OutputEvent> this.constructor).name;
 
   toString() {
-    const json = { ...this.encode(), code: this.code };
-    return JSON.stringify(json);
+    return JSON.stringify(this.toJSON());
   }
 
-  protected abstract encode(): Object;
+  toJSON() {
+    return { ...this.encode(), code: this.code };
+  }
+
+  abstract encode(): Object;
 }
