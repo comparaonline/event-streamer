@@ -1,6 +1,6 @@
 import { Server } from './server';
 import { Router } from './router';
-import { RawEvent, OutputEvent } from './events';
+import { RawEvent, OutputEvent, InputEvent } from './events';
 
 export class TestServer extends Server {
   private outputEvents: OutputEvent[] = [];
@@ -22,10 +22,10 @@ export class TestServer extends Server {
   }
 }
 
-// export class TestEvent extends BaseEvent {
-//   className = this.constructor.name;
-//   constructor(params = {}) {
-//     super(params);
-//   }
-//   build() { }
-// }
+export class TestInputEvent extends InputEvent {
+  build() { }
+}
+
+export class TestOutputEvent extends OutputEvent {
+  encode() { return {}; }
+}

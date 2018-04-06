@@ -75,7 +75,7 @@ export class EventConsumer extends EventEmitter {
     return stream;
   }
 
-  private getPartition(partitionIdx): Partition {
+  private getPartition(partitionIdx: number): Partition {
     let partition = this.partitions.get(partitionIdx);
     if (!partition) {
       partition = this.initPartition(partitionIdx);
@@ -84,7 +84,7 @@ export class EventConsumer extends EventEmitter {
     return partition;
   }
 
-  private initPartition(partitionIdx): Partition {
+  private initPartition(partitionIdx: number): Partition {
     const observer = new Subject<ConsumerStreamMessage>();
     const subscription = observer
       .concatMap(message => this.consume(message))

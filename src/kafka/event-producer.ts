@@ -1,7 +1,6 @@
 import { createWriteStream, ProducerStream } from 'node-rdkafka';
 import { EventEmitter } from 'events';
-import { OutputEvent } from '../events';
-import { KafkaEvent } from '..';
+import { KafkaOutputEvent } from './kafka-events';
 
 const FLUSH_TIMEOUT = 2000;
 const CONNECT_TIMEOUT = 1000;
@@ -34,7 +33,7 @@ export class EventProducer extends EventEmitter {
     });
   }
 
-  produce<T extends OutputEvent & KafkaEvent>(event: T) {
+  produce(event: KafkaOutputEvent) {
     try {
       return this.producerStream.write({
         topic: event.topic || this.config.defaultTopic,
