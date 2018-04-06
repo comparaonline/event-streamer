@@ -1,33 +1,8 @@
 {
-  "scripts": {
-    "tslint": "tslint -c tslint.json -p tsconfig.json",
-    "pretest": "yarn tslint",
-    "compile": "tsc --outDir ./build",
-    "prepublish": "yarn compile",
-    "clean": "rm -rf build/*",
-    "test": "jest",
-    "coverage": "jest --coverage"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "ts",
-      "tsx",
-      "js"
-    ],
-    "transform": {
-      "\\.(ts|tsx)$": "<rootDir>/node_modules/ts-jest/preprocessor.js"
-    },
-    "testRegex": "src(/.*)?/__tests__/[^/]*\\.(ts|tsx|js)$",
-    "mapCoverage": true,
-    "collectCoverageFrom": [
-      "src/**/*.{ts?(x),js?(x)}",
-      "!src/**/*.d.ts",
-      "!src/**/__tests__/**/*.*"
-    ]
-  },
   "name": "@comparaonline/event-streamer",
   "version": "0.2.7",
   "description": "Simple event-streaming framework",
+  "repository": "comparaonline/event-streamer",
   "keywords": [
     "comparaonline",
     "microservice",
@@ -41,25 +16,45 @@
     "email": "erabinovich@gmail.com",
     "url": "https://github.com/warseph"
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "files": [
     "build"
   ],
-  "repository": "comparaonline/event-streamer",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "tslint": "tslint -c tslint.json -p tsconfig.json",
+    "pretest": "yarn tslint",
+    "compile": "tsc --outDir ./build",
+    "prepublish": "yarn compile",
+    "clean": "rm -rf build/*",
+    "test": "jest",
+    "coverage": "jest --coverage"
+  },
+  "jest": {
+    "transform": {
+      "^.+\\.tsx?$": "ts-jest"
+    },
+    "testRegex": "src(/.*)?/__tests__/[^/]*\\.(jsx?|tsx?)$",
+    "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"],
+    "collectCoverageFrom": [
+      "src/**/*.{ts?(x),js?(x)}",
+      "!src/**/*.d.ts",
+      "!src/**/__tests__/**/*.*"
+    ]
+  },
   "devDependencies": {
-    "@types/config": "^0.0.33",
-    "@types/jest": "^21.1.8",
-    "@types/node": "^8.0.58",
-    "jest": "^21.2.1",
-    "nodemon": "^1.12.1",
-    "rxjs-marbles": "^2.2.0",
-    "ts-jest": "^21.2.3",
+    "@types/jest": "^22.2.2",
+    "@types/node": "^8.10.2",
+    "jest": "^22.4.3",
+    "jest-cli": "^22.4.3",
+    "nodemon": "^1.17.3",
+    "rxjs-marbles": "^2.3.3",
+    "ts-jest": "^22.4.2",
     "ts-node": "^5.0.1",
-    "tslint": "^5.8.0",
+    "tslint": "^5.9.1",
     "tslint-config-airbnb": "^5.4.2",
-    "typescript": "^2.6.2"
+    "typescript": "^2.8.1"
   },
   "dependencies": {
     "node-rdkafka": "^2.2.1",
