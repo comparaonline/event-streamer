@@ -6,17 +6,15 @@ describe('InputEvent', () => {
   }
 
   it('gets the event code from the class name', () => {
-    const event = new TestEvent({});
-    expect(event.code).toEqual('TestEvent');
+    expect(TestEvent.code).toEqual('TestEvent');
   });
 
-  it('gets the event code from the class attribute', () => {
+  it('gets the event code from the class static getter', () => {
     class TestEvent extends InputEvent {
-      code = 'Test';
+      static get code() { return 'Test'; }
       build() { }
     }
-    const event = new TestEvent({});
-    expect(event.code).toEqual('Test');
+    expect(TestEvent.code).toEqual('Test');
   });
 });
 

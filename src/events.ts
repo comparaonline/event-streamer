@@ -2,13 +2,14 @@ export interface RawEvent {
   code: string;
 }
 
-export interface InputEventCtor {
-  code: string;
-  new(rawEvent: RawEvent): InputEvent;
+export interface InputEventCtor extends RawEvent {
+  new(data: Object): InputEvent;
 }
 
 export abstract class InputEvent {
-  code = (<typeof InputEvent>this.constructor).name;
+  static get code() {
+    return this.name;
+  }
 
   constructor(data: Object) {
     this.build(data);
