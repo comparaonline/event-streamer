@@ -70,7 +70,7 @@ export class EventConsumer extends EventEmitter {
       }
     );
     stream.consumer.once('ready', () => {
-      console.debug('Consumer ready');
+      console.info(`Consumer ready. Topics: ${this.config.topics.join(', ')}`);
     });
     return stream;
   }
@@ -96,10 +96,19 @@ export class EventConsumer extends EventEmitter {
   }
 
   private consume(message: ConsumerStreamMessage): Promise<ConsumerStreamMessage> {
-    const event: RawEvent = JSON.parse(message.value.toString());
-    console.debug(`Consuming ${event}`);
+    const event = this.parseEvent(message);
+    console.debug(`Consuming ${JSON.stringify(event)}`);
     return this.router.route(event)
       .then(() => message);
+  }
+
+  private parseEvent(message: ConsumerStreamMessage): RawEvent {
+    try {
+      return JSON.parse(message.value.toString());
+    } catch (error) {
+      console.error(`Omitted message. Unable to parse: ${JSON.stringify(message)}. ${error}`);
+      return { code: '' };
+    }
   }
 
   private commit(message: ConsumerStreamMessage) {

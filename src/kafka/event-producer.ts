@@ -76,7 +76,7 @@ export class EventProducer extends EventEmitter {
       }
     );
     stream.producer.once('ready', () => {
-      console.debug('Producer ready');
+      console.info('Producer ready');
     });
     return stream;
   }
