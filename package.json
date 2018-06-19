@@ -1,6 +1,6 @@
 {
   "name": "@comparaonline/event-streamer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Simple event-streaming framework",
   "repository": "comparaonline/event-streamer",
   "author": {
@@ -19,7 +19,9 @@
   ],
   "main": "build/index.js",
   "types": "build/index.d.ts",
-  "files": [ "build" ],
+  "files": [
+    "build"
+  ],
   "private": false,
   "publishConfig": {
     "access": "public"
