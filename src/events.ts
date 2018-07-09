@@ -20,6 +20,8 @@ export abstract class InputEvent {
 
 export abstract class OutputEvent {
   code = (<typeof OutputEvent> this.constructor).name;
+  key?: string;
+  topic: string;
 
   toString() {
     return JSON.stringify(this.toJSON());

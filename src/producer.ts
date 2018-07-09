@@ -1,41 +1,47 @@
 import { createWriteStream, ProducerStream } from 'node-rdkafka';
 import { EventEmitter } from 'events';
-import { KafkaOutputEvent } from './kafka-events';
+
+import { OutputEvent } from './events';
 
 const FLUSH_TIMEOUT = 2000;
 const CONNECT_TIMEOUT = 1000;
 
-export interface EventProducerConfig {
+export interface ProducerConfig {
   groupId: string;
   broker: string;
   defaultTopic?: string;
 }
 
-export class EventProducer extends EventEmitter {
-  private config: EventProducerConfig;
-  private producerStream: ProducerStream;
+export class Producer extends EventEmitter {
+  private config: ProducerConfig;
+  private stream: ProducerStream;
 
-  constructor(config: EventProducerConfig) {
+  constructor(config: ProducerConfig) {
     super();
     this.config = config;
   }
 
-  start(): void {
-    this.producerStream = this.createStream();
-    this.producerStream.on('error', error => this.emit('error', error));
+  start(): Promise<string> {
+    this.stream = this.createStream();
+    this.stream.on('error', error => this.emit('error', error));
+    return new Promise((resolve) => {
+      this.stream.producer.once('ready', () => {
+        resolve('Producer ready');
+      });
+    });
   }
 
-  stop(): Promise<any> {
+  stop(): Promise<string> {
     return new Promise((resolve) => {
-      this.producerStream.close(() => {
+      this.stream.close(() => {
         resolve('Producer disconnected');
       });
     });
   }
 
-  produce(event: KafkaOutputEvent) {
+  produce<T extends OutputEvent>(event: T): boolean {
     try {
-      return this.producerStream.write({
+      return this.stream.write({
         topic: event.topic || this.config.defaultTopic,
         partition: null,
         value: new Buffer(event.toString()),
@@ -44,12 +50,13 @@ export class EventProducer extends EventEmitter {
       });
     } catch (error) {
       this.emit(error);
+      return false;
     }
   }
 
-  flush() {
+  flush(): Promise<any> {
     return new Promise((resolve, reject) => {
-      const producer = this.producerStream.producer;
+      const producer = this.stream.producer;
       if (!producer.isConnected()) {
         return reject('Producer not connected');
       }
@@ -64,7 +71,7 @@ export class EventProducer extends EventEmitter {
   }
 
   private createStream(): ProducerStream {
-    const stream = createWriteStream(
+    return createWriteStream(
       {
         'group.id': this.config.groupId,
         'metadata.broker.list': this.config.broker
@@ -75,9 +82,5 @@ export class EventProducer extends EventEmitter {
         connectOptions: { timeout: CONNECT_TIMEOUT }
       }
     );
-    stream.producer.once('ready', () => {
-      console.info('Producer ready');
-    });
-    return stream;
   }
 }

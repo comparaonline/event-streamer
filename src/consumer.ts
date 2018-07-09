@@ -2,9 +2,11 @@ import {
   createReadStream, ConsumerStream, ConsumerStreamMessage
 } from 'node-rdkafka';
 import { Subject, Subscription } from 'rxjs';
-import { Router } from '../router';
+import { concatMap } from 'rxjs/operators';
 import { EventEmitter } from 'events';
-import { RawEvent } from '../events';
+
+import { Router } from './router';
+import { RawEvent } from './events';
 
 const CONNECT_TIMEOUT = 1000;
 
@@ -13,36 +15,45 @@ interface Partition {
   subscription: Subscription;
 }
 
-export interface EventConsumerConfig {
+export interface ConsumerConfig {
   groupId: string;
   broker: string;
   topics: string[];
 }
 
-export class EventConsumer extends EventEmitter {
+export interface ConsumerEvents {
+  on(event: 'error', listener?: (error: Error) => void): this;
+}
+
+export class Consumer extends EventEmitter implements ConsumerEvents {
   private router: Router;
-  private config: EventConsumerConfig;
-  private consumerStream: ConsumerStream;
+  private config: ConsumerConfig;
+  private stream: ConsumerStream;
   private partitions = new Map<number, Partition>();
 
-  constructor(router: Router, config: EventConsumerConfig) {
+  constructor(router: Router, config: ConsumerConfig) {
     super();
     this.router = router;
     this.config = config;
   }
 
-  start(): void {
-    this.consumerStream = this.createStream();
-    this.consumerStream.on('error', error => this.emit('error', error));
-    this.consumerStream.on('data', (message: ConsumerStreamMessage) => {
+  start(): Promise<string> {
+    this.stream = this.createStream();
+    this.stream.on('error', error => this.emit('error', error));
+    this.stream.on('data', (message: ConsumerStreamMessage) => {
       this.dispatch(message);
+    });
+    return new Promise((resolve) => {
+      this.stream.consumer.once('ready', () => {
+        resolve(`Consumer ready. Topics: ${this.config.topics.join(', ')}`);
+      });
     });
   }
 
-  stop(): Promise<any> {
+  stop(): Promise<string> {
     this.partitions.forEach(p => p.subscription.unsubscribe());
     return new Promise((resolve) => {
-      this.consumerStream.close(() => {
+      this.stream.close(() => {
         resolve('Consumer disconnected');
       });
     });
@@ -54,7 +65,7 @@ export class EventConsumer extends EventEmitter {
   }
 
   private createStream(): ConsumerStream {
-    const stream = createReadStream(
+    return createReadStream(
       {
         'group.id': this.config.groupId,
         'metadata.broker.list': this.config.broker,
@@ -69,29 +80,26 @@ export class EventConsumer extends EventEmitter {
         connectOptions: { timeout: CONNECT_TIMEOUT }
       }
     );
-    stream.consumer.once('ready', () => {
-      console.info(`Consumer ready. Topics: ${this.config.topics.join(', ')}`);
-    });
-    return stream;
   }
 
   private getPartition(partitionIdx: number): Partition {
     let partition = this.partitions.get(partitionIdx);
     if (!partition) {
-      partition = this.initPartition(partitionIdx);
+      partition = this.initPartition();
       this.partitions.set(partitionIdx, partition);
     }
     return partition;
   }
 
-  private initPartition(partitionIdx: number): Partition {
+  private initPartition(): Partition {
     const observer = new Subject<ConsumerStreamMessage>();
-    const subscription = observer
-      .concatMap(message => this.consume(message))
-      .subscribe(
-        message => this.commit(message),
-        error => this.emit('error', error)
-      );
+    const subscription = observer.pipe(
+        concatMap(message => this.consume(message))
+      )
+      .subscribe({
+        next: message => this.commit(message),
+        error: error => this.emit('error', error)
+      });
     return { observer, subscription };
   }
 
@@ -113,7 +121,7 @@ export class EventConsumer extends EventEmitter {
 
   private commit(message: ConsumerStreamMessage) {
     console.debug(`Committing ${message.value}`);
-    const consumer = this.consumerStream.consumer;
+    const consumer = this.stream.consumer;
     if (consumer.isConnected()) {
       consumer.commitMessage(message);
     }

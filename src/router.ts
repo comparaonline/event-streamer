@@ -1,47 +1,44 @@
-import { Server } from './server';
-import { InputEvent, InputEventCtor, RawEvent } from './events';
-import { Action, ActionCtor } from './action';
+import { InputEventCtor, InputEvent, RawEvent } from './events';
+import { ActionCtor } from './action';
 
 export class Router {
-  private server: Server;
   private routes = new Map<string, Route>();
 
-  setEmitter(server: Server) {
-    this.server = server;
+  add(eventClass: InputEventCtor, actionClass: ActionCtor): void {
+    const route = this.routes.get(eventClass.code) || new Route(eventClass);
+    route.add(actionClass);
+    this.routes.set(eventClass.code, route);
   }
 
-  add(event: InputEventCtor, action: ActionCtor): void {
-    const route = this.routes.get(event.code) || new Route(event);
-    route.add(action);
-    this.routes.set(event.code, route);
-  }
-
-  route(rawEvent: RawEvent): Promise<any> {
+  route<T extends RawEvent>(rawEvent: T): Promise<any> {
     const route = this.routes.get(rawEvent.code);
     if (!route) {
       return Promise.resolve();
     }
-    return route.handle(rawEvent, this.server);
+    return route.handle(rawEvent);
   }
 }
 
 export class Route {
+  private eventClass: InputEventCtor;
   private actionCtors: ActionCtor[] = [];
 
-  constructor(private event: InputEventCtor) { }
-
-  add(action: ActionCtor) {
-    this.actionCtors.push(action);
+  constructor(eventClass: InputEventCtor) {
+    this.eventClass = eventClass;
   }
 
-  handle(rawEvent: RawEvent, server: Server): Promise<any> {
-    const event = new this.event(rawEvent);
-    return Promise.all(this.performances(event, server));
+  add(actionClass: ActionCtor) {
+    this.actionCtors.push(actionClass);
   }
 
-  private performances(event: InputEvent, server: Server): Promise<any>[] {
+  handle<T extends RawEvent>(rawEvent: T): Promise<any> {
+    const event = new this.eventClass(rawEvent);
+    return Promise.all(this.performances(event));
+  }
+
+  private performances(event: InputEvent): Promise<any>[] {
     return this.actionCtors
-      .map(actionCtor => new actionCtor(server))
+      .map(actionCtor => new actionCtor())
       .map(action => action.perform(event));
   }
 }

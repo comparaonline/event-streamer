@@ -22,25 +22,30 @@ describe('OutputEvent', () => {
   class TestEvent extends OutputEvent {
     encode() { return {}; }
   }
+  const event = new TestEvent();
 
   it('gets the event code from the class name', () => {
-    const event = new TestEvent();
     expect(event.code).toEqual('TestEvent');
   });
 
-  it('returns the JSON representation on toString()', () => {
-    const event = new TestEvent();
-    expect(JSON.parse(event.toString())).toEqual({
-      code: 'TestEvent'
+  describe('#toJSON', () => {
+    it('calls #encode for base JSON representation', () => {
+      const spy = spyOn(event, 'encode');
+      event.toJSON();
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    it('includes code in JSON representation', () => {
+      const json = event.toJSON();
+      expect(json).toHaveProperty('code', 'TestEvent');
     });
   });
 
-  it('gets the event code from the class attribute', () => {
-    class TestEvent extends OutputEvent {
-      code = 'Test';
-      encode() { return {}; }
-    }
-    const event = new TestEvent();
-    expect(event.code).toEqual('Test');
+  describe('#toString', () => {
+    it('calls #toJSON', () => {
+      const spy = spyOn(event, 'toJSON');
+      event.toString();
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
   });
 });
