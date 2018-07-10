@@ -3,7 +3,6 @@ import {
 } from 'node-rdkafka';
 import { Subject, Subscription } from 'rxjs';
 import { concatMap } from 'rxjs/operators';
-import { EventEmitter } from 'events';
 
 import { Router } from './router';
 import { RawEvent } from './events';
@@ -19,31 +18,27 @@ export interface ConsumerConfig {
   groupId: string;
   broker: string;
   topics: string[];
+  onError: (error: Error) => any;
 }
 
-export interface ConsumerEvents {
-  on(event: 'error', listener?: (error: Error) => void): this;
-}
-
-export class Consumer extends EventEmitter implements ConsumerEvents {
+export class Consumer {
   private router: Router;
   private config: ConsumerConfig;
   private stream: ConsumerStream;
   private partitions = new Map<number, Partition>();
 
   constructor(router: Router, config: ConsumerConfig) {
-    super();
     this.router = router;
     this.config = config;
   }
 
   start(): Promise<string> {
-    this.stream = this.createStream();
-    this.stream.on('error', error => this.emit('error', error));
-    this.stream.on('data', (message: ConsumerStreamMessage) => {
-      this.dispatch(message);
-    });
     return new Promise((resolve) => {
+      this.stream = this.createStream();
+      this.stream.on('error', error => this.config.onError(error));
+      this.stream.on('data', (message: ConsumerStreamMessage) => {
+        this.dispatch(message);
+      });
       this.stream.consumer.once('ready', () => {
         resolve(`Consumer ready. Topics: ${this.config.topics.join(', ')}`);
       });
@@ -51,11 +46,12 @@ export class Consumer extends EventEmitter implements ConsumerEvents {
   }
 
   stop(): Promise<string> {
-    this.partitions.forEach(p => p.subscription.unsubscribe());
     return new Promise((resolve) => {
-      this.stream.close(() => {
-        resolve('Consumer disconnected');
-      });
+      this.partitions.forEach(p => p.subscription.unsubscribe());
+      if (!this.isConnected()) {
+        return resolve('Consumer disconnected');
+      }
+      this.stream.close(() => resolve('Consumer disconnected'));
     });
   }
 
@@ -98,7 +94,7 @@ export class Consumer extends EventEmitter implements ConsumerEvents {
       )
       .subscribe({
         next: message => this.commit(message),
-        error: error => this.emit('error', error)
+        error: error => this.config.onError(error)
       });
     return { observer, subscription };
   }
@@ -114,7 +110,8 @@ export class Consumer extends EventEmitter implements ConsumerEvents {
     try {
       return JSON.parse(message.value.toString());
     } catch (error) {
-      console.error(`Omitted message. Unable to parse: ${JSON.stringify(message)}. ${error}`);
+      const msg = `Unable to parse: ${message.value.toString()}. ${error}`;
+      this.config.onError(new Error(msg));
       return { code: '' };
     }
   }
@@ -122,8 +119,14 @@ export class Consumer extends EventEmitter implements ConsumerEvents {
   private commit(message: ConsumerStreamMessage) {
     console.debug(`Committing ${message.value}`);
     const consumer = this.stream.consumer;
-    if (consumer.isConnected()) {
+    if (this.isConnected()) {
       consumer.commitMessage(message);
     }
+  }
+
+  private isConnected(): boolean {
+    return this.stream &&
+      this.stream.consumer &&
+      this.stream.consumer.connectedTime() > 0;
   }
 }
