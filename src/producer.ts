@@ -1,5 +1,4 @@
 import { createWriteStream, ProducerStream } from 'node-rdkafka';
-import { EventEmitter } from 'events';
 
 import { OutputEvent } from './events';
 
@@ -9,22 +8,22 @@ const CONNECT_TIMEOUT = 1000;
 export interface ProducerConfig {
   groupId: string;
   broker: string;
-  defaultTopic?: string;
+  defaultTopic: string;
+  onError: (error: Error) => any;
 }
 
-export class Producer extends EventEmitter {
+export class Producer {
   private config: ProducerConfig;
   private stream: ProducerStream;
 
   constructor(config: ProducerConfig) {
-    super();
     this.config = config;
   }
 
   start(): Promise<string> {
-    this.stream = this.createStream();
-    this.stream.on('error', error => this.emit('error', error));
     return new Promise((resolve) => {
+      this.stream = this.createStream();
+      this.stream.on('error', error => this.config.onError(error));
       this.stream.producer.once('ready', () => {
         resolve('Producer ready');
       });
@@ -33,34 +32,29 @@ export class Producer extends EventEmitter {
 
   stop(): Promise<string> {
     return new Promise((resolve) => {
-      this.stream.close(() => {
-        resolve('Producer disconnected');
-      });
+      if (!this.isConnected()) {
+        return resolve('Producer disconnected');
+      }
+      this.stream.close(() => resolve('Producer disconnected'));
     });
   }
 
   produce<T extends OutputEvent>(event: T): boolean {
-    try {
-      return this.stream.write({
-        topic: event.topic || this.config.defaultTopic,
-        partition: null,
-        value: new Buffer(event.toString()),
-        key: event.key,
-        timestamp: Date.now()
-      });
-    } catch (error) {
-      this.emit(error);
-      return false;
-    }
+    return this.stream.write({
+      topic: event.topic || this.config.defaultTopic,
+      partition: null,
+      value: new Buffer(event.toString()),
+      key: event.key,
+      timestamp: Date.now()
+    });
   }
 
   flush(): Promise<any> {
     return new Promise((resolve, reject) => {
       const producer = this.stream.producer;
-      if (!producer.isConnected()) {
+      if (!this.isConnected()) {
         return reject('Producer not connected');
       }
-      console.debug('Flushing producer');
       producer.flush(FLUSH_TIMEOUT, (error) => {
         if (error) {
           return reject(error);
@@ -82,5 +76,11 @@ export class Producer extends EventEmitter {
         connectOptions: { timeout: CONNECT_TIMEOUT }
       }
     );
+  }
+
+  private isConnected(): boolean {
+    return this.stream &&
+      this.stream.producer &&
+      this.stream.producer.connectedTime() > 0;
   }
 }
