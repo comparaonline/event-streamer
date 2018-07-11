@@ -99,7 +99,7 @@ export class Consumer {
 
   private async consume(message: ConsumerStreamMessage): Promise<any> {
     const event = this.parseMessage(message);
-    await this.router.route(event);
+    await this.router.handle(event);
     this.stream.consumer.commitMessage(message);
   }
 

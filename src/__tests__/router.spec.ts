@@ -1,5 +1,5 @@
 import { Action } from '../action';
-import { Route, Router } from '../router';
+import { Router } from '../router';
 import { InputEvent } from '../events';
 
 class MyEvent extends InputEvent {
@@ -20,13 +20,13 @@ describe('Router', () => {
 
     it('builds the input event', async () => {
       const spy = spyOn(MyEvent.prototype, 'build');
-      await router.route({ code: 'MyEvent' });
+      await router.handle({ code: 'MyEvent' });
       expect(spy).toHaveBeenCalledTimes(1);
     });
 
     it('calls perform on the action', async () => {
       const spy = spyOn(MyAction.prototype, 'perform');
-      await router.route({ code: 'MyEvent' });
+      await router.handle({ code: 'MyEvent' });
       expect(spy).toHaveBeenCalledTimes(1);
     });
 
@@ -40,7 +40,7 @@ describe('Router', () => {
       const spyMyAction = spyOn(MyAction.prototype, 'perform');
       const spyMySecondAction = spyOn(MySecondAction.prototype, 'perform');
 
-      await router.route({ code: 'MyEvent' });
+      await router.handle({ code: 'MyEvent' });
 
       expect(spyMyAction).toHaveBeenCalledTimes(1);
       expect(spyMySecondAction).toHaveBeenCalledTimes(1);

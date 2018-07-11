@@ -6,39 +6,40 @@ export class Router {
 
   add(eventClass: InputEventCtor, actionClass: ActionCtor): void {
     const route = this.routes.get(eventClass.code) || new Route(eventClass);
-    route.add(actionClass);
+    route.addAction(actionClass);
     this.routes.set(eventClass.code, route);
   }
 
-  route<T extends RawEvent>(rawEvent: T): Promise<any> {
+  handle<T extends RawEvent>(rawEvent: T): Promise<any> {
     const route = this.routes.get(rawEvent.code);
     if (!route) {
       return Promise.resolve();
     }
-    return route.handle(rawEvent);
+    return route.handleEvent(rawEvent);
   }
 }
 
-export class Route {
+class Route {
   private eventClass: InputEventCtor;
-  private actionCtors: ActionCtor[] = [];
+  private actionsClasses = new Set<ActionCtor>();
 
   constructor(eventClass: InputEventCtor) {
     this.eventClass = eventClass;
   }
 
-  add(actionClass: ActionCtor) {
-    this.actionCtors.push(actionClass);
+  addAction(actionClass: ActionCtor) {
+    this.actionsClasses.add(actionClass);
   }
 
-  handle<T extends RawEvent>(rawEvent: T): Promise<any> {
+  handleEvent<T extends RawEvent>(rawEvent: T): Promise<any> {
     const event = new this.eventClass(rawEvent);
-    return Promise.all(this.performances(event));
+    const results = [...this.actionsClasses]
+      .map(ac => this.performAction(ac, event));
+    return Promise.all(results);
   }
 
-  private performances(event: InputEvent): Promise<any>[] {
-    return this.actionCtors
-      .map(actionCtor => new actionCtor())
-      .map(action => action.perform(event));
+  private performAction(actionClass: ActionCtor, event: InputEvent): Promise<any> {
+    const action = new actionClass();
+    return action.perform(event);
   }
 }
