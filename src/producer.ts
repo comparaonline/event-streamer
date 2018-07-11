@@ -33,7 +33,7 @@ export class Producer {
   stop(): Promise<string> {
     return new Promise((resolve) => {
       if (!this.isConnected()) {
-        return resolve('Producer disconnected');
+        return resolve('Producer already disconnected');
       }
       this.stream.close(() => resolve('Producer disconnected'));
     });

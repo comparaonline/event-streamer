@@ -49,7 +49,7 @@ export class Consumer {
     return new Promise((resolve) => {
       this.partitions.forEach(p => p.subscription.unsubscribe());
       if (!this.isConnected()) {
-        return resolve('Consumer disconnected');
+        return resolve('Consumer already disconnected');
       }
       this.stream.close(() => resolve('Consumer disconnected'));
     });
@@ -90,37 +90,24 @@ export class Consumer {
   private initPartition(): Partition {
     const observer = new Subject<ConsumerStreamMessage>();
     const subscription = observer.pipe(
-        concatMap(message => this.consume(message))
-      )
-      .subscribe({
-        next: message => this.commit(message),
-        error: error => this.config.onError(error)
-      });
+      concatMap(message => this.consume(message))
+    ).subscribe({
+      error: error => this.config.onError(error)
+    });
     return { observer, subscription };
   }
 
-  private consume(message: ConsumerStreamMessage): Promise<ConsumerStreamMessage> {
-    const event = this.parseEvent(message);
-    console.debug(`Consuming ${JSON.stringify(event)}`);
-    return this.router.route(event)
-      .then(() => message);
+  private async consume(message: ConsumerStreamMessage): Promise<any> {
+    const event = this.parseMessage(message);
+    await this.router.route(event);
+    this.stream.consumer.commitMessage(message);
   }
 
-  private parseEvent(message: ConsumerStreamMessage): RawEvent {
+  private parseMessage(message: ConsumerStreamMessage): RawEvent {
     try {
       return JSON.parse(message.value.toString());
     } catch (error) {
-      const msg = `Unable to parse: ${message.value.toString()}. ${error}`;
-      this.config.onError(new Error(msg));
-      return { code: '' };
-    }
-  }
-
-  private commit(message: ConsumerStreamMessage) {
-    console.debug(`Committing ${message.value}`);
-    const consumer = this.stream.consumer;
-    if (this.isConnected()) {
-      consumer.commitMessage(message);
+      throw new Error(`Unparsable message: ${JSON.stringify(message)}`);
     }
   }
 
