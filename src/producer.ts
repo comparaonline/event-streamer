@@ -32,9 +32,8 @@ export class Producer {
 
   stop(): Promise<string> {
     return new Promise((resolve) => {
-      if (!this.isConnected()) {
-        return resolve('Producer already disconnected');
-      }
+      // Supress handling future errors to prevent loops
+      this.config.onError = () => null;
       this.stream.close(() => resolve('Producer disconnected'));
     });
   }

@@ -48,9 +48,8 @@ export class Consumer {
   stop(): Promise<string> {
     return new Promise((resolve) => {
       this.partitions.forEach(p => p.subscription.unsubscribe());
-      if (!this.isConnected()) {
-        return resolve('Consumer already disconnected');
-      }
+      // Supress handling future errors to prevent loops
+      this.config.onError = () => null;
       this.stream.close(() => resolve('Consumer disconnected'));
     });
   }
@@ -98,9 +97,11 @@ export class Consumer {
   }
 
   private async consume(message: ConsumerStreamMessage): Promise<any> {
+    console.debug(`Consuming offset ${message.offset} from topic ${message.topic}`);
     const event = this.parseMessage(message);
     await this.router.handle(event);
     this.stream.consumer.commitMessage(message);
+    console.debug(`Committed offset ${message.offset} from topic ${message.topic}`);
   }
 
   private parseMessage(message: ConsumerStreamMessage): RawEvent {
