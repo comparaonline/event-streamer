@@ -1,4 +1,7 @@
-import { InputEvent, OutputEvent } from '../events';
+import { expect } from 'chai';
+import { spy } from 'sinon';
+
+import { InputEvent, OutputEvent } from '../src/events';
 
 describe('InputEvent', () => {
   class TestEvent extends InputEvent {
@@ -6,7 +9,7 @@ describe('InputEvent', () => {
   }
 
   it('gets the event code from the class name', () => {
-    expect(TestEvent.code).toEqual('TestEvent');
+    expect(TestEvent.code).to.equal('TestEvent');
   });
 
   it('gets the event code from the class static getter', () => {
@@ -14,7 +17,7 @@ describe('InputEvent', () => {
       static get code() { return 'Test'; }
       build() { }
     }
-    expect(TestEvent.code).toEqual('Test');
+    expect(TestEvent.code).to.equal('Test');
   });
 });
 
@@ -25,27 +28,27 @@ describe('OutputEvent', () => {
   const event = new TestEvent();
 
   it('gets the event code from the class name', () => {
-    expect(event.code).toEqual('TestEvent');
+    expect(event.code).to.equal('TestEvent');
   });
 
   describe('#toJSON', () => {
     it('calls #encode for base JSON representation', () => {
-      const spy = spyOn(event, 'encode');
+      const encodeSpy = spy(event, 'encode');
       event.toJSON();
-      expect(spy).toHaveBeenCalledTimes(1);
+      expect(encodeSpy).to.have.been.calledOnce;
     });
 
     it('includes code in JSON representation', () => {
       const json = event.toJSON();
-      expect(json).toHaveProperty('code', 'TestEvent');
+      expect(json).to.have.property('code', 'TestEvent');
     });
   });
 
   describe('#toString', () => {
     it('calls #toJSON', () => {
-      const spy = spyOn(event, 'toJSON');
+      const toJSONSpy = spy(event, 'toJSON');
       event.toString();
-      expect(spy).toHaveBeenCalledTimes(1);
+      expect(toJSONSpy).to.have.been.calledOnce;
     });
   });
 });

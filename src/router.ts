@@ -34,12 +34,30 @@ class Route {
   handleEvent<T extends RawEvent>(rawEvent: T): Promise<any> {
     const event = new this.eventClass(rawEvent);
     const results = [...this.actionsClasses]
-      .map(ac => this.performAction(ac, event));
+    .map((ac) => {
+      // console.debug(`Routing ${this.eventClass.name} to ${ac.name}`);
+      return this.performAction(ac, event, ac.retries, ac.retryDelay);
+    });
     return Promise.all(results);
   }
 
-  private performAction(actionClass: ActionCtor, event: InputEvent): Promise<any> {
+  private async performAction(
+    actionClass: ActionCtor, event: InputEvent, retries: number, delay: number
+  ): Promise<any> {
+    // console.debug(`Performing ${actionClass.name}`);
     const action = new actionClass();
-    return action.perform(event);
+    return action.perform(event).catch(async (error) => {
+      if (retries <= 0) {
+        // console.debug(`No retries left for ${actionClass.name}`);
+        return Promise.reject(error);
+      }
+      // console.debug(`Retry ${actionClass.name} in ${delay} ms. Retries left: ${retries - 1}`);
+      await this.timeout(delay);
+      return this.performAction(actionClass, event, retries - 1, delay * 2);
+    });
+  }
+
+  private timeout(duration: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, duration));
   }
 }
