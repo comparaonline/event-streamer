@@ -97,11 +97,9 @@ export class Consumer {
   }
 
   private async consume(message: ConsumerStreamMessage): Promise<any> {
-    console.debug(`Consuming offset ${message.offset} from topic ${message.topic}`);
     const event = this.parseMessage(message);
     await this.router.handle(event);
     this.stream.consumer.commitMessage(message);
-    console.debug(`Committed offset ${message.offset} from topic ${message.topic}`);
   }
 
   private parseMessage(message: ConsumerStreamMessage): RawEvent {
@@ -110,11 +108,5 @@ export class Consumer {
     } catch (error) {
       throw new Error(`Unparsable message: ${JSON.stringify(message)}`);
     }
-  }
-
-  private isConnected(): boolean {
-    return this.stream &&
-      this.stream.consumer &&
-      this.stream.consumer.connectedTime() > 0;
   }
 }
