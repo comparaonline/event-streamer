@@ -19,6 +19,16 @@ export interface EventConsumerConfig {
   topics: string[];
 }
 
+export enum InitialOffset {
+  smallest = 'smallest',
+  earliest = 'earliest',
+  beginning = 'beginning',
+  largest = 'largest',
+  latest = 'latest',
+  end = 'end',
+  error = 'error'
+}
+
 export class EventConsumer extends EventEmitter {
   private router: Router;
   private config: EventConsumerConfig;
@@ -31,8 +41,8 @@ export class EventConsumer extends EventEmitter {
     this.config = config;
   }
 
-  start(): void {
-    this.consumerStream = this.createStream();
+  start(initialOffset: InitialOffset): void {
+    this.consumerStream = this.createStream(initialOffset);
     this.consumerStream.on('error', error => this.emit('error', error));
     this.consumerStream.on('data', (message: ConsumerStreamMessage) => {
       this.dispatch(message);
@@ -53,7 +63,7 @@ export class EventConsumer extends EventEmitter {
     partition.observer.next(message);
   }
 
-  private createStream(): ConsumerStream {
+  private createStream(initialOffset: InitialOffset): ConsumerStream {
     const stream = createReadStream(
       {
         'group.id': this.config.groupId,
@@ -61,7 +71,7 @@ export class EventConsumer extends EventEmitter {
         'enable.auto.offset.store': false
       },
       {
-        'auto.offset.reset': 'beginning'
+        'auto.offset.reset': initialOffset
       },
       {
         topics: this.config.topics,
