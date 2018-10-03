@@ -1,4 +1,5 @@
-import * as index from '../index';
+import { expect } from 'chai';
+import * as index from '..';
 
 describe('index', () => {
   [
@@ -7,7 +8,7 @@ describe('index', () => {
     'KafkaServer'
   ].forEach((module) => {
     it(`re-exports the ${module} module`, () => {
-      expect(index[module]).toBeDefined();
+      expect(index[module]).to.be.a('function');
     });
   });
 });

@@ -29,10 +29,11 @@
   "scripts": {
     "tslint": "tslint -c tslint.json -p tsconfig.json",
     "pretest": "yarn tslint",
-    "compile": "tsc --outDir ./build",
+    "compile": "tsc",
     "prepublish": "yarn compile",
     "clean": "rm -rf build/*",
-    "test": "jest",
+    "test": "TS_NODE_FILES=true NODE_CONFIG_ENV=test mocha",
+    "test:fast": "TS_NODE_FILES=true NODE_CONFIG_ENV=test mocha",
     "coverage": "jest --coverage"
   },
   "dependencies": {
@@ -41,13 +42,13 @@
     "rxjs": "^5.5.3"
   },
   "devDependencies": {
-    "@types/jest": "^22.2.2",
+    "@types/chai": "^4.1.6",
+    "@types/mocha": "^5.2.5",
     "@types/node": "^8.10.2",
-    "jest": "^22.4.3",
-    "jest-cli": "^22.4.3",
+    "chai": "^4.2.0",
+    "mocha": "^5.2.0",
     "nodemon": "^1.17.3",
     "rxjs-marbles": "^2.3.3",
-    "ts-jest": "^22.4.2",
     "ts-node": "^5.0.1",
     "tslint": "^5.9.1",
     "tslint-config-airbnb": "^5.4.2",
