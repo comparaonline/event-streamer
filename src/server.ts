@@ -1,4 +1,4 @@
-import { RawEvent, OutputEvent } from './events';
+import { OutputEvent } from './events';
 import { Router } from './router';
 import { EventEmitter } from 'events';
 

@@ -78,13 +78,13 @@ export class EventConsumer extends EventEmitter {
   private getPartition(partitionIdx: number): Partition {
     let partition = this.partitions.get(partitionIdx);
     if (!partition) {
-      partition = this.initPartition(partitionIdx);
+      partition = this.initPartition();
       this.partitions.set(partitionIdx, partition);
     }
     return partition;
   }
 
-  private initPartition(partitionIdx: number): Partition {
+  private initPartition(): Partition {
     const observer = new Subject<ConsumerStreamMessage>();
     const subscription = observer
       .concatMap(message => this.consume(message))

@@ -1,6 +1,6 @@
 import { Server } from './server';
 import { InputEvent, InputEventCtor, RawEvent } from './events';
-import { Action, ActionCtor } from './action';
+import { ActionCtor } from './action';
 
 export class Router {
   private server: Server;
