@@ -1,7 +1,7 @@
 import { Server } from '../server';
 import { Router } from '../router';
 import { OutputEvent } from '../events';
-import { EventConsumer } from './event-consumer';
+import { EventConsumer, InitialOffset } from './event-consumer';
 import { EventProducer } from './event-producer';
 
 export interface KafkaConfig {
@@ -9,6 +9,7 @@ export interface KafkaConfig {
   broker: string;
   consumerTopics: string[];
   producerTopic?: string;
+  initialOffset?: InitialOffset;
 }
 
 export class KafkaServer extends Server {
@@ -20,7 +21,8 @@ export class KafkaServer extends Server {
     this.consumer = new EventConsumer(this.router, {
       groupId: this.config.groupId,
       broker: this.config.broker,
-      topics: this.config.consumerTopics
+      topics: this.config.consumerTopics,
+      initialOffset: this.config.initialOffset || InitialOffset.beginning
     });
     this.producer = new EventProducer({
       groupId: this.config.groupId,
