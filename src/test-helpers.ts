@@ -1,5 +1,4 @@
 import { Server } from './server';
-import { Router } from './router';
 import { RawEvent, OutputEvent, InputEvent } from './events';
 
 export class TestServer extends Server {

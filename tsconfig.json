@@ -1,24 +1,26 @@
 {
   "compilerOptions": {
-    "outDir": "./build",
+    "outDir": "build",
+    "rootDir": "src",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "declaration": true,
     "lib": [
-      "es2015",
+      "es2017",
       "dom"
     ],
     "module": "commonjs",
     "moduleResolution": "node",
-    "noImplicitAny": false,
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "removeComments": false,
     "sourceMap": true,
     "suppressImplicitAnyIndexErrors": true,
     "strictNullChecks": true,
-    "target": "es6"
+    "target": "es2017"
   },
   "include": [
-    "./src/**/*.ts",
-    "./src/**/*.tsx"
+    "src/**/*"
   ]
 }
