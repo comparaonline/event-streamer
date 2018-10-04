@@ -17,6 +17,7 @@ export interface EventConsumerConfig {
   groupId: string;
   broker: string;
   topics: string[];
+  initialOffset: InitialOffset;
 }
 
 export enum InitialOffset {
@@ -41,8 +42,8 @@ export class EventConsumer extends EventEmitter {
     this.config = config;
   }
 
-  start(initialOffset: InitialOffset): void {
-    this.consumerStream = this.createStream(initialOffset);
+  start(): void {
+    this.consumerStream = this.createStream(this.config.initialOffset);
     this.consumerStream.on('error', error => this.emit('error', error));
     this.consumerStream.on('data', (message: ConsumerStreamMessage) => {
       this.dispatch(message);
