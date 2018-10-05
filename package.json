@@ -30,7 +30,7 @@
     "tslint": "tslint -c tslint.json -p tsconfig.json",
     "pretest": "yarn tslint",
     "compile": "tsc",
-    "prepublish": "yarn compile",
+    "prepublishOnly": "yarn compile",
     "clean": "rm -rf build/*",
     "test": "TS_NODE_FILES=true NODE_CONFIG_ENV=test mocha 'src/**/__tests__/*.{ts,tsx}'",
     "test:fast": "TS_NODE_FILES=true NODE_CONFIG_ENV=test mocha 'src/**/__tests__/*.{ts,tsx}'",
