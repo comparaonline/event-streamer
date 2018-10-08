@@ -1,6 +1,6 @@
 {
   "name": "@comparaonline/event-streamer",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Simple event-streaming framework",
   "repository": "comparaonline/event-streamer",
   "author": {
@@ -30,16 +30,16 @@
     "tslint": "tslint -c tslint.json -p tsconfig.json",
     "pretest": "yarn tslint",
     "compile": "tsc",
-    "prepublish": "yarn compile",
+    "prepublishOnly": "yarn compile",
     "clean": "rm -rf build/*",
-    "test": "TS_NODE_FILES=true NODE_CONFIG_ENV=test mocha 'src/**/__tests__/*.{ts,tsx}'",
-    "test:fast": "TS_NODE_FILES=true NODE_CONFIG_ENV=test mocha 'src/**/__tests__/*.{ts,tsx}'",
+    "test": "TS_NODE_FILES=true mocha 'src/**/__tests__/*.{ts,tsx}'",
+    "test:fast": "TS_NODE_FILES=true mocha 'src/**/__tests__/*.{ts,tsx}'",
     "coverage": "jest --coverage"
   },
   "dependencies": {
     "node-rdkafka": "^2.2.1",
     "reflect-metadata": "^0.1.10",
-    "rxjs": "^5.5.3"
+    "rxjs": "^6.3.3"
   },
   "devDependencies": {
     "@types/chai": "^4.1.6",
