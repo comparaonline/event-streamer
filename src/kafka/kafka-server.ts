@@ -1,34 +1,24 @@
 import { Server } from '../server';
 import { Router } from '../router';
 import { OutputEvent } from '../events';
-import { EventConsumer, InitialOffset } from './event-consumer';
+import { EventConsumer } from './event-consumer';
 import { EventProducer } from './event-producer';
-
-export interface KafkaConfig {
-  groupId: string;
-  broker: string;
-  consumerTopics: string[];
-  producerTopic?: string;
-  initialOffset?: InitialOffset;
-}
+import { RDKafkaConfiguration } from './interfaces/rdkafka-configuration';
+import { KafkaConfiguration } from './interfaces/kafka-configuration';
+import { InitialOffset } from './interfaces/initial-offset';
 
 export class KafkaServer extends Server {
   private consumer: EventConsumer;
   private producer: EventProducer;
 
-  constructor(protected router: Router, private config: KafkaConfig) {
+  constructor(
+    router: Router,
+    private config: KafkaConfiguration,
+    rdConfig: RDKafkaConfiguration = {}
+  ) {
     super(router);
-    this.consumer = new EventConsumer(this.router, {
-      groupId: this.config.groupId,
-      broker: this.config.broker,
-      topics: this.config.consumerTopics,
-      initialOffset: this.config.initialOffset || InitialOffset.beginning
-    });
-    this.producer = new EventProducer({
-      groupId: this.config.groupId,
-      broker: this.config.broker,
-      defaultTopic: this.config.producerTopic
-    });
+    this.consumer = new EventConsumer(router, this.consumerConfig, rdConfig);
+    this.producer = new EventProducer(this.producerConfig, rdConfig);
   }
 
   start() {
@@ -38,11 +28,28 @@ export class KafkaServer extends Server {
     this.producer.on('error', error => this.emit('error', error));
   }
 
-  stop(): Promise<any> {
+  stop(): Promise<string[]> {
     return Promise.all([this.consumer.stop(), this.producer.stop()]);
   }
 
   output(event: OutputEvent) {
     return this.producer.produce(event);
+  }
+
+  private get consumerConfig() {
+    return {
+      groupId: this.config.groupId,
+      broker: this.config.broker,
+      topics: this.config.consumerTopics,
+      initialOffset: this.config.initialOffset || InitialOffset.beginning
+    };
+  }
+
+  private get producerConfig() {
+    return {
+      groupId: this.config.groupId,
+      broker: this.config.broker,
+      defaultTopic: this.config.producerTopic
+    };
   }
 }

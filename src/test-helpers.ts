@@ -1,7 +1,12 @@
 import { Server } from './server';
 import { RawEvent, OutputEvent, InputEvent } from './events';
+import { Router } from './router';
 
 export class TestServer extends Server {
+  constructor(
+    private router: Router
+  ) { super(router); }
+
   private outputEvents: OutputEvent[] = [];
 
   input(rawEvent: RawEvent) {
