@@ -2,15 +2,7 @@ import { createWriteStream, ProducerStream } from 'node-rdkafka';
 import { EventEmitter } from 'events';
 import { KafkaOutputEvent } from './kafka-events';
 import { RDKafkaConfiguration } from './interfaces/rdkafka-configuration';
-
-const FLUSH_TIMEOUT = 2000;
-const CONNECT_TIMEOUT = 1000;
-
-export interface EventProducerConfig {
-  groupId: string;
-  broker: string;
-  defaultTopic?: string;
-}
+import { EventProducerConfig } from './interfaces/event-producer-configuration';
 
 export class EventProducer extends EventEmitter {
   private producerStream: ProducerStream;
@@ -54,7 +46,7 @@ export class EventProducer extends EventEmitter {
         return reject('Producer not connected');
       }
       console.debug('Flushing producer');
-      producer.flush(FLUSH_TIMEOUT, (error) => {
+      producer.flush(this.config.flushTimeout, (error) => {
         if (error) {
           return reject(error);
         }
@@ -73,7 +65,7 @@ export class EventProducer extends EventEmitter {
       {},
       {
         objectMode: true,
-        connectOptions: { timeout: CONNECT_TIMEOUT }
+        connectOptions: { timeout: this.config.connectionTimeout }
       }
     );
     stream.producer.once('ready', () => {

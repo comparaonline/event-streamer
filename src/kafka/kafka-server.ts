@@ -6,6 +6,11 @@ import { EventProducer } from './event-producer';
 import { RDKafkaConfiguration } from './interfaces/rdkafka-configuration';
 import { KafkaConfiguration } from './interfaces/kafka-configuration';
 import { InitialOffset } from './interfaces/initial-offset';
+import { EventConsumerConfiguration } from './interfaces/event-consumer-configuration';
+import { EventProducerConfig } from './interfaces/event-producer-configuration';
+
+const DEFAULT_CONNECTION_TIMEOUT = 1000;
+const DEFAULT_FLUSH_TIMEOUT = 2000;
 
 export class KafkaServer extends Server {
   private consumer: EventConsumer;
@@ -36,20 +41,23 @@ export class KafkaServer extends Server {
     return this.producer.produce(event);
   }
 
-  private get consumerConfig() {
+  private get consumerConfig(): EventConsumerConfiguration {
     return {
       groupId: this.config.groupId,
       broker: this.config.broker,
       topics: this.config.consumerTopics,
-      initialOffset: this.config.initialOffset || InitialOffset.beginning
+      initialOffset: this.config.initialOffset || InitialOffset.beginning,
+      connectionTimeout: this.config.connectionTimeout || DEFAULT_CONNECTION_TIMEOUT
     };
   }
 
-  private get producerConfig() {
+  private get producerConfig(): EventProducerConfig {
     return {
       groupId: this.config.groupId,
       broker: this.config.broker,
-      defaultTopic: this.config.producerTopic
+      defaultTopic: this.config.producerTopic,
+      connectionTimeout: this.config.connectionTimeout || DEFAULT_CONNECTION_TIMEOUT,
+      flushTimeout: this.config.flushTimeout || DEFAULT_FLUSH_TIMEOUT
     };
   }
 }

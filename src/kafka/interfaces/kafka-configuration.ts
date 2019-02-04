@@ -6,4 +6,6 @@ export interface KafkaConfiguration {
   consumerTopics: string[];
   producerTopic?: string;
   initialOffset?: InitialOffset;
+  connectionTimeout?: number;
+  flushTimeout?: number;
 }
