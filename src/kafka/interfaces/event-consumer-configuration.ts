@@ -5,4 +5,5 @@ export interface EventConsumerConfiguration {
   broker: string;
   topics: string[];
   initialOffset: InitialOffset;
+  connectionTimeout: number;
 }

@@ -11,8 +11,6 @@ import { Partition } from './interfaces/partition';
 import { InitialOffset } from './interfaces/initial-offset';
 import { RDKafkaConfiguration } from './interfaces/rdkafka-configuration';
 
-const CONNECT_TIMEOUT = 1000;
-
 export class EventConsumer extends EventEmitter {
   private consumerStream: ConsumerStream;
   private partitions = new Map<number, Partition>();
@@ -59,7 +57,7 @@ export class EventConsumer extends EventEmitter {
       {
         topics: this.config.topics,
         objectMode: true,
-        connectOptions: { timeout: CONNECT_TIMEOUT }
+        connectOptions: { timeout: this.config.connectionTimeout }
       }
     );
     stream.consumer.once('ready', () => {
