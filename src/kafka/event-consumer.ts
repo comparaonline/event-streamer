@@ -1,47 +1,27 @@
 import {
   createReadStream, ConsumerStream, ConsumerStreamMessage
 } from 'node-rdkafka';
-import { Subject, Subscription } from 'rxjs';
+import { Subject } from 'rxjs';
 import { concatMap } from 'rxjs/operators';
 import { Router } from '../router';
 import { EventEmitter } from 'events';
 import { RawEvent } from '../events';
+import { EventConsumerConfiguration } from './interfaces/event-consumer-configuration';
+import { Partition } from './interfaces/partition';
+import { InitialOffset } from './interfaces/initial-offset';
+import { RDKafkaConfiguration } from './interfaces/rdkafka-configuration';
 
 const CONNECT_TIMEOUT = 1000;
 
-interface Partition {
-  observer: Subject<ConsumerStreamMessage>;
-  subscription: Subscription;
-}
-
-export interface EventConsumerConfig {
-  groupId: string;
-  broker: string;
-  topics: string[];
-  initialOffset: InitialOffset;
-}
-
-export enum InitialOffset {
-  smallest = 'smallest',
-  earliest = 'earliest',
-  beginning = 'beginning',
-  largest = 'largest',
-  latest = 'latest',
-  end = 'end',
-  error = 'error'
-}
-
 export class EventConsumer extends EventEmitter {
-  private router: Router;
-  private config: EventConsumerConfig;
   private consumerStream: ConsumerStream;
   private partitions = new Map<number, Partition>();
 
-  constructor(router: Router, config: EventConsumerConfig) {
-    super();
-    this.router = router;
-    this.config = config;
-  }
+  constructor(
+    private router: Router,
+    private config: EventConsumerConfiguration,
+    private rdConfig: RDKafkaConfiguration = {}
+  ) { super(); }
 
   start(): void {
     this.consumerStream = this.createStream(this.config.initialOffset);
@@ -70,7 +50,8 @@ export class EventConsumer extends EventEmitter {
       {
         'group.id': this.config.groupId,
         'metadata.broker.list': this.config.broker,
-        'enable.auto.offset.store': false
+        'enable.auto.offset.store': false,
+        ...this.rdConfig
       },
       {
         'auto.offset.reset': initialOffset

@@ -1,6 +1,7 @@
 import { createWriteStream, ProducerStream } from 'node-rdkafka';
 import { EventEmitter } from 'events';
 import { KafkaOutputEvent } from './kafka-events';
+import { RDKafkaConfiguration } from './interfaces/rdkafka-configuration';
 
 const FLUSH_TIMEOUT = 2000;
 const CONNECT_TIMEOUT = 1000;
@@ -12,13 +13,12 @@ export interface EventProducerConfig {
 }
 
 export class EventProducer extends EventEmitter {
-  private config: EventProducerConfig;
   private producerStream: ProducerStream;
 
-  constructor(config: EventProducerConfig) {
-    super();
-    this.config = config;
-  }
+  constructor(
+    private config: EventProducerConfig,
+    private rdConfig: RDKafkaConfiguration = {}
+  ) { super(); }
 
   start(): void {
     this.producerStream = this.createStream();
@@ -67,7 +67,8 @@ export class EventProducer extends EventEmitter {
     const stream = createWriteStream(
       {
         'group.id': this.config.groupId,
-        'metadata.broker.list': this.config.broker
+        'metadata.broker.list': this.config.broker,
+        ...this.rdConfig
       },
       {},
       {
