@@ -2,7 +2,7 @@ import {
   createReadStream, ConsumerStream, ConsumerStreamMessage
 } from 'node-rdkafka';
 import { Subject } from 'rxjs';
-import { concatMap } from 'rxjs/operators';
+import { concatMap, map } from 'rxjs/operators';
 import { Router } from '../router';
 import { EventEmitter } from 'events';
 import { RawEvent } from '../events';
@@ -78,7 +78,8 @@ export class EventConsumer extends EventEmitter {
   private initPartition(): Partition {
     const observer = new Subject<ConsumerStreamMessage>();
     const subscription = observer.pipe(
-      concatMap(message => this.consume(message))
+      map(message => this.consume(message)),
+      concatMap(result => result)
     ).subscribe(
         message => this.commit(message),
         error => this.emit('error', error)
