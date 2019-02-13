@@ -11,9 +11,11 @@ import { Partition } from './interfaces/partition';
 import { InitialOffset } from './interfaces/initial-offset';
 import { RDKafkaConfiguration } from './interfaces/rdkafka-configuration';
 
+const key = ({ topic, partition }: ConsumerStreamMessage) => `${topic}:${partition}`;
+
 export class EventConsumer extends EventEmitter {
   private consumerStream: ConsumerStream;
-  private partitions = new Map<number, Partition>();
+  private partitions = new Map<string, Partition>();
 
   constructor(
     private router: Router,
@@ -39,7 +41,7 @@ export class EventConsumer extends EventEmitter {
   }
 
   dispatch(message: ConsumerStreamMessage) {
-    const partition = this.getPartition(message.partition);
+    const partition = this.getPartition(key(message));
     partition.observer.next(message);
   }
 
@@ -66,11 +68,11 @@ export class EventConsumer extends EventEmitter {
     return stream;
   }
 
-  private getPartition(partitionIdx: number): Partition {
-    let partition = this.partitions.get(partitionIdx);
+  private getPartition(key: string): Partition {
+    let partition = this.partitions.get(key);
     if (!partition) {
       partition = this.initPartition();
-      this.partitions.set(partitionIdx, partition);
+      this.partitions.set(key, partition);
     }
     return partition;
   }
