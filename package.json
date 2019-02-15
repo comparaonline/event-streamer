@@ -37,12 +37,14 @@
     "coverage": "jest --coverage"
   },
   "dependencies": {
+    "config": "^3.0.1",
     "node-rdkafka": "^2.2.1",
     "reflect-metadata": "^0.1.10",
     "rxjs": "^6.3.3"
   },
   "devDependencies": {
     "@types/chai": "^4.1.6",
+    "@types/config": "^0.0.34",
     "@types/mocha": "^5.2.5",
     "@types/node": "^8.10.2",
     "chai": "^4.2.0",

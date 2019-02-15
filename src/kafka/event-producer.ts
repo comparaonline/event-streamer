@@ -9,7 +9,8 @@ export class EventProducer extends EventEmitter {
 
   constructor(
     private config: EventProducerConfig,
-    private rdConfig: RDKafkaConfiguration = {}
+    private rdConfig: RDKafkaConfiguration = {},
+    private logger = config.logger
   ) { super(); }
 
   start(): void {
@@ -45,7 +46,7 @@ export class EventProducer extends EventEmitter {
       if (!producer.isConnected()) {
         return reject('Producer not connected');
       }
-      console.debug('Flushing producer');
+      this.logger.debug('Flushing producer');
       producer.flush(this.config.flushTimeout, (error) => {
         if (error) {
           return reject(error);
@@ -69,7 +70,7 @@ export class EventProducer extends EventEmitter {
       }
     );
     stream.producer.once('ready', () => {
-      console.info('Producer ready');
+      this.logger.info('Producer ready');
     });
     return stream;
   }

@@ -20,7 +20,8 @@ export class EventConsumer extends EventEmitter {
   constructor(
     private router: Router,
     private config: EventConsumerConfiguration,
-    private rdConfig: RDKafkaConfiguration = {}
+    private rdConfig: RDKafkaConfiguration = {},
+    private logger = config.logger
   ) { super(); }
 
   start(): void {
@@ -63,7 +64,7 @@ export class EventConsumer extends EventEmitter {
       }
     );
     stream.consumer.once('ready', () => {
-      console.info(`Consumer ready. Topics: ${this.config.topics.join(', ')}`);
+      this.logger.info(`Consumer ready. Topics: ${this.config.topics.join(', ')}`);
     });
     return stream;
   }
@@ -91,7 +92,7 @@ export class EventConsumer extends EventEmitter {
 
   private consume(message: ConsumerStreamMessage): Promise<ConsumerStreamMessage> {
     const event = this.parseEvent(message);
-    console.debug(`Consuming ${JSON.stringify(event)}`);
+    this.logger.debug(`Consuming ${JSON.stringify(event)}`);
     return this.router.route(event)
       .then(() => message);
   }
@@ -100,13 +101,13 @@ export class EventConsumer extends EventEmitter {
     try {
       return JSON.parse(message.value.toString());
     } catch (error) {
-      console.error(`Omitted message. Unable to parse: ${JSON.stringify(message)}. ${error}`);
+      this.logger.error(`Omitted message. Unable to parse: ${JSON.stringify(message)}. ${error}`);
       return { code: '' };
     }
   }
 
   private commit(message: ConsumerStreamMessage) {
-    console.debug(`Committing ${message.value}`);
+    this.logger.debug(`Committing ${message.value}`);
     const consumer = this.consumerStream.consumer;
     if (consumer.isConnected()) {
       consumer.commitMessage(message);
