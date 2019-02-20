@@ -2,7 +2,7 @@ import {
   createReadStream, ConsumerStream, ConsumerStreamMessage
 } from 'node-rdkafka';
 import { Subject } from 'rxjs';
-import { concatMap } from 'rxjs/operators';
+import { concatMap, map } from 'rxjs/operators';
 import { Router } from '../router';
 import { EventEmitter } from 'events';
 import { RawEvent } from '../events';
@@ -11,14 +11,17 @@ import { Partition } from './interfaces/partition';
 import { InitialOffset } from './interfaces/initial-offset';
 import { RDKafkaConfiguration } from './interfaces/rdkafka-configuration';
 
+const key = ({ topic, partition }: ConsumerStreamMessage) => `${topic}:${partition}`;
+
 export class EventConsumer extends EventEmitter {
   private consumerStream: ConsumerStream;
-  private partitions = new Map<number, Partition>();
+  private partitions = new Map<string, Partition>();
 
   constructor(
     private router: Router,
     private config: EventConsumerConfiguration,
-    private rdConfig: RDKafkaConfiguration = {}
+    private rdConfig: RDKafkaConfiguration = {},
+    private logger = config.logger
   ) { super(); }
 
   start(): void {
@@ -39,7 +42,7 @@ export class EventConsumer extends EventEmitter {
   }
 
   dispatch(message: ConsumerStreamMessage) {
-    const partition = this.getPartition(message.partition);
+    const partition = this.getPartition(key(message));
     partition.observer.next(message);
   }
 
@@ -61,16 +64,16 @@ export class EventConsumer extends EventEmitter {
       }
     );
     stream.consumer.once('ready', () => {
-      console.info(`Consumer ready. Topics: ${this.config.topics.join(', ')}`);
+      this.logger.info(`Consumer ready. Topics: ${this.config.topics.join(', ')}`);
     });
     return stream;
   }
 
-  private getPartition(partitionIdx: number): Partition {
-    let partition = this.partitions.get(partitionIdx);
+  private getPartition(key: string): Partition {
+    let partition = this.partitions.get(key);
     if (!partition) {
       partition = this.initPartition();
-      this.partitions.set(partitionIdx, partition);
+      this.partitions.set(key, partition);
     }
     return partition;
   }
@@ -78,7 +81,8 @@ export class EventConsumer extends EventEmitter {
   private initPartition(): Partition {
     const observer = new Subject<ConsumerStreamMessage>();
     const subscription = observer.pipe(
-      concatMap(message => this.consume(message))
+      map(message => this.consume(message)),
+      concatMap(result => result)
     ).subscribe(
         message => this.commit(message),
         error => this.emit('error', error)
@@ -88,7 +92,7 @@ export class EventConsumer extends EventEmitter {
 
   private consume(message: ConsumerStreamMessage): Promise<ConsumerStreamMessage> {
     const event = this.parseEvent(message);
-    console.debug(`Consuming ${JSON.stringify(event)}`);
+    this.logger.debug(`Consuming ${JSON.stringify(event)}`);
     return this.router.route(event)
       .then(() => message);
   }
@@ -97,13 +101,13 @@ export class EventConsumer extends EventEmitter {
     try {
       return JSON.parse(message.value.toString());
     } catch (error) {
-      console.error(`Omitted message. Unable to parse: ${JSON.stringify(message)}. ${error}`);
+      this.logger.error(`Omitted message. Unable to parse: ${JSON.stringify(message)}. ${error}`);
       return { code: '' };
     }
   }
 
   private commit(message: ConsumerStreamMessage) {
-    console.debug(`Committing ${message.value}`);
+    this.logger.debug(`Committing ${message.value}`);
     const consumer = this.consumerStream.consumer;
     if (consumer.isConnected()) {
       consumer.commitMessage(message);
