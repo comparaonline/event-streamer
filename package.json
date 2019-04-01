@@ -39,6 +39,7 @@
   "dependencies": {
     "config": "^3.0.1",
     "node-rdkafka": "^2.2.1",
+    "opentracing": "^0.14.3",
     "reflect-metadata": "^0.1.10",
     "rxjs": "^6.3.3"
   },

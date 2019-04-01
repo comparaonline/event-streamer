@@ -10,6 +10,7 @@ import { EventConsumerConfiguration } from './interfaces/event-consumer-configur
 import { Partition } from './interfaces/partition';
 import { InitialOffset } from './interfaces/initial-offset';
 import { RDKafkaConfiguration } from './interfaces/rdkafka-configuration';
+import { tracer } from '../lib/tracer';
 
 const key = ({ topic, partition }: ConsumerStreamMessage) => `${topic}:${partition}`;
 
@@ -92,9 +93,19 @@ export class EventConsumer extends EventEmitter {
 
   private consume(message: ConsumerStreamMessage): Promise<ConsumerStreamMessage> {
     const event = this.parseEvent(message);
+    const span = tracer.startSpan(
+      event.code, this.config.projectName
+    );
     this.logger.debug(`Consuming ${JSON.stringify(event)}`);
     return this.router.route(event)
-      .then(() => message);
+      .then(() => {
+        tracer.finishSpan(span);
+        return message;
+      })
+      .catch((error) => {
+        tracer.finishSpanWithError(span, error);
+        throw error;
+      });
   }
 
   private parseEvent(message: ConsumerStreamMessage): RawEvent {

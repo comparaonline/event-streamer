@@ -8,4 +8,5 @@ export interface EventConsumerConfiguration {
   topics: string[];
   initialOffset: InitialOffset;
   connectionTimeout: number;
+  projectName: string;
 }
