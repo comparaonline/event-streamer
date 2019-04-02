@@ -62,7 +62,8 @@ export class KafkaServer extends Server {
       broker: this.config.broker,
       topics: this.config.consumerTopics,
       initialOffset: this.config.initialOffset,
-      connectionTimeout: this.config.connectionTimeout
+      connectionTimeout: this.config.connectionTimeout,
+      projectName: this.config.projectName
     };
   }
 
