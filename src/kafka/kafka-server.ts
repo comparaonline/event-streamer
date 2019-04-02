@@ -22,7 +22,7 @@ const defaultConfig: Partial<KafkaConfiguration> = {
   connectionTimeout: 1000,
   flushTimeout: 2000,
   initialOffset: InitialOffset.latest,
-  projectName: process.env.npm_package_version
+  projectName: process.env.npm_package_version || 'unnamed-project'
 };
 
 export class KafkaServer extends Server {
