@@ -1,6 +1,6 @@
 {
   "name": "@comparaonline/event-streamer",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Simple event-streaming framework",
   "repository": "comparaonline/event-streamer",
   "author": {
@@ -39,6 +39,7 @@
   "dependencies": {
     "config": "^3.0.1",
     "node-rdkafka": "^2.2.1",
+    "opentracing": "^0.14.3",
     "reflect-metadata": "^0.1.10",
     "rxjs": "^6.3.3"
   },

@@ -12,4 +12,5 @@ export interface KafkaConfiguration {
   connectionTimeout: number;
   flushTimeout: number;
   rdConfig: RDKafkaConfiguration;
+  projectName: string;
 }

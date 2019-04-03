@@ -10,7 +10,9 @@ import { EventConsumerConfiguration } from './interfaces/event-consumer-configur
 import { Partition } from './interfaces/partition';
 import { InitialOffset } from './interfaces/initial-offset';
 import { RDKafkaConfiguration } from './interfaces/rdkafka-configuration';
+import * as opentracing from 'opentracing';
 
+const APM_TYPE = 'KafkaEventConsume';
 const key = ({ topic, partition }: ConsumerStreamMessage) => `${topic}:${partition}`;
 
 export class EventConsumer extends EventEmitter {
@@ -92,9 +94,24 @@ export class EventConsumer extends EventEmitter {
 
   private consume(message: ConsumerStreamMessage): Promise<ConsumerStreamMessage> {
     const event = this.parseEvent(message);
+    const span = this.startSpan(event, message.topic);
     this.logger.debug(`Consuming ${JSON.stringify(event)}`);
     return this.router.route(event)
-      .then(() => message);
+      .then(() => {
+        span.finish();
+        return message;
+      })
+      .catch((error) => {
+        span.setTag(opentracing.Tags.ERROR, true);
+        span.log({
+          event: 'error',
+          'error.object': error,
+          message: error.message,
+          stack: error.stack
+        });
+        span.finish();
+        throw error;
+      });
   }
 
   private parseEvent(message: ConsumerStreamMessage): RawEvent {
@@ -112,5 +129,19 @@ export class EventConsumer extends EventEmitter {
     if (consumer.isConnected()) {
       consumer.commitMessage(message);
     }
+  }
+
+  private startSpan(event: RawEvent, topic: string) : opentracing.Span {
+    const tracer = opentracing.globalTracer();
+    return tracer.startSpan(
+      event.code,
+      {
+        tags: {
+          topic,
+          type: APM_TYPE,
+          'service.name': `${this.config.projectName}-events`
+        }
+      }
+    );
   }
 }
