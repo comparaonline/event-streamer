@@ -3,7 +3,8 @@ process.env.ALLOW_CONFIG_MUTATIONS = 'y';
 import config = require('config');
 
 export const extendConfig = <A>(configs: Partial<A>, defaultConfig: Partial<A>): A => {
-  config.util.extendDeep(defaultConfig, configs);
-  config.util.setModuleDefaults('event-streamer', defaultConfig);
-  return defaultConfig as A;
+  const clonedConfig = config.util.cloneDeep(defaultConfig);
+  config.util.extendDeep(clonedConfig, configs);
+  config.util.setModuleDefaults('event-streamer', clonedConfig);
+  return config.get('event-streamer');
 };
