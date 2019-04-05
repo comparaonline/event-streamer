@@ -141,7 +141,7 @@ export class EventConsumer extends EventEmitter {
           topic,
           type: APM_TYPE,
           'service.name': `${this.config.projectName}-events`,
-          'service.resource': event.code
+          'resource.name': event.code
         }
       }
     );
