@@ -12,6 +12,7 @@ import { InitialOffset } from './interfaces/initial-offset';
 import { RDKafkaConfiguration } from './interfaces/rdkafka-configuration';
 import * as opentracing from 'opentracing';
 
+const DD_SERVICE_NAME = 'kafka.event.consume';
 const APM_TYPE = 'KafkaEventConsume';
 const key = ({ topic, partition }: ConsumerStreamMessage) => `${topic}:${partition}`;
 
@@ -134,12 +135,13 @@ export class EventConsumer extends EventEmitter {
   private startSpan(event: RawEvent, topic: string) : opentracing.Span {
     const tracer = opentracing.globalTracer();
     return tracer.startSpan(
-      event.code,
+      DD_SERVICE_NAME,
       {
         tags: {
           topic,
           type: APM_TYPE,
-          'service.name': `${this.config.projectName}-events`
+          'service.name': `${this.config.projectName}-events`,
+          'service.resource': event.code
         }
       }
     );
