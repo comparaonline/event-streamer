@@ -8,3 +8,6 @@ export const extendConfig = <A>(configs: Partial<A>, defaultConfig: Partial<A>):
   config.util.setModuleDefaults('event-streamer', clonedConfig);
   return config.get('event-streamer');
 };
+
+export const getConfig = <T = any>(name: string): T =>
+  config.get(`event-streamer.${name}`);
