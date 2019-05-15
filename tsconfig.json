@@ -18,7 +18,8 @@
     "sourceMap": true,
     "suppressImplicitAnyIndexErrors": true,
     "strictNullChecks": true,
-    "target": "es2017"
+    "target": "es2017",
+    "skipLibCheck": true
   },
   "include": [
     "src/**/*"

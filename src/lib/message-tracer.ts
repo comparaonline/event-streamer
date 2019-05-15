@@ -1,6 +1,4 @@
-import './extend-config';
 import * as opentracing from 'opentracing';
-import * as config from 'config';
 import { RawEvent } from '../events';
 
 const DD_SERVICE_NAME = 'kafka.event.consume';
@@ -22,8 +20,7 @@ const logError = (span: opentracing.Span) => <T extends Error>(error: T) => {
   throw error;
 };
 
-export const messageTracer = (topic: string) => {
-  const NAME = config.get('event-streamer.projectName');
+export const messageTracer = (projectName: string, topic: string) => {
   return <T, D extends { event: RawEvent, result: Promise<T> }>(data: D) => {
     const tracer = opentracing.globalTracer();
     const span = tracer.startSpan(
@@ -32,7 +29,7 @@ export const messageTracer = (topic: string) => {
         tags: {
           topic,
           type: APM_TYPE,
-          'service.name': `${NAME}-events`,
+          'service.name': `${projectName}-events`,
           'resource.name': data.event.code
         }
       }

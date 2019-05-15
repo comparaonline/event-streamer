@@ -71,7 +71,7 @@ export class EventConsumer extends EventEmitter {
   }
 
   private handlePartition(partition: GroupedObservable<string, ConsumerStreamMessage>) {
-    const trace = messageTracer(partition.key);
+    const trace = messageTracer(this.config.projectName, partition.key);
 
     return partition.pipe(
       map(this.parseEvent()),
