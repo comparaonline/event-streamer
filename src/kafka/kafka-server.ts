@@ -12,12 +12,13 @@ import { extendConfig } from '../lib/extend-config';
 
 const nullFn = () => { };
 
+const defaultLogger = {
+  info: nullFn,
+  debug: nullFn,
+  error: nullFn
+};
+
 const defaultConfig: Partial<KafkaConfiguration> = {
-  logger: {
-    info: nullFn,
-    debug: nullFn,
-    error: nullFn
-  },
   rdConfig: {},
   connectionTimeout: 1000,
   flushTimeout: 2000,
@@ -58,7 +59,7 @@ export class KafkaServer extends Server {
 
   private get consumerConfig(): EventConsumerConfiguration {
     return {
-      logger: this.config.logger,
+      logger: this.config.logger || defaultLogger,
       groupId: this.config.groupId,
       broker: this.config.broker,
       topics: this.config.consumerTopics,
@@ -70,7 +71,7 @@ export class KafkaServer extends Server {
 
   private get producerConfig(): EventProducerConfig {
     return {
-      logger: this.config.logger,
+      logger: this.config.logger || defaultLogger,
       groupId: this.config.groupId,
       broker: this.config.broker,
       defaultTopic: this.config.producerTopic,
