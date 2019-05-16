@@ -1,6 +1,6 @@
 {
   "name": "@comparaonline/event-streamer",
-  "version": "3.0.0-alpha7",
+  "version": "3.0.0-alpha8",
   "description": "Simple event-streaming framework",
   "repository": "comparaonline/event-streamer",
   "author": {
