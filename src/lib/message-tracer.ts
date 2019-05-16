@@ -1,5 +1,6 @@
 import * as opentracing from 'opentracing';
-import { RawEvent } from '../events';
+import { EventMessage } from '../kafka/interfaces/event-message';
+import { FutureResult } from '../kafka/interfaces/future-result';
 
 const DD_SERVICE_NAME = 'kafka.event.consume';
 const APM_TYPE = 'KafkaEventConsume';
@@ -20,8 +21,12 @@ const logError = (span: opentracing.Span) => <T extends Error>(error: T) => {
   throw error;
 };
 
-export const messageTracer = (projectName: string, topic: string) => {
-  return <T, D extends { event: RawEvent, result: Promise<T> }>(data: D) => {
+export interface PromiseTracer {
+  (data: EventMessage & FutureResult): EventMessage & FutureResult;
+}
+
+export const messageTracer = (projectName: string, topic: string): PromiseTracer => {
+  return (data: EventMessage & FutureResult): EventMessage & FutureResult => {
     const tracer = opentracing.globalTracer();
     const span = tracer.startSpan(
       DD_SERVICE_NAME,

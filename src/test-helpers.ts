@@ -1,23 +1,29 @@
 import { Server } from './server';
 import { RawEvent, OutputEvent, InputEvent } from './events';
 import { Router } from './router';
+import { Subject } from 'rxjs';
 
 export class TestServer extends Server {
-  constructor(
-    private router: Router
-  ) { super(router); }
-
   private outputEvents: OutputEvent[] = [];
+  private subject = new Subject();
+
+  constructor(
+    router: Router
+  ) {
+    super(router);
+    this.subject.pipe(router.route(v => v));
+  }
 
   input(rawEvent: RawEvent) {
-    return this.router.route(rawEvent);
+    this.subject.next(rawEvent);
   }
 
   output(event: OutputEvent): void {
     this.outputEvents.push(event);
   }
 
-  emitted(): OutputEvent[] {
+  async emitted(): Promise<OutputEvent[]> {
+    await this.subject.toPromise();
     return this.outputEvents;
   }
 

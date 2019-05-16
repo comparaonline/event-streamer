@@ -2,7 +2,7 @@ import {
   createReadStream, ConsumerStream, ConsumerStreamMessage
 } from 'node-rdkafka';
 import { fromEvent, GroupedObservable } from 'rxjs';
-import { concatMap, map, groupBy, tap, flatMap } from 'rxjs/operators';
+import { map, groupBy, tap, flatMap, filter } from 'rxjs/operators';
 import { Router } from '../router';
 import { EventEmitter } from 'events';
 import { RawEvent } from '../events';
@@ -11,6 +11,7 @@ import { Partition } from './interfaces/partition';
 import { InitialOffset } from './interfaces/initial-offset';
 import { RDKafkaConfiguration } from './interfaces/rdkafka-configuration';
 import { messageTracer } from '../lib/message-tracer';
+import { EventMessage } from './interfaces/event-message';
 
 const topicPartition = ({ topic, partition }: ConsumerStreamMessage) => `${topic}:${partition}`;
 
@@ -74,45 +75,45 @@ export class EventConsumer extends EventEmitter {
     const trace = messageTracer(this.config.projectName, partition.key);
 
     return partition.pipe(
-      map(this.parseEvent()),
-      tap(this.log('Consuming')),
-      map(this.route()),
-      map(trace),
-      concatMap(this.awaitResult()),
-      tap(this.log('Committing')),
-      map(this.commit())
+      this.buildEvent(),
+      this.filterEvents(),
+      this.log('Consuming'),
+      this.router.route(trace),
+      this.log('Committing'),
+      this.commit()
     );
   }
 
-  private parseEvent() {
-    return (message: ConsumerStreamMessage) => {
-      try {
-        return { message, event: JSON.parse(message.value.toString()) as RawEvent };
-      } catch (error) {
-        this.logger.error(`Omitted message. Unable to parse: ${JSON.stringify(message)}. ${error}`);
-        return { message, event: { code: '' } };
-      }
-    };
+  private buildEvent() {
+    return map((message: ConsumerStreamMessage) =>
+      ({ message, event: this.parseEvent(message.value.toString()) }));
   }
 
-  private log<T extends { event: RawEvent }>(message: string) {
-    return ({ event }: T) => this.logger.debug(`${message} ${JSON.stringify(event)}`);
+  private filterEvents() {
+    return filter(({ event: { code } }: EventMessage) =>
+      this.router.canHandle(code));
   }
 
-  private route<T extends { event: RawEvent }>() {
-    return (data: T) => ({ ...data, result: this.router.route(data.event) });
-  }
-
-  private awaitResult<T extends { result: Promise<any> }>() {
-    return async (data: T) => ({ ...data, result: await data.result });
+  private log(message: string) {
+    return tap(({ event }: EventMessage) =>
+      this.logger.debug(`${message} ${JSON.stringify(event)}`));
   }
 
   private commit() {
-    return ({ message }: { message: ConsumerStreamMessage }) => {
+    return tap(({ message }: EventMessage) => {
       const consumer = this.consumerStream.consumer;
       if (consumer.isConnected()) {
         consumer.commitMessage(message);
       }
-    };
+    });
+  }
+
+  private parseEvent(json: string): RawEvent {
+    try {
+      return JSON.parse(json);
+    } catch (error) {
+      this.logger.error(`Omitted message. Unable to parse: ${json}. ${error}`);
+      return { code: '' };
+    }
   }
 }
