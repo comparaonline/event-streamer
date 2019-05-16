@@ -3,7 +3,7 @@ import { Router } from '../router';
 import { OutputEvent } from '../events';
 import { EventConsumer } from './event-consumer';
 import { EventProducer } from './event-producer';
-import { ConsumerGroupStreamOptions, ProducerStreamOptions, KafkaClientOptions, ProducerOptions } from 'kafka-node';
+import { ConsumerGroupStreamOptions, KafkaClientOptions, ProducerOptions } from 'kafka-node';
 
 export class KafkaServer extends Server {
   private consumer: EventConsumer;
