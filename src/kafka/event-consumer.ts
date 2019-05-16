@@ -44,7 +44,7 @@ export class EventConsumer extends EventEmitter {
   private createStream(): ConsumerGroupStream {
     const config = { ...this.config, autoCommit: false };
     const stream = new ConsumerGroupStream(config, this.topics);
-    stream.once('ready', () => {
+    stream.on('ready', () => {
       console.info(`Consumer ready. Topics: ${this.topics.join(', ')}`);
     });
     return stream;
