@@ -1,54 +1,37 @@
-import { ProducerStream, ProducerStreamOptions } from 'kafka-node';
+import { Producer, KafkaClient, ProducerOptions, KafkaClientOptions } from 'kafka-node';
 import { EventEmitter } from 'events';
 import { KafkaOutputEvent } from './kafka-events';
 
 export class EventProducer extends EventEmitter {
-  private producerStream: ProducerStream;
+  private producer: Producer;
 
   constructor(
-    private config: ProducerStreamOptions,
+    private clientConfig: KafkaClientOptions,
+    private producerConfig: ProducerOptions,
     private defaultTopic: string
   ) { super(); }
 
   start(): void {
-    this.producerStream = this.createStream();
-    this.producerStream.on('error', error => this.emit('error', error));
+    const client = new KafkaClient(this.clientConfig);
+    this.producer = new Producer(client, this.producerConfig);
   }
 
   stop(): Promise<any> {
     return new Promise((resolve) => {
-      this.producerStream.close(() => {
+      this.producer.close(() => {
         resolve('Producer disconnected');
       });
     });
   }
 
   produce(event: KafkaOutputEvent) {
-    try {
-      return this.producerStream.write({
+    return new Promise((resolve, reject) => this.producer.send(
+      [{
         topic: event.topic || this.defaultTopic,
-        partition: null,
-        value: new Buffer(event.toString()),
-        key: event.key,
-        timestamp: Date.now()
-      });
-    } catch (error) {
-      this.emit(error);
-    }
-  }
-
-  flush() {
-    return new Promise((resolve, reject) => {
-      console.debug('Closing producer');
-      this.producerStream.end((error: Error) => error ? reject(error) : resolve());
-    });
-  }
-
-  private createStream(): ProducerStream {
-    const stream = new ProducerStream(this.config);
-    stream.once('ready', () => {
-      console.info('Producer ready');
-    });
-    return stream;
+        messages: event.toString(),
+        key: event.key
+      }],
+      (error: Error, data: any) => error ? reject(error) : resolve(data))
+    );
   }
 }
