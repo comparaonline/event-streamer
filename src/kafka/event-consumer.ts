@@ -22,7 +22,6 @@ export class EventConsumer extends EventEmitter {
     this.consumerStream = this.createStream();
     this.consumerStream.on('error', error => this.emit('error', error));
     fromEvent(this.consumerStream, 'data').pipe(
-      tap(message => console.dir({ message, text: 'received message' })),
       groupBy(topicPartition),
       map(partition => this.handlePartition(partition)),
       flatMap(partition => partition)
