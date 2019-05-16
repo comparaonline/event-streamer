@@ -1,9 +1,9 @@
-import { Producer, KafkaClient, ProducerOptions, KafkaClientOptions } from 'kafka-node';
+import { KafkaClient, ProducerOptions, KafkaClientOptions, HighLevelProducer } from 'kafka-node';
 import { EventEmitter } from 'events';
 import { KafkaOutputEvent } from './kafka-events';
 
 export class EventProducer extends EventEmitter {
-  private producer: Producer;
+  private producer: HighLevelProducer;
 
   constructor(
     private clientConfig: KafkaClientOptions,
@@ -13,7 +13,10 @@ export class EventProducer extends EventEmitter {
 
   start(): void {
     const client = new KafkaClient(this.clientConfig);
-    this.producer = new Producer(client, this.producerConfig);
+    this.producer = new HighLevelProducer(client, this.producerConfig);
+    this.producer.once('ready', () => {
+      console.info(`Producer ready. Default topic: ${this.defaultTopic}`);
+    });
   }
 
   stop(): Promise<any> {
