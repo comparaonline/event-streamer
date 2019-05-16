@@ -37,7 +37,7 @@
     "coverage": "jest --coverage"
   },
   "dependencies": {
-    "node-rdkafka": "^2.2.1",
+    "kafka-node": "^4.1.3",
     "opentracing": "^0.14.3",
     "reflect-metadata": "^0.1.10",
     "rxjs": "^6.3.3"
