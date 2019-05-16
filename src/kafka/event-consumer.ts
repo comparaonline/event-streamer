@@ -1,35 +1,27 @@
-import {
-  createReadStream, ConsumerStream, ConsumerStreamMessage
-} from 'node-rdkafka';
 import { fromEvent, GroupedObservable } from 'rxjs';
 import { map, groupBy, tap, flatMap, filter } from 'rxjs/operators';
+import { ConsumerGroupStream, ConsumerGroupStreamOptions, Message } from 'kafka-node';
 import { Router } from '../router';
 import { EventEmitter } from 'events';
 import { RawEvent } from '../events';
-import { EventConsumerConfiguration } from './interfaces/event-consumer-configuration';
-import { Partition } from './interfaces/partition';
-import { InitialOffset } from './interfaces/initial-offset';
-import { RDKafkaConfiguration } from './interfaces/rdkafka-configuration';
 import { messageTracer } from '../lib/message-tracer';
 import { EventMessage } from './interfaces/event-message';
 
-const topicPartition = ({ topic, partition }: ConsumerStreamMessage) => `${topic}:${partition}`;
+const topicPartition = ({ topic, partition }: Message) => `${topic}:${partition}`;
 
 export class EventConsumer extends EventEmitter {
-  private consumerStream: ConsumerStream;
-  private partitions = new Map<string, Partition>();
+  private consumerStream: ConsumerGroupStream;
 
   constructor(
     private router: Router,
-    private config: EventConsumerConfiguration,
-    private rdConfig: RDKafkaConfiguration = {},
-    private logger = config.logger
+    private config: ConsumerGroupStreamOptions,
+    private topics: string[]
   ) { super(); }
 
   start(): void {
-    this.consumerStream = this.createStream(this.config.initialOffset);
+    this.consumerStream = this.createStream();
     this.consumerStream.on('error', error => this.emit('error', error));
-    fromEvent(this.consumerStream, 'data').pipe(
+    fromEvent(this.consumerStream, 'message').pipe(
       groupBy(topicPartition),
       map(partition => this.handlePartition(partition)),
       flatMap(partition => partition)
@@ -40,7 +32,6 @@ export class EventConsumer extends EventEmitter {
   }
 
   stop(): Promise<any> {
-    this.partitions.forEach(p => p.subscription.unsubscribe());
     return new Promise((resolve) => {
       this.consumerStream.close(() => {
         resolve('Consumer disconnected');
@@ -48,31 +39,17 @@ export class EventConsumer extends EventEmitter {
     });
   }
 
-  private createStream(initialOffset: InitialOffset): ConsumerStream {
-    const stream = createReadStream(
-      {
-        'group.id': this.config.groupId,
-        'metadata.broker.list': this.config.broker,
-        'enable.auto.offset.store': false,
-        ...this.rdConfig
-      },
-      {
-        'auto.offset.reset': initialOffset
-      },
-      {
-        topics: this.config.topics,
-        objectMode: true,
-        connectOptions: { timeout: this.config.connectionTimeout }
-      }
-    );
-    stream.consumer.once('ready', () => {
-      this.logger.info(`Consumer ready. Topics: ${this.config.topics.join(', ')}`);
+  private createStream(): ConsumerGroupStream {
+    const config = { ...this.config, autoCommit: false };
+    const stream = new ConsumerGroupStream(config, this.topics);
+    stream.once('ready', () => {
+      console.info(`Consumer ready. Topics: ${this.topics.join(', ')}`);
     });
     return stream;
   }
 
-  private handlePartition(partition: GroupedObservable<string, ConsumerStreamMessage>) {
-    const trace = messageTracer(this.config.projectName, partition.key);
+  private handlePartition(partition: GroupedObservable<string, Message>) {
+    const trace = messageTracer(this.config.groupId, partition.key);
 
     return partition.pipe(
       this.buildEvent(),
@@ -85,7 +62,7 @@ export class EventConsumer extends EventEmitter {
   }
 
   private buildEvent() {
-    return map((message: ConsumerStreamMessage) =>
+    return map((message: Message) =>
       ({ message, event: this.parseEvent(message.value.toString()) }));
   }
 
@@ -96,23 +73,18 @@ export class EventConsumer extends EventEmitter {
 
   private log(message: string) {
     return tap(({ event }: EventMessage) =>
-      this.logger.debug(`${message} ${JSON.stringify(event)}`));
+      console.debug(`${message} ${JSON.stringify(event)}`));
   }
 
   private commit() {
-    return tap(({ message }: EventMessage) => {
-      const consumer = this.consumerStream.consumer;
-      if (consumer.isConnected()) {
-        consumer.commitMessage(message);
-      }
-    });
+    return tap(({ message }: EventMessage) => this.consumerStream.commit(message));
   }
 
   private parseEvent(json: string): RawEvent {
     try {
       return JSON.parse(json);
     } catch (error) {
-      this.logger.error(`Omitted message. Unable to parse: ${json}. ${error}`);
+      console.error(`Omitted message. Unable to parse: ${json}. ${error}`);
       return { code: '' };
     }
   }
