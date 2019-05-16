@@ -3,7 +3,7 @@ import { Router } from '../router';
 import { OutputEvent } from '../events';
 import { EventConsumer } from './event-consumer';
 import { EventProducer } from './event-producer';
-import { ConsumerGroupStreamOptions, ProducerStreamOptions } from 'kafka-node';
+import { ConsumerGroupStreamOptions, ProducerStreamOptions, KafkaClientOptions, ProducerOptions } from 'kafka-node';
 
 export class KafkaServer extends Server {
   private consumer: EventConsumer;
@@ -11,14 +11,15 @@ export class KafkaServer extends Server {
 
   constructor(
     router: Router,
-    private consumerOptions: ConsumerGroupStreamOptions,
-    private producerOptions: ProducerStreamOptions,
+    consumerOptions: ConsumerGroupStreamOptions,
+    kafkaClientOptions: KafkaClientOptions,
+    producerOptions: ProducerOptions,
     topics: string[],
     defaultTopic: string
   ) {
     super(router);
-    this.consumer = new EventConsumer(router, this.consumerOptions, topics);
-    this.producer = new EventProducer(this.producerOptions, defaultTopic);
+    this.consumer = new EventConsumer(router, consumerOptions, topics);
+    this.producer = new EventProducer(kafkaClientOptions, producerOptions, defaultTopic);
   }
 
   start() {
