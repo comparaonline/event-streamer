@@ -1,7 +1,7 @@
-import { ConsumerStreamMessage } from 'node-rdkafka';
 import { RawEvent } from '../../events';
+import { Message } from 'kafka-node';
 
 export interface EventMessage {
-  message: ConsumerStreamMessage;
+  message: Message;
   event: RawEvent;
 }

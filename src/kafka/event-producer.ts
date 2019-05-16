@@ -1,16 +1,13 @@
-import { createWriteStream, ProducerStream } from 'node-rdkafka';
+import { ProducerStream, ProducerStreamOptions } from 'kafka-node';
 import { EventEmitter } from 'events';
 import { KafkaOutputEvent } from './kafka-events';
-import { RDKafkaConfiguration } from './interfaces/rdkafka-configuration';
-import { EventProducerConfig } from './interfaces/event-producer-configuration';
 
 export class EventProducer extends EventEmitter {
   private producerStream: ProducerStream;
 
   constructor(
-    private config: EventProducerConfig,
-    private rdConfig: RDKafkaConfiguration = {},
-    private logger = config.logger
+    private config: ProducerStreamOptions,
+    private defaultTopic: string
   ) { super(); }
 
   start(): void {
@@ -29,7 +26,7 @@ export class EventProducer extends EventEmitter {
   produce(event: KafkaOutputEvent) {
     try {
       return this.producerStream.write({
-        topic: event.topic || this.config.defaultTopic,
+        topic: event.topic || this.defaultTopic,
         partition: null,
         value: new Buffer(event.toString()),
         key: event.key,
@@ -42,35 +39,15 @@ export class EventProducer extends EventEmitter {
 
   flush() {
     return new Promise((resolve, reject) => {
-      const producer = this.producerStream.producer;
-      if (!producer.isConnected()) {
-        return reject('Producer not connected');
-      }
-      this.logger.debug('Flushing producer');
-      producer.flush(this.config.flushTimeout, (error) => {
-        if (error) {
-          return reject(error);
-        }
-        resolve();
-      });
+      console.debug('Closing producer');
+      this.producerStream.end((error: Error) => error ? reject(error) : resolve());
     });
   }
 
   private createStream(): ProducerStream {
-    const stream = createWriteStream(
-      {
-        'group.id': this.config.groupId,
-        'metadata.broker.list': this.config.broker,
-        ...this.rdConfig
-      },
-      {},
-      {
-        objectMode: true,
-        connectOptions: { timeout: this.config.connectionTimeout }
-      }
-    );
-    stream.producer.once('ready', () => {
-      this.logger.info('Producer ready');
+    const stream = new ProducerStream(this.config);
+    stream.once('ready', () => {
+      console.info('Producer ready');
     });
     return stream;
   }
