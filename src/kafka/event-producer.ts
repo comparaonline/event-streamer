@@ -32,6 +32,6 @@ export class EventProducer extends EventEmitter {
         key: event.key
       }],
       (error: Error, data: any) => error ? reject(error) : resolve(data))
-    );
+    ).then((resolve: any) => console.dir({ resolve })).catch(error => console.dir({ error }));
   }
 }
