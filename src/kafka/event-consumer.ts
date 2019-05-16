@@ -22,6 +22,7 @@ export class EventConsumer extends EventEmitter {
     this.consumerStream = this.createStream();
     this.consumerStream.on('error', error => this.emit('error', error));
     fromEvent(this.consumerStream, 'message').pipe(
+      tap(message => console.dir({ message, text: 'received message' })),
       groupBy(topicPartition),
       map(partition => this.handlePartition(partition)),
       flatMap(partition => partition)
@@ -29,6 +30,7 @@ export class EventConsumer extends EventEmitter {
       null,
       (error) => { this.emit('error', error); }
     );
+    this.consumerStream.resume();
   }
 
   stop(): Promise<any> {
@@ -68,7 +70,7 @@ export class EventConsumer extends EventEmitter {
 
   private filterEvents() {
     return filter(({ event: { code } }: EventMessage) =>
-      this.router.canHandle(code));
+      this.router.canRoute(code));
   }
 
   private log(message: string) {
