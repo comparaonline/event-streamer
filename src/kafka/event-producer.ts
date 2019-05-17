@@ -4,6 +4,7 @@ import {
 import { EventEmitter } from 'events';
 import { KafkaOutputEvent } from './kafka-events';
 import { clientOptions } from './client-options';
+import { promisify } from 'util';
 
 export class EventProducer extends EventEmitter {
   private producer: HighLevelProducer;
@@ -31,13 +32,15 @@ export class EventProducer extends EventEmitter {
   }
 
   produce(event: KafkaOutputEvent) {
-    return new Promise((resolve, reject) => this.producer.send(
-      [{
-        topic: event.topic || this.defaultTopic,
-        messages: event.toString(),
-        key: event.key
-      }],
-      (error: Error, data: any) => error ? reject(error) : resolve(data))
-    );
+    const fn = promisify(this.producer.send.bind(this.producer));
+    return fn(this.message(event));
+  }
+
+  private message(event: KafkaOutputEvent) {
+    return [{
+      topic: event.topic || this.defaultTopic,
+      messages: event.toString(),
+      key: event.key
+    }];
   }
 }
