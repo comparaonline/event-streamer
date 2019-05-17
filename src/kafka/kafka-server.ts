@@ -8,11 +8,14 @@ import { KafkaConfiguration } from './interfaces/kafka-configuration';
 import { InitialOffset } from './interfaces/initial-offset';
 import { EventConsumerConfiguration } from './interfaces/event-consumer-configuration';
 import { EventProducerConfig } from './interfaces/event-producer-configuration';
-import { extendConfig } from '../lib/extend-config';
 
 const nullFn = () => { };
 
-const defaultConfig: Partial<KafkaConfiguration> = {
+const defaultConfig: KafkaConfiguration = {
+  groupId: '',
+  broker: '',
+  consumerTopics: [],
+  producerTopic: '',
   logger: {
     info: nullFn,
     debug: nullFn,
@@ -28,15 +31,13 @@ const defaultConfig: Partial<KafkaConfiguration> = {
 export class KafkaServer extends Server {
   private consumer: EventConsumer;
   private producer: EventProducer;
-  private config: KafkaConfiguration;
 
   constructor(
     router: Router,
-    config: Partial<KafkaConfiguration>,
+    private config: Partial<KafkaConfiguration>,
     rdConfig: RDKafkaConfiguration = {}
   ) {
     super(router);
-    this.config = extendConfig(config, defaultConfig);
     this.consumer = new EventConsumer(router, this.consumerConfig, rdConfig);
     this.producer = new EventProducer(this.producerConfig, rdConfig);
   }
@@ -58,24 +59,24 @@ export class KafkaServer extends Server {
 
   private get consumerConfig(): EventConsumerConfiguration {
     return {
-      logger: this.config.logger,
-      groupId: this.config.groupId,
-      broker: this.config.broker,
-      topics: this.config.consumerTopics,
-      initialOffset: this.config.initialOffset,
-      connectionTimeout: this.config.connectionTimeout,
-      projectName: this.config.projectName
+      logger: this.config.logger || defaultConfig.logger,
+      groupId: this.config.groupId || defaultConfig.groupId,
+      broker: this.config.broker || defaultConfig.broker,
+      topics: this.config.consumerTopics || defaultConfig.consumerTopics,
+      initialOffset: this.config.initialOffset || defaultConfig.initialOffset,
+      connectionTimeout: this.config.connectionTimeout || defaultConfig.connectionTimeout,
+      projectName: this.config.projectName || defaultConfig.projectName
     };
   }
 
   private get producerConfig(): EventProducerConfig {
     return {
-      logger: this.config.logger,
-      groupId: this.config.groupId,
-      broker: this.config.broker,
-      defaultTopic: this.config.producerTopic,
-      connectionTimeout: this.config.connectionTimeout,
-      flushTimeout: this.config.flushTimeout
+      logger: this.config.logger || defaultConfig.logger,
+      groupId: this.config.groupId || defaultConfig.groupId,
+      broker: this.config.broker || defaultConfig.broker,
+      defaultTopic: this.config.producerTopic || defaultConfig.producerTopic,
+      connectionTimeout: this.config.connectionTimeout || defaultConfig.connectionTimeout,
+      flushTimeout: this.config.flushTimeout || defaultConfig.flushTimeout
     };
   }
 }

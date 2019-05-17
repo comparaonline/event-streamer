@@ -1,8 +1,8 @@
 import {
   createReadStream, ConsumerStream, ConsumerStreamMessage
 } from 'node-rdkafka';
-import { Subject } from 'rxjs';
-import { concatMap, map } from 'rxjs/operators';
+import { fromEvent, GroupedObservable } from 'rxjs';
+import { map, groupBy, tap, flatMap, filter } from 'rxjs/operators';
 import { Router } from '../router';
 import { EventEmitter } from 'events';
 import { RawEvent } from '../events';
@@ -10,11 +10,10 @@ import { EventConsumerConfiguration } from './interfaces/event-consumer-configur
 import { Partition } from './interfaces/partition';
 import { InitialOffset } from './interfaces/initial-offset';
 import { RDKafkaConfiguration } from './interfaces/rdkafka-configuration';
-import * as opentracing from 'opentracing';
+import { messageTracer } from '../lib/message-tracer';
+import { EventMessage } from './interfaces/event-message';
 
-const DD_SERVICE_NAME = 'kafka.event.consume';
-const APM_TYPE = 'KafkaEventConsume';
-const key = ({ topic, partition }: ConsumerStreamMessage) => `${topic}:${partition}`;
+const topicPartition = ({ topic, partition }: ConsumerStreamMessage) => `${topic}:${partition}`;
 
 export class EventConsumer extends EventEmitter {
   private consumerStream: ConsumerStream;
@@ -30,9 +29,14 @@ export class EventConsumer extends EventEmitter {
   start(): void {
     this.consumerStream = this.createStream(this.config.initialOffset);
     this.consumerStream.on('error', error => this.emit('error', error));
-    this.consumerStream.on('data', (message: ConsumerStreamMessage) => {
-      this.dispatch(message);
-    });
+    fromEvent(this.consumerStream, 'data').pipe(
+      groupBy(topicPartition),
+      map(partition => this.handlePartition(partition)),
+      flatMap(partition => partition)
+    ).subscribe(
+      null,
+      (error) => { this.emit('error', error); }
+    );
   }
 
   stop(): Promise<any> {
@@ -42,11 +46,6 @@ export class EventConsumer extends EventEmitter {
         resolve('Consumer disconnected');
       });
     });
-  }
-
-  dispatch(message: ConsumerStreamMessage) {
-    const partition = this.getPartition(key(message));
-    partition.observer.next(message);
   }
 
   private createStream(initialOffset: InitialOffset): ConsumerStream {
@@ -72,78 +71,49 @@ export class EventConsumer extends EventEmitter {
     return stream;
   }
 
-  private getPartition(key: string): Partition {
-    let partition = this.partitions.get(key);
-    if (!partition) {
-      partition = this.initPartition();
-      this.partitions.set(key, partition);
-    }
-    return partition;
+  private handlePartition(partition: GroupedObservable<string, ConsumerStreamMessage>) {
+    const trace = messageTracer(this.config.projectName, partition.key);
+
+    return partition.pipe(
+      this.buildEvent(),
+      this.filterEvents(),
+      this.log('Consuming'),
+      this.router.route(trace),
+      this.log('Committing'),
+      this.commit()
+    );
   }
 
-  private initPartition(): Partition {
-    const observer = new Subject<ConsumerStreamMessage>();
-    const subscription = observer.pipe(
-      map(message => this.consume(message)),
-      concatMap(result => result)
-    ).subscribe(
-        message => this.commit(message),
-        error => this.emit('error', error)
-      );
-    return { observer, subscription };
+  private buildEvent() {
+    return map((message: ConsumerStreamMessage) =>
+      ({ message, event: this.parseEvent(message.value.toString()) }));
   }
 
-  private consume(message: ConsumerStreamMessage): Promise<ConsumerStreamMessage> {
-    const event = this.parseEvent(message);
-    const span = this.startSpan(event, message.topic);
-    this.logger.debug(`Consuming ${JSON.stringify(event)}`);
-    return this.router.route(event)
-      .then(() => {
-        span.finish();
-        return message;
-      })
-      .catch((error) => {
-        span.setTag(opentracing.Tags.ERROR, true);
-        span.log({
-          event: 'error',
-          'error.object': error,
-          message: error.message,
-          stack: error.stack
-        });
-        span.finish();
-        throw error;
-      });
+  private filterEvents() {
+    return filter(({ event: { code } }: EventMessage) =>
+      this.router.canHandle(code));
   }
 
-  private parseEvent(message: ConsumerStreamMessage): RawEvent {
+  private log(message: string) {
+    return tap(({ event }: EventMessage) =>
+      this.logger.debug(`${message} ${JSON.stringify(event)}`));
+  }
+
+  private commit() {
+    return tap(({ message }: EventMessage) => {
+      const consumer = this.consumerStream.consumer;
+      if (consumer.isConnected()) {
+        consumer.commitMessage(message);
+      }
+    });
+  }
+
+  private parseEvent(json: string): RawEvent {
     try {
-      return JSON.parse(message.value.toString());
+      return JSON.parse(json);
     } catch (error) {
-      this.logger.error(`Omitted message. Unable to parse: ${JSON.stringify(message)}. ${error}`);
+      this.logger.error(`Omitted message. Unable to parse: ${json}. ${error}`);
       return { code: '' };
     }
-  }
-
-  private commit(message: ConsumerStreamMessage) {
-    this.logger.debug(`Committing ${message.value}`);
-    const consumer = this.consumerStream.consumer;
-    if (consumer.isConnected()) {
-      consumer.commitMessage(message);
-    }
-  }
-
-  private startSpan(event: RawEvent, topic: string) : opentracing.Span {
-    const tracer = opentracing.globalTracer();
-    return tracer.startSpan(
-      DD_SERVICE_NAME,
-      {
-        tags: {
-          topic,
-          type: APM_TYPE,
-          'service.name': `${this.config.projectName}-events`,
-          'resource.name': event.code
-        }
-      }
-    );
   }
 }
