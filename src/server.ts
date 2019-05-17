@@ -8,5 +8,5 @@ export abstract class Server extends EventEmitter {
     router.setEmitter(this);
   }
 
-  abstract output(event: OutputEvent): void;
+  abstract output(event: OutputEvent): Promise<void>;
 }

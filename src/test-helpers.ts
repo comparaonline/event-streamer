@@ -18,7 +18,7 @@ export class TestServer extends Server {
     this.subject.next(rawEvent);
   }
 
-  output(event: OutputEvent): void {
+  async output(event: OutputEvent): Promise<void> {
     this.outputEvents.push(event);
   }
 

@@ -31,7 +31,7 @@ export class EventProducer extends EventEmitter {
     });
   }
 
-  produce(event: KafkaOutputEvent) {
+  produce(event: KafkaOutputEvent): Promise<void> {
     const fn = promisify(this.producer.send.bind(this.producer));
     return fn(this.message(event));
   }
