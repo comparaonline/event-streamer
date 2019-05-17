@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 // Main Classes
 export { Router } from './router';
 export { InputEvent, OutputEvent } from './events';

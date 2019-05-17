@@ -19,7 +19,8 @@
     "suppressImplicitAnyIndexErrors": true,
     "strictNullChecks": true,
     "target": "es2017",
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "resolveJsonModule": true
   },
   "include": [
     "src/**/*"
