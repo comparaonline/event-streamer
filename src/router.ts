@@ -28,7 +28,7 @@ export class Router {
     this.routes.set(event.code, route);
   }
 
-  canHandle(eventName: string) {
+  canRoute(eventName: string) {
     return this.routes.has(eventName);
   }
 

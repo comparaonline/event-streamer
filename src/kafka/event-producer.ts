@@ -1,77 +1,46 @@
-import { createWriteStream, ProducerStream } from 'node-rdkafka';
+import {
+  KafkaClient, ProducerOptions, KafkaClientOptions, HighLevelProducer
+} from 'kafka-node';
 import { EventEmitter } from 'events';
 import { KafkaOutputEvent } from './kafka-events';
-import { RDKafkaConfiguration } from './interfaces/rdkafka-configuration';
-import { EventProducerConfig } from './interfaces/event-producer-configuration';
+import { clientOptions } from './client-options';
+import { promisify } from 'util';
 
 export class EventProducer extends EventEmitter {
-  private producerStream: ProducerStream;
+  private producer: HighLevelProducer;
 
   constructor(
-    private config: EventProducerConfig,
-    private rdConfig: RDKafkaConfiguration = {},
-    private logger = config.logger
+    private clientConfig: KafkaClientOptions,
+    private producerConfig: ProducerOptions,
+    private defaultTopic: string
   ) { super(); }
 
   start(): void {
-    this.producerStream = this.createStream();
-    this.producerStream.on('error', error => this.emit('error', error));
+    const client = new KafkaClient(clientOptions(this.clientConfig));
+    this.producer = new HighLevelProducer(client, this.producerConfig);
+    this.producer.on('ready', () => {
+      console.info(`Producer ready. Default topic: ${this.defaultTopic}`);
+    });
   }
 
   stop(): Promise<any> {
     return new Promise((resolve) => {
-      this.producerStream.close(() => {
+      this.producer.close(() => {
         resolve('Producer disconnected');
       });
     });
   }
 
   produce(event: KafkaOutputEvent) {
-    try {
-      return this.producerStream.write({
-        topic: event.topic || this.config.defaultTopic,
-        partition: null,
-        value: new Buffer(event.toString()),
-        key: event.key,
-        timestamp: Date.now()
-      });
-    } catch (error) {
-      this.emit(error);
-    }
+    const fn = promisify(this.producer.send.bind(this.producer));
+    return fn(this.message(event));
   }
 
-  flush() {
-    return new Promise((resolve, reject) => {
-      const producer = this.producerStream.producer;
-      if (!producer.isConnected()) {
-        return reject('Producer not connected');
-      }
-      this.logger.debug('Flushing producer');
-      producer.flush(this.config.flushTimeout, (error) => {
-        if (error) {
-          return reject(error);
-        }
-        resolve();
-      });
-    });
-  }
-
-  private createStream(): ProducerStream {
-    const stream = createWriteStream(
-      {
-        'group.id': this.config.groupId,
-        'metadata.broker.list': this.config.broker,
-        ...this.rdConfig
-      },
-      {},
-      {
-        objectMode: true,
-        connectOptions: { timeout: this.config.connectionTimeout }
-      }
-    );
-    stream.producer.once('ready', () => {
-      this.logger.info('Producer ready');
-    });
-    return stream;
+  private message(event: KafkaOutputEvent) {
+    return [{
+      topic: event.topic || this.defaultTopic,
+      messages: event.toString(),
+      key: event.key
+    }];
   }
 }
