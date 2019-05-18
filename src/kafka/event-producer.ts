@@ -19,6 +19,7 @@ export class EventProducer extends EventEmitter {
     const client = new KafkaClient(clientOptions(this.clientConfig));
     this.producer = new HighLevelProducer(client, this.producerConfig);
     this.producer.on('ready', () => {
+      /* istanbul ignore next */
       console.info(`Producer ready. Default topic: ${this.defaultTopic}`);
     });
   }

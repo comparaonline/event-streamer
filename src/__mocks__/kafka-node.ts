@@ -18,7 +18,8 @@ const createSpies = ({ on, trigger, listeners }: EmitterHelper) => ({
     off: jest.fn(),
     start: jest.fn(),
     resume: jest.fn(),
-    close: jest.fn(fn => fn())
+    close: jest.fn(fn => fn()),
+    commit: jest.fn()
   }
 });
 

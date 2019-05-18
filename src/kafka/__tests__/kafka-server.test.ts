@@ -1,15 +1,15 @@
-import { KafkaServer } from '../kafka-server';
-import { testConfig } from './helpers/test-configuration';
-import { registeredEvent } from './helpers/registered-event';
-import { testRouter } from './factories/test-router';
 import kafkaNode = require('../../__mocks__/kafka-node');
-import { TestOutputEvent } from './factories/test-output-event';
+import { KafkaServer } from '../kafka-server';
+import { kafkaServerConfig } from '../../test/factories/configurations';
+import { registeredEvent } from './helpers/registered-event';
+import { testRouter } from '../../test/factories/test-router';
+import { TestOutputEvent } from '../../test/factories/test-output-event';
 
 describe('KafkaServer', () => {
   let server: KafkaServer;
   beforeEach(() => kafkaNode.reset());
   beforeEach(() => {
-    server = new KafkaServer(testRouter, ...testConfig);
+    server = new KafkaServer(testRouter(), ...kafkaServerConfig);
     server.start();
   });
 
@@ -53,7 +53,7 @@ describe('KafkaServer', () => {
       }];
       await server.output(event);
       const send = kafkaNode.spies.HighLevelProducer.send;
-      expect(send).toHaveBeenCalledWith(expectedMessage, jasmine.anything());
+      expect(send).toHaveBeenCalledWith(expectedMessage, expect.anything());
     });
   });
 });

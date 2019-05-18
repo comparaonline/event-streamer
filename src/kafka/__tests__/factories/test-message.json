@@ -1,5 +1,0 @@
-{
-  "topic": "testTopic",
-  "value": "{\"class\":\"TestInputEvent\",\"value\":\"Test value\"}",
-  "partition": 0
-}

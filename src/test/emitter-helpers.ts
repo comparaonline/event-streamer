@@ -1,3 +1,5 @@
+import { fail } from 'assert';
+
 export const emitterHelper = () => {
   const listeners = new Map<string, Map<string, Function[]>>();
   return {
@@ -20,5 +22,11 @@ const trigger = (listeners: Map<string, Map < string, Function[] >>) =>
     handlers.forEach(fn => fn(...values));
   };
 
-const get = <K, V>(map: Map<K, Map<K, V>>, ...keys: K[]): V =>
-  keys.reduce((map: Map<K, any>, key) => map.get(key) || fail(`${key} not found on ${map}`), map);
+const get = <V>(map: Map<string, Map<string, V>>, ...keys: string[]): V =>
+  keys.reduce<any>(
+    (map, key) => map.get(key) || fail(`'${key}' not found on ${displayMap(map)}`),
+    map
+  );
+
+const displayMap = (map: Map<string, any>) =>
+  `[${[...map.keys()].map(v => `'${v}'`).join(', ')}]`;
