@@ -40,4 +40,3 @@ export const kafkaServerConfig: ServerConfig = [
   consumerConfig[1],
   producerConfig[2]
 ];
-
