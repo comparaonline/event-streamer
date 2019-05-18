@@ -1,6 +1,6 @@
 /* istanbul ignore file */
 // Main Classes
-export { Router } from './router';
+export { Router, RouteStrategy } from './router';
 export { InputEvent, OutputEvent } from './events';
 export { Action } from './action';
 export { Server } from './server';

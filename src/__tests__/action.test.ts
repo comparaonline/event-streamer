@@ -8,7 +8,7 @@ describe('Action', () => {
     const server: Server = { output } as any;
     const action = new TestOutputAction(server);
     const event = new TestOutputEvent();
-    action.outputEvent = event;
+    TestOutputAction.outputEvent = event;
     await action.perform();
     expect(output).toHaveBeenCalledWith(event);
   });

@@ -7,6 +7,7 @@ import { testInvalidMessage } from '../test/factories/test-invalid-message';
 import { trackAction } from '../test/action-helpers';
 import { buildMessageEvent } from '../test/message-helpers';
 import { testRouting } from '../test/router-helpers';
+import { testRouter } from '../test/factories/test-router';
 
 const actions = [TestAction, TestSlowAction];
 const trackers = actions.map(trackAction);
@@ -56,5 +57,17 @@ describe('Router', () => {
     expect(TestAction.perform).not.toBeCalled();
     expect(TestSlowAction.perform).not.toBeCalled();
 
+  });
+
+  describe('canRoute', () => {
+    it('returns true for known events', () => {
+      const router = testRouter();
+      expect(router.canRoute('TestInputEvent')).toBeTruthy();
+    });
+
+    it('returns false for unkknown events', () => {
+      const router = testRouter();
+      expect(router.canRoute('TestUnknownEvent')).toBeFalsy();
+    });
   });
 });
