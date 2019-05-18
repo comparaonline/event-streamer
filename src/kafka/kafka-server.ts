@@ -5,15 +5,22 @@ import { EventConsumer } from './event-consumer';
 import { EventProducer } from './event-producer';
 import { Configuration } from './interfaces/configuration';
 import { ConfigurationManager } from './configuration-manager';
+import { defaultLogger, setLogger } from '../lib/default-logger';
 
 export class KafkaServer extends Server {
+  private consumer: EventConsumer;
+  private producer: EventProducer;
   constructor(
     router: Router,
     settings: Configuration,
-    config = new ConfigurationManager(settings),
-    private consumer = new EventConsumer(router, config),
-    private producer = new EventProducer(config)
-  ) { super(router); }
+    logger = defaultLogger
+  ) {
+    super(router);
+    setLogger(logger);
+    const config = new ConfigurationManager(settings);
+    this.consumer = new EventConsumer(router, config);
+    this.producer = new EventProducer(config);
+  }
 
   start() {
     this.consumer.start();

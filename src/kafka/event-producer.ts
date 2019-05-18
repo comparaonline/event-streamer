@@ -6,6 +6,7 @@ import { KafkaOutputEvent } from './kafka-events';
 import { clientOptions } from './client-options';
 import { promisify } from 'util';
 import { ConfigurationManager } from './configuration-manager';
+import { defaultLogger } from '../lib/default-logger';
 
 export class EventProducer extends EventEmitter {
   private producer: HighLevelProducer;
@@ -19,7 +20,7 @@ export class EventProducer extends EventEmitter {
     this.producer = new HighLevelProducer(client, this.config.producerOptions);
   /* istanbul ignore next */
     this.producer.on('ready', () => {
-      console.info(`Producer ready. Default topic: ${this.config.producerTopic}`);
+      defaultLogger.info(`Producer ready. Default topic: ${this.config.producerTopic}`);
     });
   }
 

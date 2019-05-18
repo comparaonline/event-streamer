@@ -7,6 +7,7 @@ import { RawEvent } from '../events';
 import { messageTracer } from '../lib/message-tracer';
 import { EventMessage } from './interfaces/event-message';
 import { ConfigurationManager } from './configuration-manager';
+import { defaultLogger } from '../lib/default-logger';
 
 const topicPartition = ({ topic, partition }: Message) => `${topic}:${partition}`;
 
@@ -45,7 +46,7 @@ export class EventConsumer extends EventEmitter {
     const stream = new ConsumerGroupStream(this.config.consumerOptions, topics);
     /* istanbul ignore next */
     stream.on('ready', () => {
-      console.info(`Consumer ready. Topics: ${topics.join(', ')}`);
+      defaultLogger.info(`Consumer ready. Topics: ${topics.join(', ')}`);
     });
     return stream;
   }
@@ -75,7 +76,7 @@ export class EventConsumer extends EventEmitter {
 
   private log(message: string) {
     return tap(({ event }: EventMessage) =>
-      console.debug(`${message} ${JSON.stringify(event)}`));
+      defaultLogger.debug(`${message} ${JSON.stringify(event)}`));
   }
 
   private commit() {
@@ -86,7 +87,7 @@ export class EventConsumer extends EventEmitter {
     try {
       return JSON.parse(json);
     } catch (error) {
-      console.error(`Omitted message. Unable to parse: ${json}. ${error}`);
+      defaultLogger.error(`Omitted message. Unable to parse: ${json}. ${error}`);
       return { code: '' };
     }
   }
