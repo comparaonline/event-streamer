@@ -1,26 +1,25 @@
 import {
-  KafkaClient, ProducerOptions, KafkaClientOptions, HighLevelProducer
+  KafkaClient, HighLevelProducer
 } from 'kafka-node';
 import { EventEmitter } from 'events';
 import { KafkaOutputEvent } from './kafka-events';
 import { clientOptions } from './client-options';
 import { promisify } from 'util';
+import { ConfigurationManager } from './configuration-manager';
 
 export class EventProducer extends EventEmitter {
   private producer: HighLevelProducer;
 
   constructor(
-    private clientConfig: KafkaClientOptions,
-    private producerConfig: ProducerOptions,
-    private defaultTopic: string
+    private config: ConfigurationManager
   ) { super(); }
 
   start(): void {
-    const client = new KafkaClient(clientOptions(this.clientConfig));
-    this.producer = new HighLevelProducer(client, this.producerConfig);
+    const client = new KafkaClient(clientOptions(this.config.kafkaClientOptions));
+    this.producer = new HighLevelProducer(client, this.config.producerOptions);
   /* istanbul ignore next */
     this.producer.on('ready', () => {
-      console.info(`Producer ready. Default topic: ${this.defaultTopic}`);
+      console.info(`Producer ready. Default topic: ${this.config.producerTopic}`);
     });
   }
 
@@ -39,7 +38,7 @@ export class EventProducer extends EventEmitter {
 
   private message(event: KafkaOutputEvent) {
     return [{
-      topic: event.topic || this.defaultTopic,
+      topic: event.topic || this.config.producerTopic,
       messages: event.toString(),
       key: event.key
     }];

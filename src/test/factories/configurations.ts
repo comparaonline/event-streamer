@@ -1,42 +1,17 @@
-import { ConsumerGroupStreamOptions, KafkaClientOptions, ProducerOptions } from 'kafka-node';
+import { Configuration } from '../../kafka/interfaces/configuration';
+import { ConfigurationManager } from '../../kafka/configuration-manager';
 
-type ConsumerConfig = [
-  ConsumerGroupStreamOptions,
-  string[]
-];
-type ProducerConfig = [
-  KafkaClientOptions,
-  ProducerOptions,
-  string
-];
-type ServerConfig = [
-  ConsumerGroupStreamOptions,
-  KafkaClientOptions,
-  ProducerOptions,
-  string[],
-  string
-];
-
-export const consumerConfig: ConsumerConfig = [
-  {
+export const configuration: Configuration = {
+  global: {
+    kafkaHost: 'test-host:9092'
+  },
+  consumer: {
     groupId: 'testGroupId',
-    kafkaHost: 'test-host:9092'
+    topics: ['test-consumer-topic1', 'test-consumer-topic2']
   },
-  ['test-consumer-topic1', 'test-consumer-topic2']
-];
+  producer: {
+    defaultTopic: 'test-producer-topic'
+  }
+};
 
-export const producerConfig: ProducerConfig = [
-  {
-    kafkaHost: 'test-host:9092'
-  },
-  {},
-  'test-producer-topic'
-];
-
-export const kafkaServerConfig: ServerConfig = [
-  consumerConfig[0],
-  producerConfig[0],
-  producerConfig[1],
-  consumerConfig[1],
-  producerConfig[2]
-];
+export const configurationManager = new ConfigurationManager(configuration);
