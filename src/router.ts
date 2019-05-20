@@ -6,13 +6,14 @@ import { Observable, OperatorFunction } from 'rxjs';
 import { EventMessage } from './kafka/interfaces/event-message';
 import { map, concatMap, groupBy, flatMap } from 'rxjs/operators';
 import { FutureResult } from './kafka/interfaces/future-result';
+import { Message } from 'kafka-node';
 
 export const enum RouteStrategy {
   PARALLEL_ROUTE_PARALLEL_DISPATCH,
   PARALLEL_ROUTE_SEQUENTIAL_DISPATCH,
   SEQUENTIAL_ROUTE
 }
-type RouteResult = OperatorFunction <EventMessage, EventMessage>;
+type RouteResult = OperatorFunction<EventMessage, {message: Message}>;
 
 export class Router {
   public strategy = RouteStrategy.PARALLEL_ROUTE_PARALLEL_DISPATCH;
