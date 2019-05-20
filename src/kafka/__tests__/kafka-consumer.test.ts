@@ -4,6 +4,7 @@ import { testRouter } from '../../test/factories/test-router';
 import { testMessage } from '../../test/factories/test-message';
 import { testInvalidMessage } from '../../test/factories/test-invalid-message';
 import { configurationManager } from '../../test/factories/configurations';
+import { eventEmitted } from '../../test/emitter-helpers';
 
 describe('KafkaConsumer', () => {
   let consumer: EventConsumer;
@@ -13,32 +14,34 @@ describe('KafkaConsumer', () => {
     consumer.start();
   });
 
-  it('process a message', () => {
-    const emitted = new Promise((resolve, reject) => {
-      consumer.on('next', resolve);
-      consumer.on('error', reject);
-    });
-    kafkaNode.spies.trigger('ConsumerGroupStream', 'data', testMessage());
-    return expect(emitted).resolves.toBeUndefined();
+  it('process a message', async () => {
+    const emitted = jest.fn();
+    consumer.on('next', emitted);
+    const message = testMessage();
+    kafkaNode.spies.trigger('ConsumerGroupStream', 'data', message);
+    await eventEmitted(consumer, 'next');
+    expect(emitted).toBeCalledWith(message);
   });
 
-  it('ignores invalid messages', () => {
-    const emitted = new Promise((resolve, reject) => {
-      consumer.on('next', resolve);
-      consumer.on('error', reject);
-    });
-    kafkaNode.spies.trigger('ConsumerGroupStream', 'data', testInvalidMessage());
-    kafkaNode.spies.trigger('ConsumerGroupStream', 'data', testMessage());
-    return expect(emitted).resolves.toBeUndefined();
+  it('lets invalid messages pass through', async () => {
+    const emitted = jest.fn();
+    consumer.on('next', emitted);
+    const message = testInvalidMessage();
+    kafkaNode.spies.trigger('ConsumerGroupStream', 'data', message);
+    await eventEmitted(consumer, 'next');
+    expect(emitted).toHaveBeenCalledWith(message);
   });
 
-  it('emits errors on errors', () => {
-    const emitted = new Promise((resolve, reject) => {
-      consumer.on('next', resolve);
-      consumer.on('error', reject);
-    });
+  it('emits errors on errors', async () => {
+    const error = jest.fn();
+    const next = jest.fn();
+    consumer.on('next', next);
+    consumer.on('error', error);
+
     kafkaNode.spies.trigger('ConsumerGroupStream', 'data', testMessage('throw'));
     kafkaNode.spies.trigger('ConsumerGroupStream', 'data', testMessage());
-    return expect(emitted).rejects.toThrowError(/Test Error/);
+    await eventEmitted(consumer, 'error');
+    expect(next).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalled();
   });
 });

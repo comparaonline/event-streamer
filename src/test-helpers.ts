@@ -1,39 +1,51 @@
 import { Server } from './server';
-import { RawEvent, OutputEvent, InputEvent } from './events';
+import { OutputEvent, InputEvent } from './events';
+import { RawEvent } from './raw-event';
 import { Router } from './router';
-import { from } from 'rxjs';
+import { Subject } from 'rxjs';
 import { EventMessage } from './kafka/interfaces/event-message';
-import { map } from 'rxjs/operators';
+import { Message } from 'kafka-node';
+import { EventEmitter } from 'events';
 
-const rawToEventMessage = (event: RawEvent): EventMessage => ({
-  event,
-  message: { topic: 'test', value: JSON.stringify(event) }
-});
+const rawToEventMessage = (() => {
+  let offset = 0;
+  return (event: RawEvent): EventMessage => ({
+    event,
+    message: { offset: offset += 1, topic: 'test', value: JSON.stringify(event) }
+  });
+})();
 
 export class TestServer extends Server {
   private outputEvents: OutputEvent[] = [];
-  private rawEvents: RawEvent[] = [];
+  private subject: Subject<EventMessage> = new Subject();
+  private emitter = new EventEmitter();
 
   constructor(
     private router: Router
   ) {
     super(router);
+    this.subject.pipe(
+      this.router.route(v => v)
+    ).subscribe(
+      next => this.emitter.emit('next', next)
+    );
   }
 
-  input<T extends RawEvent>(event: T) {
-    this.rawEvents.push(event);
+  input<T extends RawEvent>(event: T): Promise<Message> {
+    const eventMessage = rawToEventMessage(event);
+    return new Promise((resolve) => {
+      this.emitter.on('next', ({ message }: { message: Message }) => {
+        if (message.offset === eventMessage.message.offset) resolve(message);
+      });
+      this.subject.next(eventMessage);
+    });
   }
 
   async output(event: OutputEvent): Promise<void> {
-    this.outputEvents.push(event);
+    this.outputEvents = this.outputEvents.concat(event);
   }
 
-  async emitted(): Promise<OutputEvent[]> {
-    await from(this.rawEvents).pipe(
-      map(rawToEventMessage),
-      this.router.route(v => v)
-    ).toPromise();
-
+  emitted(): OutputEvent[] {
     return this.outputEvents;
   }
 }

@@ -1,4 +1,9 @@
 import { fail } from 'assert';
+import { EventEmitter } from 'events';
+
+export const eventEmitted = (emitter: EventEmitter, event: string) => {
+  return new Promise(resolve => emitter.on(event, resolve));
+};
 
 export const emitterHelper = () => {
   const listeners = new Map<string, Map<string, Function[]>>();

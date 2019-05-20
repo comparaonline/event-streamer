@@ -1,22 +1,34 @@
 import { Server } from './server';
-import { InputEvent, InputEventCtor, RawEvent } from './events';
+import { InputEvent, InputEventCtor } from './events';
+import { RawEvent } from './raw-event';
 import { ActionCtor } from './action';
 import { PromiseTracer } from './lib/message-tracer';
 import { Observable, OperatorFunction } from 'rxjs';
 import { EventMessage } from './kafka/interfaces/event-message';
 import { map, concatMap, groupBy, flatMap } from 'rxjs/operators';
 import { FutureResult } from './kafka/interfaces/future-result';
+import { Message } from 'kafka-node';
 
 export const enum RouteStrategy {
   PARALLEL_ROUTE_PARALLEL_DISPATCH,
   PARALLEL_ROUTE_SEQUENTIAL_DISPATCH,
   SEQUENTIAL_ROUTE
 }
+type StrategyList = {
+  [k in RouteStrategy]: (tracer: PromiseTracer) => RouteResult
+};
+type RouteResult = OperatorFunction<EventMessage, { message: Message }>;
+const resolved = Promise.resolve();
 
 export class Router {
   public strategy = RouteStrategy.PARALLEL_ROUTE_PARALLEL_DISPATCH;
   private server: Server;
   private routes = new Map<string, Route>();
+  private routeStrategies: StrategyList = {
+    [RouteStrategy.PARALLEL_ROUTE_PARALLEL_DISPATCH]: this.parRoute.bind(this),
+    [RouteStrategy.PARALLEL_ROUTE_SEQUENTIAL_DISPATCH]: this.parRouteSeqDispatch.bind(this),
+    [RouteStrategy.SEQUENTIAL_ROUTE]: this.seqRoute.bind(this)
+  };
 
   setEmitter(server: Server) {
     this.server = server;
@@ -28,51 +40,45 @@ export class Router {
     this.routes.set(event.code, route);
   }
 
-  canRoute(eventName: string) {
-    return this.routes.has(eventName);
+  getRoute(event?: RawEvent) {
+    return RawEvent.isValid(event)
+      && this.routes.has(event.code)
+      && this.routes.get(event.code);
   }
 
-  route(tracer: PromiseTracer): OperatorFunction<EventMessage, EventMessage> {
-    switch (this.strategy) {
-      case RouteStrategy.PARALLEL_ROUTE_PARALLEL_DISPATCH:
-        return this.parRoute(tracer);
-      case RouteStrategy.PARALLEL_ROUTE_SEQUENTIAL_DISPATCH:
-        return this.parRouteSeqDispatch(tracer);
-      case RouteStrategy.SEQUENTIAL_ROUTE:
-        return this.seqRoute(tracer);
-    }
+  route(tracer: PromiseTracer): RouteResult {
+    return this.routeStrategies[this.strategy](tracer);
   }
 
-  parRoute(tracer: PromiseTracer): OperatorFunction<EventMessage, EventMessage> {
+  parRoute(tracer: PromiseTracer): RouteResult {
     return (obs: Observable<EventMessage>) => obs.pipe(
-      map(data => ({ ...data, result: this.routeEvent(data.event) })),
-      map(tracer),
+      map(data => this.dispatch(data, tracer)),
       this.finishProcessing()
     );
   }
 
-  parRouteSeqDispatch(tracer: PromiseTracer): OperatorFunction<EventMessage, EventMessage> {
+  parRouteSeqDispatch(tracer: PromiseTracer): RouteResult {
     return (obs: Observable<EventMessage>) => obs.pipe(
-      groupBy(({ event }) => event.code),
-      flatMap(obs => obs.pipe(this.seqRoute(tracer)))
+        groupBy(({ event }) => event.code),
+        flatMap(obs => obs.pipe(this.seqRoute(tracer)))
+      );
+  }
+
+  seqRoute(tracer: PromiseTracer): RouteResult {
+    return (obs: Observable<EventMessage>) => obs.pipe(
+      concatMap(data => this.awaitResult(this.dispatch(data, tracer)))
     );
   }
 
-  seqRoute(tracer: PromiseTracer): OperatorFunction<EventMessage, EventMessage> {
-    return (obs: Observable<EventMessage>) => obs.pipe(
-      concatMap(data => this.awaitResult(tracer({
-        ...data,
-        result: this.routeEvent(data.event)
-      })))
-    );
+  private dispatch(data: EventMessage, tracer: PromiseTracer) {
+    const { event } = data;
+    const route = this.getRoute(event);
+    const result = this.routeResult(data);
+    return !route ? result() : tracer(result(route.handle(event, this.server)));
   }
 
-  private routeEvent(rawEvent: RawEvent): Promise<any> {
-    const route = this.routes.get(rawEvent.code);
-    if (!route) {
-      return Promise.resolve();
-    }
-    return route.handle(rawEvent, this.server);
+  private routeResult(data: EventMessage) {
+    return (result: Promise<any> = resolved) => ({ ...data, result });
   }
 
   private finishProcessing() {
