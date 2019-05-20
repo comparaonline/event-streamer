@@ -12,11 +12,17 @@ export const enum RouteStrategy {
   PARALLEL_ROUTE_SEQUENTIAL_DISPATCH,
   SEQUENTIAL_ROUTE
 }
+type RouteResult = OperatorFunction <EventMessage, EventMessage>;
 
 export class Router {
   public strategy = RouteStrategy.PARALLEL_ROUTE_PARALLEL_DISPATCH;
   private server: Server;
   private routes = new Map<string, Route>();
+  private routeStrategies = {
+    [RouteStrategy.PARALLEL_ROUTE_PARALLEL_DISPATCH]: this.parRoute.bind(this),
+    [RouteStrategy.PARALLEL_ROUTE_SEQUENTIAL_DISPATCH]: this.parRouteSeqDispatch.bind(this),
+    [RouteStrategy.SEQUENTIAL_ROUTE]: this.seqRoute.bind(this)
+  };
 
   setEmitter(server: Server) {
     this.server = server;
@@ -32,33 +38,26 @@ export class Router {
     return this.routes.has(eventName);
   }
 
-  route(tracer: PromiseTracer): OperatorFunction<EventMessage, EventMessage> {
-    switch (this.strategy) {
-      case RouteStrategy.PARALLEL_ROUTE_PARALLEL_DISPATCH:
-        return this.parRoute(tracer);
-      case RouteStrategy.PARALLEL_ROUTE_SEQUENTIAL_DISPATCH:
-        return this.parRouteSeqDispatch(tracer);
-      case RouteStrategy.SEQUENTIAL_ROUTE:
-        return this.seqRoute(tracer);
-    }
+  route(tracer: PromiseTracer): RouteResult {
+    return this.routeStrategies[this.strategy](tracer);
   }
 
-  parRoute(tracer: PromiseTracer): OperatorFunction<EventMessage, EventMessage> {
+  parRoute(tracer: PromiseTracer): RouteResult {
     return (obs: Observable<EventMessage>) => obs.pipe(
       map(data => ({ ...data, result: this.routeEvent(data.event) })),
-      map(tracer),
+      map(tracer) ,
       this.finishProcessing()
     );
   }
 
-  parRouteSeqDispatch(tracer: PromiseTracer): OperatorFunction<EventMessage, EventMessage> {
+  parRouteSeqDispatch(tracer: PromiseTracer): RouteResult {
     return (obs: Observable<EventMessage>) => obs.pipe(
-      groupBy(({ event }) => event.code),
-      flatMap(obs => obs.pipe(this.seqRoute(tracer)))
-    );
+        groupBy(({ event }) => event.code),
+        flatMap(obs => obs.pipe(this.seqRoute(tracer)))
+      );
   }
 
-  seqRoute(tracer: PromiseTracer): OperatorFunction<EventMessage, EventMessage> {
+  seqRoute(tracer: PromiseTracer): RouteResult {
     return (obs: Observable<EventMessage>) => obs.pipe(
       concatMap(data => this.awaitResult(tracer({
         ...data,
@@ -67,7 +66,7 @@ export class Router {
     );
   }
 
-  private routeEvent(rawEvent: RawEvent): Promise<any> {
+  private routeEvent(rawEvent: RawEvent): Promise <any> {
     const route = this.routes.get(rawEvent.code);
     if (!route) {
       return Promise.resolve();
