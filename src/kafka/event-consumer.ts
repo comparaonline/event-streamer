@@ -27,7 +27,7 @@ export class EventConsumer extends EventEmitter {
       map(partition => this.handlePartition(partition)),
       flatMap(partition => partition)
     ).subscribe(
-      () => this.emit('next'),
+      ({ message }) => this.emit('next', message),
       (error) => { this.emit('error', error); }
     );
     this.consumerStream.resume();
