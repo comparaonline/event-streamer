@@ -4,14 +4,28 @@ import { TestOutputAction } from '../test/factories/test-output-action';
 
 describe('TestHelpers', () => {
   describe('TestRouter', () => {
-    it('routes the events', async () => {
+    let server: TestServer;
+    beforeEach(() => {
       const router = new Router();
       router.add(TestInputEvent, TestOutputAction);
+      server = new TestServer(router);
+    });
+
+    it('routes an event', async () => {
       const output = new TestOutputEvent();
       TestOutputAction.outputEvent = output;
-      const server = new TestServer(router);
-      server.input({ code: TestInputEvent.name, value: 'test' });
-      expect(await server.emitted()).toStrictEqual([output]);
+
+      await server.input({ code: TestInputEvent.name, value: 'test' });
+      expect(server.emitted()).toStrictEqual([output]);
+    });
+
+    it('routes multiple events', async () => {
+      const output = new TestOutputEvent();
+      TestOutputAction.outputEvent = output;
+
+      await server.input({ code: TestInputEvent.name, value: 'test' });
+      await server.input({ code: TestInputEvent.name, value: 'test' });
+      expect(server.emitted()).toStrictEqual([output, output]);
     });
   });
 });
