@@ -5,6 +5,7 @@ module.exports = {
   roots: ['src/'],
   testRegex: "src(/.*)?/__tests__/[^/]*\\.test\\.(ts)$",
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
+  collectCoverage: true,
   collectCoverageFrom: [
     "src/**/*.{ts,js}",
     "!src/**/*.d.ts",
