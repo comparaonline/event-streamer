@@ -1,5 +1,6 @@
 import { Server } from './server';
-import { InputEvent, InputEventCtor, RawEvent } from './events';
+import { InputEvent, InputEventCtor } from './events';
+import { RawEvent } from './raw-event';
 import { ActionCtor } from './action';
 import { PromiseTracer } from './lib/message-tracer';
 import { Observable, OperatorFunction } from 'rxjs';
@@ -13,13 +14,17 @@ export const enum RouteStrategy {
   PARALLEL_ROUTE_SEQUENTIAL_DISPATCH,
   SEQUENTIAL_ROUTE
 }
-type RouteResult = OperatorFunction<EventMessage, {message: Message}>;
+type StrategyList = {
+  [k in RouteStrategy]: (tracer: PromiseTracer) => RouteResult
+};
+type RouteResult = OperatorFunction<EventMessage, { message: Message }>;
+const resolved = Promise.resolve();
 
 export class Router {
   public strategy = RouteStrategy.PARALLEL_ROUTE_PARALLEL_DISPATCH;
   private server: Server;
   private routes = new Map<string, Route>();
-  private routeStrategies = {
+  private routeStrategies: StrategyList = {
     [RouteStrategy.PARALLEL_ROUTE_PARALLEL_DISPATCH]: this.parRoute.bind(this),
     [RouteStrategy.PARALLEL_ROUTE_SEQUENTIAL_DISPATCH]: this.parRouteSeqDispatch.bind(this),
     [RouteStrategy.SEQUENTIAL_ROUTE]: this.seqRoute.bind(this)
@@ -35,8 +40,10 @@ export class Router {
     this.routes.set(event.code, route);
   }
 
-  canRoute(eventName: string) {
-    return this.routes.has(eventName);
+  getRoute(event?: RawEvent) {
+    return RawEvent.isValid(event)
+      && this.routes.has(event.code)
+      && this.routes.get(event.code);
   }
 
   route(tracer: PromiseTracer): RouteResult {
@@ -45,8 +52,7 @@ export class Router {
 
   parRoute(tracer: PromiseTracer): RouteResult {
     return (obs: Observable<EventMessage>) => obs.pipe(
-      map(data => ({ ...data, result: this.routeEvent(data.event) })),
-      map(tracer) ,
+      map(data => this.dispatch(data, tracer)),
       this.finishProcessing()
     );
   }
@@ -60,19 +66,19 @@ export class Router {
 
   seqRoute(tracer: PromiseTracer): RouteResult {
     return (obs: Observable<EventMessage>) => obs.pipe(
-      concatMap(data => this.awaitResult(tracer({
-        ...data,
-        result: this.routeEvent(data.event)
-      })))
+      concatMap(data => this.awaitResult(this.dispatch(data, tracer)))
     );
   }
 
-  private routeEvent(rawEvent: RawEvent): Promise <any> {
-    const route = this.routes.get(rawEvent.code);
-    if (!route) {
-      return Promise.resolve();
-    }
-    return route.handle(rawEvent, this.server);
+  private dispatch(data: EventMessage, tracer: PromiseTracer) {
+    const { event } = data;
+    const route = this.getRoute(event);
+    const result = this.routeResult(data);
+    return !route ? result() : tracer(result(route.handle(event, this.server)));
+  }
+
+  private routeResult(data: EventMessage) {
+    return (result: Promise<any> = resolved) => ({ ...data, result });
   }
 
   private finishProcessing() {

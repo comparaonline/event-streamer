@@ -1,5 +1,6 @@
 import { Server } from './server';
-import { RawEvent, OutputEvent, InputEvent } from './events';
+import { OutputEvent, InputEvent } from './events';
+import { RawEvent } from './raw-event';
 import { Router } from './router';
 import { from } from 'rxjs';
 import { EventMessage } from './kafka/interfaces/event-message';

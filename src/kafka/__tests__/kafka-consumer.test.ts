@@ -23,11 +23,10 @@ describe('KafkaConsumer', () => {
     expect(emitted).toBeCalledWith(message);
   });
 
-  it('ignores invalid messages', async () => {
+  it('lets invalid messages pass through', async () => {
     const emitted = jest.fn();
     consumer.on('next', emitted);
-    const message = testMessage();
-    kafkaNode.spies.trigger('ConsumerGroupStream', 'data', testInvalidMessage());
+    const message = testInvalidMessage();
     kafkaNode.spies.trigger('ConsumerGroupStream', 'data', message);
     await eventEmitted(consumer, 'next');
     expect(emitted).toHaveBeenCalledWith(message);

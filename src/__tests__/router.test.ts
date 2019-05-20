@@ -1,6 +1,6 @@
 import { TestSlowAction } from '../test/factories/test-slow-action';
 import { TestAction } from '../test/factories/test-action';
-import { RouteStrategy } from '../router';
+import { RouteStrategy, Router, Route } from '../router';
 import { testMessage } from '../test/factories/test-message';
 import { testSlowMessage } from '../test/factories/test-slow-message';
 import { testInvalidMessage } from '../test/factories/test-invalid-message';
@@ -60,14 +60,22 @@ describe('Router', () => {
   });
 
   describe('canRoute', () => {
-    it('returns true for known events', () => {
-      const router = testRouter();
-      expect(router.canRoute('TestInputEvent')).toBeTruthy();
+    let router: Router;
+    beforeEach(() => { router = testRouter(); });
+    it('returns false on undefined', () => {
+      expect(router.getRoute()).toBeFalsy();
     });
-
+    it('returns false on empty object', () => {
+      expect(router.getRoute({} as any)).toBeFalsy();
+    });
+    it('returns false on empty code', () => {
+      expect(router.getRoute({ code : '' })).toBeFalsy();
+    });
     it('returns false for unkknown events', () => {
-      const router = testRouter();
-      expect(router.canRoute('TestUnknownEvent')).toBeFalsy();
+      expect(router.getRoute({ code: 'TestUnknownEvent' })).toBeFalsy();
+    });
+    it('returns true for known events', () => {
+      expect(router.getRoute({ code: 'TestInputEvent' })).toBeInstanceOf(Route);
     });
   });
 });

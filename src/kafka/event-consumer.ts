@@ -1,9 +1,9 @@
 import { fromEvent, GroupedObservable } from 'rxjs';
-import { map, groupBy, tap, flatMap, filter } from 'rxjs/operators';
+import { map, groupBy, tap, flatMap } from 'rxjs/operators';
 import { ConsumerGroupStream, Message } from 'kafka-node';
 import { Router } from '../router';
 import { EventEmitter } from 'events';
-import { RawEvent } from '../events';
+import { RawEvent } from '../raw-event';
 import { messageTracer } from '../lib/message-tracer';
 import { EventMessage } from './interfaces/event-message';
 import { ConfigurationManager } from './configuration-manager';
@@ -56,7 +56,6 @@ export class EventConsumer extends EventEmitter {
 
     return partition.pipe(
       this.buildEvent(),
-      this.filterEvents(),
       this.log('Consuming'),
       this.router.route(trace),
       this.log('Committing'),
@@ -67,11 +66,6 @@ export class EventConsumer extends EventEmitter {
   private buildEvent() {
     return map((message: Message) =>
       ({ message, event: this.parseEvent(message.value.toString()) }));
-  }
-
-  private filterEvents() {
-    return filter(({ event: { code } }: EventMessage) =>
-      this.router.canRoute(code));
   }
 
   private log(message: string) {

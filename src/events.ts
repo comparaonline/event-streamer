@@ -1,6 +1,4 @@
-export interface RawEvent {
-  code: string;
-}
+import { RawEvent } from './raw-event';
 
 export interface InputEventCtor extends RawEvent {
   new(data: Object): InputEvent;
