@@ -1,41 +1,49 @@
 import { Server } from './server';
 import { RawEvent, OutputEvent, InputEvent } from './events';
 import { Router } from './router';
-import { Subject } from 'rxjs';
+import { from } from 'rxjs';
+import { EventMessage } from './kafka/interfaces/event-message';
+import { map } from 'rxjs/operators';
+
+const rawToEventMessage = (event: RawEvent): EventMessage => ({
+  event,
+  message: { topic: 'test', value: JSON.stringify(event) }
+});
 
 export class TestServer extends Server {
   private outputEvents: OutputEvent[] = [];
-  private subject = new Subject();
+  private rawEvents: RawEvent[] = [];
 
   constructor(
-    router: Router
+    private router: Router
   ) {
     super(router);
-    this.subject.pipe(router.route(v => v));
   }
 
-  input(rawEvent: RawEvent) {
-    this.subject.next(rawEvent);
+  input<T extends RawEvent>(event: T) {
+    this.rawEvents.push(event);
   }
 
-  output(event: OutputEvent): void {
+  async output(event: OutputEvent): Promise<void> {
     this.outputEvents.push(event);
   }
 
   async emitted(): Promise<OutputEvent[]> {
-    await this.subject.toPromise();
-    return this.outputEvents;
-  }
+    await from(this.rawEvents).pipe(
+      map(rawToEventMessage),
+      this.router.route(v => v)
+    ).toPromise();
 
-  reset() {
-    this.outputEvents.length = 0;
+    return this.outputEvents;
   }
 }
 
 export class TestInputEvent extends InputEvent {
+  /* istanbul ignore next */
   build() { }
 }
 
 export class TestOutputEvent extends OutputEvent {
+  /* istanbul ignore next */
   encode() { return {}; }
 }

@@ -26,7 +26,7 @@ export class EventConsumer extends EventEmitter {
       map(partition => this.handlePartition(partition)),
       flatMap(partition => partition)
     ).subscribe(
-      null,
+      () => this.emit('next'),
       (error) => { this.emit('error', error); }
     );
     this.consumerStream.resume();
@@ -43,6 +43,7 @@ export class EventConsumer extends EventEmitter {
   private createStream(): ConsumerGroupStream {
     const config = { ...this.config, autoCommit: false };
     const stream = new ConsumerGroupStream(config, this.topics);
+    /* istanbul ignore next */
     stream.on('ready', () => {
       console.info(`Consumer ready. Topics: ${this.topics.join(', ')}`);
     });

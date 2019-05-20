@@ -1,4 +1,3 @@
-import { expect } from 'chai';
 import { InputEvent, OutputEvent } from '../events';
 
 describe('InputEvent', () => {
@@ -7,7 +6,7 @@ describe('InputEvent', () => {
   }
 
   it('gets the event code from the class name', () => {
-    expect(TestEvent.code).to.equal('TestEvent');
+    expect(TestEvent.code).toEqual('TestEvent');
   });
 
   it('gets the event code from the class static getter', () => {
@@ -15,7 +14,7 @@ describe('InputEvent', () => {
       static get code() { return 'Test'; }
       build() { }
     }
-    expect(TestEvent.code).to.equal('Test');
+    expect(TestEvent.code).toEqual('Test');
   });
 });
 
@@ -26,12 +25,12 @@ describe('OutputEvent', () => {
 
   it('gets the event code from the class name', () => {
     const event = new TestEvent();
-    expect(event.code).to.equal('TestEvent');
+    expect(event.code).toEqual('TestEvent');
   });
 
   it('returns the JSON representation on toString()', () => {
     const event = new TestEvent();
-    expect(JSON.parse(event.toString())).to.deep.equal({
+    expect(JSON.parse(event.toString())).toEqual({
       code: 'TestEvent'
     });
   });
@@ -42,6 +41,6 @@ describe('OutputEvent', () => {
       encode() { return {}; }
     }
     const event = new TestEvent();
-    expect(event.code).to.equal('Test');
+    expect(event.code).toEqual('Test');
   });
 });

@@ -32,8 +32,8 @@
     "compile": "tsc",
     "prepublishOnly": "yarn compile",
     "clean": "rm -rf build/*",
-    "test": "TS_NODE_FILES=true mocha 'src/**/__tests__/*.{ts,tsx}'",
-    "test:fast": "TS_NODE_FILES=true mocha 'src/**/__tests__/*.{ts,tsx}'",
+    "test": "jest",
+    "test:fast": "jest",
     "coverage": "jest --coverage"
   },
   "dependencies": {
@@ -43,14 +43,11 @@
     "rxjs": "^6.3.3"
   },
   "devDependencies": {
-    "@types/chai": "^4.1.6",
-    "@types/config": "^0.0.34",
-    "@types/mocha": "^5.2.5",
+    "@types/jest": "^24.0.13",
     "@types/node": "^8.10.2",
-    "chai": "^4.2.0",
-    "mocha": "^5.2.0",
+    "jest": "^24.8.0",
     "nodemon": "^1.17.3",
-    "rxjs-marbles": "^2.3.3",
+    "ts-jest": "^24.0.2",
     "ts-node": "^8.1.0",
     "tslint": "^5.16.0",
     "tslint-config-airbnb": "^5.11.1",
