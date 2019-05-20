@@ -10,7 +10,7 @@ export abstract class Action {
 
   abstract perform(event: InputEvent): Promise<any>;
 
-  protected emit(event: OutputEvent) {
-    this.server.output(event);
+  protected emit(event: OutputEvent): Promise<void> {
+    return this.server.output(event);
   }
 }
