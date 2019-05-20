@@ -1,11 +1,13 @@
 import { fromEvent, GroupedObservable } from 'rxjs';
 import { map, groupBy, tap, flatMap, filter } from 'rxjs/operators';
-import { ConsumerGroupStream, ConsumerGroupStreamOptions, Message } from 'kafka-node';
+import { ConsumerGroupStream, Message } from 'kafka-node';
 import { Router } from '../router';
 import { EventEmitter } from 'events';
 import { RawEvent } from '../events';
 import { messageTracer } from '../lib/message-tracer';
 import { EventMessage } from './interfaces/event-message';
+import { ConfigurationManager } from './configuration-manager';
+import { defaultLogger } from '../lib/default-logger';
 
 const topicPartition = ({ topic, partition }: Message) => `${topic}:${partition}`;
 
@@ -14,8 +16,7 @@ export class EventConsumer extends EventEmitter {
 
   constructor(
     private router: Router,
-    private config: ConsumerGroupStreamOptions,
-    private topics: string[]
+    private config: ConfigurationManager
   ) { super(); }
 
   start(): void {
@@ -41,17 +42,17 @@ export class EventConsumer extends EventEmitter {
   }
 
   private createStream(): ConsumerGroupStream {
-    const config = { ...this.config, autoCommit: false };
-    const stream = new ConsumerGroupStream(config, this.topics);
+    const topics = this.config.consumerTopics;
+    const stream = new ConsumerGroupStream(this.config.consumerOptions, topics);
     /* istanbul ignore next */
     stream.on('ready', () => {
-      console.info(`Consumer ready. Topics: ${this.topics.join(', ')}`);
+      defaultLogger.info(`Consumer ready. Topics: ${topics.join(', ')}`);
     });
     return stream;
   }
 
   private handlePartition(partition: GroupedObservable<string, Message>) {
-    const trace = messageTracer(this.config.groupId, partition.key);
+    const trace = messageTracer(this.config.consumerOptions.groupId, partition.key);
 
     return partition.pipe(
       this.buildEvent(),
@@ -75,7 +76,7 @@ export class EventConsumer extends EventEmitter {
 
   private log(message: string) {
     return tap(({ event }: EventMessage) =>
-      console.debug(`${message} ${JSON.stringify(event)}`));
+      defaultLogger.debug(`${message} ${JSON.stringify(event)}`));
   }
 
   private commit() {
@@ -86,7 +87,7 @@ export class EventConsumer extends EventEmitter {
     try {
       return JSON.parse(json);
     } catch (error) {
-      console.error(`Omitted message. Unable to parse: ${json}. ${error}`);
+      defaultLogger.error(`Omitted message. Unable to parse: ${json}. ${error}`);
       return { code: '' };
     }
   }

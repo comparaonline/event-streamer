@@ -1,15 +1,15 @@
 import kafkaNode = require('../../__mocks__/kafka-node');
 import { EventConsumer } from '../event-consumer';
-import { consumerConfig } from '../../test/factories/configurations';
 import { testRouter } from '../../test/factories/test-router';
 import { testMessage } from '../../test/factories/test-message';
 import { testInvalidMessage } from '../../test/factories/test-invalid-message';
+import { configurationManager } from '../../test/factories/configurations';
 
 describe('KafkaConsumer', () => {
   let consumer: EventConsumer;
   beforeEach(() => kafkaNode.reset());
   beforeEach(() => {
-    consumer = new EventConsumer(testRouter(), ...consumerConfig);
+    consumer = new EventConsumer(testRouter(), configurationManager);
     consumer.start();
   });
 

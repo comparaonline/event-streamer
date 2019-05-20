@@ -3,23 +3,23 @@ import { Router } from '../router';
 import { OutputEvent } from '../events';
 import { EventConsumer } from './event-consumer';
 import { EventProducer } from './event-producer';
-import { ConsumerGroupStreamOptions, KafkaClientOptions, ProducerOptions } from 'kafka-node';
+import { Configuration } from './interfaces/configuration';
+import { ConfigurationManager } from './configuration-manager';
+import { defaultLogger, setLogger } from '../lib/default-logger';
 
 export class KafkaServer extends Server {
   private consumer: EventConsumer;
   private producer: EventProducer;
-
   constructor(
     router: Router,
-    consumerOptions: ConsumerGroupStreamOptions,
-    kafkaClientOptions: KafkaClientOptions,
-    producerOptions: ProducerOptions,
-    topics: string[],
-    defaultTopic: string
+    settings: Configuration,
+    logger = defaultLogger
   ) {
     super(router);
-    this.consumer = new EventConsumer(router, consumerOptions, topics);
-    this.producer = new EventProducer(kafkaClientOptions, producerOptions, defaultTopic);
+    setLogger(logger);
+    const config = new ConfigurationManager(settings);
+    this.consumer = new EventConsumer(router, config);
+    this.producer = new EventProducer(config);
   }
 
   start() {

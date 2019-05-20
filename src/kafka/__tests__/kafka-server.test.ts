@@ -1,6 +1,6 @@
 import kafkaNode = require('../../__mocks__/kafka-node');
 import { KafkaServer } from '../kafka-server';
-import { kafkaServerConfig } from '../../test/factories/configurations';
+import { configuration } from '../../test/factories/configurations';
 import { registeredEvent } from './helpers/registered-event';
 import { testRouter } from '../../test/factories/test-router';
 import { TestOutputEvent } from '../../test/factories/test-output-event';
@@ -9,7 +9,7 @@ describe('KafkaServer', () => {
   let server: KafkaServer;
   beforeEach(() => kafkaNode.reset());
   beforeEach(() => {
-    server = new KafkaServer(testRouter(), ...kafkaServerConfig);
+    server = new KafkaServer(testRouter(), configuration);
     server.start();
   });
 
