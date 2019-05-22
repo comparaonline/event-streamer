@@ -34,7 +34,7 @@ export class ConfigurationManager {
   }
   get producerOptions(): ProducerOptions {
     return {
-      partitionerType: 0
+      partitionerType: this.config.producer.partitioner || 2
     };
   }
   private getter(elem: ConsumerConfig|ProducerConfig) {
