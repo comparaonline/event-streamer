@@ -74,7 +74,8 @@ export class EventConsumer extends EventEmitter {
   }
 
   private commit() {
-    return tap(({ message }: EventMessage) => this.consumerStream.commit(message));
+    return tap(({ message }: EventMessage) =>
+      this.consumerStream.commit(message, true));
   }
 
   private parseEvent(json: string): RawEvent {
