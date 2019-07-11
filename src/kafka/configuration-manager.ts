@@ -5,6 +5,7 @@ import { Configuration } from './interfaces/configuration';
 import { ConsumerConfig } from './interfaces/consumer-config';
 import { ProducerConfig } from './interfaces/producer-config';
 import { BackpressureConfig } from './interfaces/backpressure-config';
+import { ProducerRetryOptions } from './interfaces/producer-retry-options';
 
 export class ConfigurationManager {
   constructor(
@@ -44,6 +45,15 @@ export class ConfigurationManager {
   get producerOptions(): ProducerOptions {
     return {
       partitionerType: this.config.producer.partitioner || 2
+    };
+  }
+
+  get retryOptions(): ProducerRetryOptions {
+    const options = this.config.producer.retry || { retries: 5, delay: 1000, increase: 2 };
+    return {
+      retries: options.retries,
+      delay: options.delay,
+      increase: options.increase
     };
   }
   private getter(elem: ConsumerConfig|ProducerConfig) {

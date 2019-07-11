@@ -7,6 +7,8 @@ import { clientOptions } from './client-options';
 import { promisify } from 'util';
 import { ConfigurationManager } from './configuration-manager';
 import { defaultLogger } from '../lib/default-logger';
+import { from } from 'rxjs';
+import { retry } from '../lib/retry';
 
 export class EventProducer extends EventEmitter {
   private producer: HighLevelProducer;
@@ -33,8 +35,11 @@ export class EventProducer extends EventEmitter {
   }
 
   produce(event: KafkaOutputEvent): Promise<void> {
+    const { retries, delay, increase } = this.config.retryOptions;
     const fn = promisify(this.producer.send.bind(this.producer));
-    return fn(this.message(event));
+    return from<Promise<void>>(fn(this.message(event))).pipe(
+      retry(retries, delay, increase)
+    ).toPromise();
   }
 
   private message(event: KafkaOutputEvent) {
