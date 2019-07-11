@@ -4,6 +4,7 @@ import {
 import { Configuration } from './interfaces/configuration';
 import { ConsumerConfig } from './interfaces/consumer-config';
 import { ProducerConfig } from './interfaces/producer-config';
+import { BackpressureConfig } from './interfaces/backpressure-config';
 
 export class ConfigurationManager {
   constructor(
@@ -21,6 +22,14 @@ export class ConfigurationManager {
       ssl: get('ssl'),
       sslOptions: get('sslOptions'),
       sasl: get('sasl')
+    };
+  }
+
+  get backpressureOptions(): BackpressureConfig {
+    const get = this.getter(this.config.consumer);
+    return {
+      pause: (get<BackpressureConfig>('backpressure') || /* istanbul ignore next */{}).pause,
+      resume: (get<BackpressureConfig>('backpressure') || /* istanbul ignore next */{}).resume
     };
   }
 

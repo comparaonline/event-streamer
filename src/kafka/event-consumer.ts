@@ -1,5 +1,7 @@
-import { fromEvent, GroupedObservable, Subject } from 'rxjs';
-import { map, groupBy, tap, flatMap, scan, share } from 'rxjs/operators';
+import { fromEvent, GroupedObservable, Subject, of, EMPTY } from 'rxjs';
+import {
+  map, groupBy, tap, flatMap, scan, share, distinctUntilChanged, skip
+} from 'rxjs/operators';
 import { ConsumerGroupStream, Message } from 'kafka-node';
 import { Router } from '../router';
 import { EventEmitter } from 'events';
@@ -18,6 +20,12 @@ export class EventConsumer extends EventEmitter {
     scan((acc, value) => acc + value, 0),
     share()
   );
+  /* istanbul ignore next */
+  private actions = {
+    pause: of(() => this.consumerStream.pause()),
+    resume: of(() => this.consumerStream.resume()),
+    nothing: EMPTY
+  };
 
   constructor(
     private router: Router,
@@ -36,6 +44,7 @@ export class EventConsumer extends EventEmitter {
       (error) => { this.emit('error', error); }
     );
     this.consumerStream.resume();
+    this.handleBackpressure();
   }
 
   stop(): Promise<any> {
@@ -43,6 +52,26 @@ export class EventConsumer extends EventEmitter {
       this.consumerStream.close(() => {
         resolve('Consumer disconnected');
       });
+    });
+  }
+
+  private handleBackpressure() {
+    const { pause, resume } = this.config.backpressureOptions;
+    /* istanbul ignore next */
+    if (pause === undefined || resume === undefined) return;
+    this.backpressure.pipe(
+      this.backpressureAction(pause, resume),
+      distinctUntilChanged(),
+      skip(1)
+    ).subscribe(action => action());
+  }
+
+  private backpressureAction(pause: number, resume: number) {
+    /* istanbul ignore next */
+    return flatMap((current: number) => {
+      if (current >= pause) return this.actions.pause;
+      if (current <= resume) return this.actions.resume;
+      return this.actions.nothing;
     });
   }
 
