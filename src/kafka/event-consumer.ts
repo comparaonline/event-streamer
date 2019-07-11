@@ -13,6 +13,11 @@ const topicPartition = ({ topic, partition }: Message) => `${topic}:${partition}
 
 export class EventConsumer extends EventEmitter {
   private consumerStream: ConsumerGroupStream;
+  private backpressureCount = 0;
+
+  get backpressure() {
+    return this.backpressureCount;
+  }
 
   constructor(
     private router: Router,
@@ -55,12 +60,22 @@ export class EventConsumer extends EventEmitter {
     const trace = messageTracer(this.config.consumerOptions.groupId, partition.key);
 
     return partition.pipe(
+      this.eventRead(),
       this.buildEvent(),
       this.log('Consuming'),
       this.router.route(trace),
+      this.eventHandled(),
       this.log('Committing'),
       this.commit()
     );
+  }
+
+  private eventRead() {
+    return tap(() => this.backpressureCount += 1);
+  }
+
+  private eventHandled() {
+    return tap(() => this.backpressureCount -= 1);
   }
 
   private buildEvent() {

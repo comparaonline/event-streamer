@@ -5,6 +5,7 @@ import { testMessage } from '../../test/factories/test-message';
 import { testInvalidMessage } from '../../test/factories/test-invalid-message';
 import { configurationManager } from '../../test/factories/configurations';
 import { eventEmitted } from '../../test/emitter-helpers';
+import { testSlowMessage } from '../../test/factories/test-slow-message';
 
 describe('KafkaConsumer', () => {
   let consumer: EventConsumer;
@@ -43,5 +44,17 @@ describe('KafkaConsumer', () => {
     await eventEmitted(consumer, 'error');
     expect(next).not.toHaveBeenCalled();
     expect(error).toHaveBeenCalled();
+  });
+
+  it('keeps track of backpressure', async () => {
+    expect(consumer.backpressure).toEqual(0);
+    kafkaNode.spies.trigger('ConsumerGroupStream', 'data', testSlowMessage('test1', 100));
+    expect(consumer.backpressure).toEqual(1);
+    kafkaNode.spies.trigger('ConsumerGroupStream', 'data', testSlowMessage('test2', 100));
+    expect(consumer.backpressure).toEqual(2);
+    await eventEmitted(consumer, 'next');
+    expect(consumer.backpressure).toEqual(1);
+    await eventEmitted(consumer, 'next');
+    expect(consumer.backpressure).toEqual(0);
   });
 });
