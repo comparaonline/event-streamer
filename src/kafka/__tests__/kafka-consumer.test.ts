@@ -47,14 +47,16 @@ describe('KafkaConsumer', () => {
   });
 
   it('keeps track of backpressure', async () => {
-    expect(consumer.backpressure).toEqual(0);
+    let backpressure = 0;
+    consumer.backpressure.subscribe(i => backpressure = i);
+    expect(backpressure).toEqual(0);
     kafkaNode.spies.trigger('ConsumerGroupStream', 'data', testSlowMessage('test1', 100));
-    expect(consumer.backpressure).toEqual(1);
+    expect(backpressure).toEqual(1);
     kafkaNode.spies.trigger('ConsumerGroupStream', 'data', testSlowMessage('test2', 100));
-    expect(consumer.backpressure).toEqual(2);
+    expect(backpressure).toEqual(2);
     await eventEmitted(consumer, 'next');
-    expect(consumer.backpressure).toEqual(1);
+    expect(backpressure).toEqual(1);
     await eventEmitted(consumer, 'next');
-    expect(consumer.backpressure).toEqual(0);
+    expect(backpressure).toEqual(0);
   });
 });

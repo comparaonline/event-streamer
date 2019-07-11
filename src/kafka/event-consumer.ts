@@ -1,5 +1,5 @@
-import { fromEvent, GroupedObservable } from 'rxjs';
-import { map, groupBy, tap, flatMap } from 'rxjs/operators';
+import { fromEvent, GroupedObservable, Subject } from 'rxjs';
+import { map, groupBy, tap, flatMap, scan, share } from 'rxjs/operators';
 import { ConsumerGroupStream, Message } from 'kafka-node';
 import { Router } from '../router';
 import { EventEmitter } from 'events';
@@ -13,11 +13,11 @@ const topicPartition = ({ topic, partition }: Message) => `${topic}:${partition}
 
 export class EventConsumer extends EventEmitter {
   private consumerStream: ConsumerGroupStream;
-  private backpressureCount = 0;
-
-  get backpressure() {
-    return this.backpressureCount;
-  }
+  private readonly backpressureSubject = new Subject<number>();
+  public readonly backpressure = this.backpressureSubject.pipe(
+    scan((acc, value) => acc + value, 0),
+    share()
+  );
 
   constructor(
     private router: Router,
@@ -71,11 +71,11 @@ export class EventConsumer extends EventEmitter {
   }
 
   private eventRead() {
-    return tap(() => this.backpressureCount += 1);
+    return tap(() => this.backpressureSubject.next(1));
   }
 
   private eventHandled() {
-    return tap(() => this.backpressureCount -= 1);
+    return tap(() => this.backpressureSubject.next(-1));
   }
 
   private buildEvent() {
