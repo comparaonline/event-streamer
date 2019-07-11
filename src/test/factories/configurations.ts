@@ -7,7 +7,11 @@ export const configuration: Configuration = {
   },
   consumer: {
     groupId: 'testGroupId',
-    topics: ['test-consumer-topic1', 'test-consumer-topic2']
+    topics: ['test-consumer-topic1', 'test-consumer-topic2'],
+    backpressure: {
+      pause: 3,
+      resume: 2
+    }
   },
   producer: {
     defaultTopic: 'test-producer-topic'
