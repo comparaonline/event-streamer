@@ -48,6 +48,10 @@ export class TestServer extends Server {
   emitted(): OutputEvent[] {
     return this.outputEvents;
   }
+
+  cleanEmitted(): void {
+    this.outputEvents = [];
+  }
 }
 
 export class TestInputEvent extends InputEvent {
