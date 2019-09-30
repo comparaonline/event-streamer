@@ -4,7 +4,7 @@ export interface InputEventCtor extends RawEvent {
   new(data: Object): InputEvent;
 }
 
-export abstract class InputEvent {
+export class InputEvent {
   static get code() {
     return this.name;
   }
@@ -13,7 +13,9 @@ export abstract class InputEvent {
     this.build(data);
   }
 
-  abstract build(data: Object): void;
+  build(data: Object): void {
+    Object.assign(this, data);
+  }
 }
 
 export abstract class OutputEvent {

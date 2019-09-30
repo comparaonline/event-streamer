@@ -16,6 +16,14 @@ describe('InputEvent', () => {
     }
     expect(TestEvent.code).toEqual('Test');
   });
+
+  it('copies the properties from the raw event by default', () => {
+    class TestEvent extends InputEvent {
+      public value: string;
+    }
+    const testEvent = new TestEvent({ value: 'test' });
+    expect(testEvent).toHaveProperty('value', 'test');
+  });
 });
 
 describe('OutputEvent', () => {
