@@ -1,4 +1,4 @@
-import { fromEvent, GroupedObservable, Subject, of, EMPTY } from 'rxjs';
+import { fromEvent, GroupedObservable, Subject, of, EMPTY, Observable } from 'rxjs';
 import {
   map, groupBy, tap, flatMap, scan, share, distinctUntilChanged, skip
 } from 'rxjs/operators';
@@ -10,6 +10,7 @@ import { messageTracer } from '../lib/message-tracer';
 import { EventMessage } from './interfaces/event-message';
 import { ConfigurationManager } from './configuration-manager';
 import { defaultLogger } from '../lib/default-logger';
+import { Databag } from '../lib/databag';
 
 const topicPartition = ({ topic, partition }: Message) => `${topic}:${partition}`;
 
@@ -86,16 +87,41 @@ export class EventConsumer extends EventEmitter {
   }
 
   private handlePartition(partition: GroupedObservable<string, Message>) {
-    const trace = messageTracer(this.config.consumerOptions.groupId, partition.key);
-
     return partition.pipe(
-      this.eventRead(),
-      this.buildEvent(),
-      this.log('Consuming'),
-      this.router.route(trace),
-      this.eventHandled(),
-      this.log('Committing'),
-      this.commit()
+      Databag.wrap(),
+      Databag.setMany({
+        partition: partition.key,
+        consumerGroup: this.config.consumerOptions.groupId
+      }),
+      this.before(),
+      this.process(),
+      this.after(),
+      Databag.unwrap()
+    );
+  }
+
+  private before() {
+    return (obs: Observable<Databag<Message>>) => obs.pipe(
+      Databag.inside(this.eventRead()),
+      Databag.inside(this.buildEvent()),
+      Databag.inside(this.log('Consuming'))
+    );
+  }
+
+  private process() {
+    return (obs: Observable<Databag<EventMessage>>) => obs.pipe(
+      Databag.insideWithBag((bag) => {
+        const trace = messageTracer(bag.get('consumerGroup'), bag.get('partition'));
+        return this.router.route(trace);
+      })
+    );
+  }
+
+  private after() {
+    return (obs: Observable<Databag<{ message: Message }>>) => obs.pipe(
+      Databag.inside(this.eventHandled()),
+      Databag.inside(this.log('Committing')),
+      Databag.inside(this.commit())
     );
   }
 
