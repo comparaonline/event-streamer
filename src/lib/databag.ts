@@ -31,6 +31,11 @@ export class Databag<T> {
     return this.additional[name];
   }
 
+  modify<A>(name: string, modify: (value: A, bag: Databag<T>) => A) {
+    this.additional[name] = modify(this.additional[name], this);
+    return this;
+  }
+
   static wrap<A>(): OperatorFunction<A, Databag<A>> {
     return (obs: Observable<A>) => obs.pipe(map(val => new Databag(val)));
   }
@@ -69,6 +74,11 @@ export class Databag<T> {
 
   static setMany<A>(obj: { [k: string]: any }): DatabagOperator<A, A> {
     return map(databag => databag.setMany(obj));
+  }
+
+  static modify<A, B>(name: string, modify: (value: B, bag: Databag<A>) => B):
+    DatabagOperator<A, A> {
+    return map(databag => databag.modify(name, modify));
   }
 
   static get<A, B = unknown>(name: string): OperatorFunction<Databag<B>, A> {

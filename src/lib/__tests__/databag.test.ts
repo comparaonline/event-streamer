@@ -128,7 +128,7 @@ describe('Databag', () => {
     const obs = from(testValues).pipe(Databag.wrap(), Databag.set('value', 'test'));
     it('sets a property inside a bag', async () => {
       const results = await obs.pipe(
-        Databag.setWithBag('value2', bag => `${ bag.get('value') }${ bag.data }`),
+        Databag.setWithBag('value2', bag => `${bag.get('value')}${bag.data}`),
         toArray()
       ).toPromise();
       results.forEach((result, i) =>
@@ -164,6 +164,28 @@ describe('Databag', () => {
         toArray()
       ).toPromise();
       expect(results).toEqual(testValues.map(() => 'test'));
+    });
+  });
+
+  describe('#modify', () => {
+    const testValues = [1, 2, 3, 4];
+    const obs = from(testValues).pipe(Databag.wrap(), Databag.set('value', 1));
+    it('changes a property in the bag', async () => {
+      const results = await obs.pipe(
+        Databag.modify('value', (value: number) => value - 1),
+        Databag.get('value'),
+        toArray()
+      ).toPromise();
+      expect(results).toEqual(testValues.map(() => 0));
+    });
+
+    it('provides the bag as a second parameter', async () => {
+      const results = await obs.pipe(
+        Databag.modify('value', (value: number, bag) => value - bag.get<number>('value')),
+        Databag.get('value'),
+        toArray()
+      ).toPromise();
+      expect(results).toEqual(testValues.map(() => 0));
     });
   });
 });
