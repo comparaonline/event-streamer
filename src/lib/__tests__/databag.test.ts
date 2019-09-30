@@ -123,6 +123,19 @@ describe('Databag', () => {
     });
   });
 
+  describe('#setWithBag', () => {
+    const testValues = [1, 2, 3, 4];
+    const obs = from(testValues).pipe(Databag.wrap(), Databag.set('value', 'test'));
+    it('sets a property inside a bag', async () => {
+      const results = await obs.pipe(
+        Databag.setWithBag('value2', bag => `${ bag.get('value') }${ bag.data }`),
+        toArray()
+      ).toPromise();
+      results.forEach((result, i) =>
+        expect(result.get('value2')).toEqual(`test${i + 1}`));
+    });
+  });
+
   describe('#setMany', () => {
     const testValues = [1, 2, 3, 4];
     const obs = from(testValues).pipe(Databag.wrap());

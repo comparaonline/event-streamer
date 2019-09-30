@@ -3,13 +3,19 @@ import { map, flatMap } from 'rxjs/operators';
 
 type DatabagOperator<A, B> = OperatorFunction<Databag<A>, Databag<B>>;
 type DynamicOperator<A, B> = (db: Databag<A>) => OperatorFunction<A, B>;
+type ValueGenerator<A> = (bag: Databag<A>) => any;
 
 export class Databag<T> {
   private additional = {};
-  private constructor(private data: T) {}
+  private constructor(public data: T) {}
 
   set(name: string, value: any) {
     this.additional[name] = value;
+    return this;
+  }
+
+  setWithBag(name: string, generateValue: ValueGenerator<T>) {
+    this.additional[name] = generateValue(this);
     return this;
   }
 
@@ -55,6 +61,10 @@ export class Databag<T> {
 
   static set<A>(name: string, value: any): DatabagOperator<A, A> {
     return map(databag => databag.set(name, value));
+  }
+
+  static setWithBag<A>(name: string, generateValue: ValueGenerator<A>): DatabagOperator<A, A> {
+    return map(databag => databag.setWithBag(name, generateValue));
   }
 
   static setMany<A>(obj: { [k: string]: any }): DatabagOperator<A, A> {
