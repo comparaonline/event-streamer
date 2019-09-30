@@ -9,6 +9,7 @@
       }
     ],
     "array-type": false,
-    "strict-boolean-expressions": false
+    "strict-boolean-expressions": false,
+    "no-floating-promises": true
   }
 }
