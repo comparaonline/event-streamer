@@ -7,6 +7,9 @@ import { configurationManager } from '../../test/factories/configurations';
 import { eventEmitted } from '../../test/emitter-helpers';
 import { testSlowMessage } from '../../test/factories/test-slow-message';
 import { of } from 'rxjs';
+import { Tracer } from '../../tracer';
+import { tap } from 'rxjs/operators';
+import { TracerContext } from '../../tracer/tracer-context';
 
 describe('KafkaConsumer', () => {
   let consumer: EventConsumer;
@@ -87,5 +90,75 @@ describe('KafkaConsumer', () => {
     await eventEmitted(consumer, 'next');
     expect(pause).toHaveBeenCalledTimes(1);
     expect(resume).toHaveBeenCalledTimes(1);
+  });
+
+  describe('regular event process flow', () => {
+    it('emits a process event', async () => {
+      const tracer = Tracer.instance();
+      const emitted = jest.fn();
+      const subscription = tracer.listen('process').pipe(tap(emitted)).subscribe();
+      const message = testMessage();
+      kafkaNode.spies.trigger('ConsumerGroupStream', 'data', message);
+      await eventEmitted(consumer, 'next');
+      expect(emitted).toBeCalledWith(expect.any(TracerContext));
+      subscription.unsubscribe();
+    });
+
+    it('emits a process-finished event', async () => {
+      const tracer = Tracer.instance();
+      const emitted = jest.fn();
+      const subscription = tracer.listen('process-finished').pipe(tap(emitted)).subscribe();
+      const message = testMessage();
+      kafkaNode.spies.trigger('ConsumerGroupStream', 'data', message);
+      await eventEmitted(consumer, 'next');
+      expect(emitted).toBeCalledWith(expect.any(TracerContext));
+      subscription.unsubscribe();
+    });
+
+    it('does not emit a process-finished event', async () => {
+      const tracer = Tracer.instance();
+      const emitted = jest.fn();
+      const subscription = tracer.listen('process-error').pipe(tap(emitted)).subscribe();
+      const message = testMessage();
+      kafkaNode.spies.trigger('ConsumerGroupStream', 'data', message);
+      await eventEmitted(consumer, 'next');
+      expect(emitted).not.toBeCalled();
+      subscription.unsubscribe();
+    });
+  });
+
+  describe('error processing event process flow', () => {
+    it('emits a process message', async () => {
+      const tracer = Tracer.instance();
+      const emitted = jest.fn();
+      const subscription = tracer.listen('process').pipe(tap(emitted)).subscribe();
+      const message = testMessage('throw');
+      kafkaNode.spies.trigger('ConsumerGroupStream', 'data', message);
+      await eventEmitted(consumer, 'error');
+      expect(emitted).toBeCalledWith(expect.any(TracerContext));
+      subscription.unsubscribe();
+    });
+
+    it('does not emit a process-finished event', async () => {
+      const tracer = Tracer.instance();
+      const emitted = jest.fn();
+      const subscription = tracer.listen('process-finished').pipe(tap(emitted)).subscribe();
+      const message = testMessage('throw');
+      kafkaNode.spies.trigger('ConsumerGroupStream', 'data', message);
+      await eventEmitted(consumer, 'error');
+      expect(emitted).not.toBeCalled();
+      subscription.unsubscribe();
+    });
+
+    it('emits a process-error event', async () => {
+      const tracer = Tracer.instance();
+      const emitted = jest.fn();
+      const subscription = tracer.listen('process-error').pipe(tap(emitted)).subscribe();
+      const message = testMessage('throw');
+      kafkaNode.spies.trigger('ConsumerGroupStream', 'data', message);
+      await eventEmitted(consumer, 'error');
+      expect(emitted).not.toBeCalled();
+      subscription.unsubscribe();
+    });
   });
 });

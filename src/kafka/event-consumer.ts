@@ -11,12 +11,14 @@ import { EventMessage } from './interfaces/event-message';
 import { ConfigurationManager } from './configuration-manager';
 import { defaultLogger } from '../lib/default-logger';
 import { Databag } from '../lib/databag';
+import { Tracer } from '../tracer';
 
 const topicPartition = ({ topic, partition }: Message) => `${topic}:${partition}`;
 
 export class EventConsumer extends EventEmitter {
   private consumerStream: ConsumerGroupStream;
   private readonly backpressureSubject = new Subject<number>();
+  private tracer = Tracer.instance();
   public readonly backpressure = this.backpressureSubject.pipe(
     scan((acc, value) => acc + value, 0),
     share()
@@ -104,16 +106,36 @@ export class EventConsumer extends EventEmitter {
     return (obs: Observable<Databag<Message>>) => obs.pipe(
       Databag.inside(this.eventRead()),
       Databag.inside(this.buildEvent()),
+      this.setupTracer(),
       Databag.inside(this.log('Consuming'))
+    );
+  }
+  setupTracer() {
+    return (obs: Observable<Databag<{ message: Message, event: RawEvent }>>) => obs.pipe(
+      Databag.setWithBag('context', bag => this.tracer.startTracing(bag.data.event)
+        .set('partition', bag.get('partition'))
+        .set('consumerGroup', bag.get('consumerGroup'))
+      )
+    );
+  }
+
+  trace<A>(eventName: string, event: 'next' | 'error' | 'complete' = 'next') {
+    const handler = (data: Databag<A>) =>
+      this.tracer.emit(eventName, data.get('context'));
+    return tap(...['next', 'error', 'complete']
+      .map(name => name !== event ? undefined : handler)
     );
   }
 
   private process() {
     return (obs: Observable<Databag<EventMessage>>) => obs.pipe(
+      this.trace('process'),
       Databag.insideWithBag((bag) => {
         const trace = messageTracer(bag.get('consumerGroup'), bag.get('partition'));
         return this.router.route(trace);
-      })
+      }),
+      this.trace('process-finished'),
+      this.trace('process-error', 'error')
     );
   }
 
