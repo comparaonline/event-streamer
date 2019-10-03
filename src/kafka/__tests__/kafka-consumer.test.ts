@@ -5,8 +5,6 @@ import { testMessage } from '../../test/factories/test-message';
 import { testInvalidMessage } from '../../test/factories/test-invalid-message';
 import { configurationManager } from '../../test/factories/configurations';
 import { eventEmitted } from '../../test/emitter-helpers';
-import { testSlowMessage } from '../../test/factories/test-slow-message';
-import { of } from 'rxjs';
 import { Tracer } from '../../tracer';
 import { tap } from 'rxjs/operators';
 import { TracerContext } from '../../tracer/tracer-context';
@@ -48,48 +46,6 @@ describe('KafkaConsumer', () => {
     await eventEmitted(consumer, 'error');
     expect(next).not.toHaveBeenCalled();
     expect(error).toHaveBeenCalled();
-  });
-
-  it('keeps track of backpressure', async () => {
-    let backpressure = 0;
-    consumer.backpressure.subscribe(i => backpressure = i);
-    expect(backpressure).toEqual(0);
-    kafkaNode.spies.trigger('ConsumerGroupStream', 'data', testSlowMessage('test1', 100));
-    expect(backpressure).toEqual(1);
-    kafkaNode.spies.trigger('ConsumerGroupStream', 'data', testSlowMessage('test2', 100));
-    expect(backpressure).toEqual(2);
-    await eventEmitted(consumer, 'next');
-    expect(backpressure).toEqual(1);
-    await eventEmitted(consumer, 'next');
-    expect(backpressure).toEqual(0);
-  });
-
-  it('executes the expected backpressure actions', async () => {
-    const resume = jest.fn();
-    const pause = jest.fn();
-    consumer['actions'] = {
-      ...consumer['actions'],
-      resume: of(resume),
-      pause: of(pause)
-    };
-    kafkaNode.spies.trigger('ConsumerGroupStream', 'data', testSlowMessage('asdasd', 200));
-    kafkaNode.spies.trigger('ConsumerGroupStream', 'data', testSlowMessage('test2', 100));
-    kafkaNode.spies.trigger('ConsumerGroupStream', 'data', testSlowMessage('test3', 100));
-    kafkaNode.spies.trigger('ConsumerGroupStream', 'data', testSlowMessage('test4', 100));
-    expect(pause).toHaveBeenCalledTimes(1);
-    expect(resume).not.toHaveBeenCalled();
-    await eventEmitted(consumer, 'next');
-    expect(pause).toHaveBeenCalledTimes(1);
-    expect(resume).not.toHaveBeenCalled();
-    await eventEmitted(consumer, 'next');
-    expect(pause).toHaveBeenCalledTimes(1);
-    expect(resume).toHaveBeenCalledTimes(1);
-    await eventEmitted(consumer, 'next');
-    expect(pause).toHaveBeenCalledTimes(1);
-    expect(resume).toHaveBeenCalledTimes(1);
-    await eventEmitted(consumer, 'next');
-    expect(pause).toHaveBeenCalledTimes(1);
-    expect(resume).toHaveBeenCalledTimes(1);
   });
 
   describe('regular event process flow', () => {

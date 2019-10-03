@@ -1,34 +1,25 @@
-import { fromEvent, GroupedObservable, Subject, of, EMPTY, Observable } from 'rxjs';
+import { fromEvent, GroupedObservable, Observable } from 'rxjs';
 import {
-  map, groupBy, tap, flatMap, scan, share, distinctUntilChanged, skip
+  map, groupBy, tap, flatMap
 } from 'rxjs/operators';
 import { ConsumerGroupStream, Message } from 'kafka-node';
-import { Router } from '../router';
+import { Router } from '../../router';
 import { EventEmitter } from 'events';
-import { RawEvent } from '../raw-event';
-import { messageTracer } from '../lib/message-tracer';
-import { EventMessage } from './interfaces/event-message';
-import { ConfigurationManager } from './configuration-manager';
-import { defaultLogger } from '../lib/default-logger';
-import { Databag } from '../lib/databag';
-import { Tracer } from '../tracer';
+import { RawEvent } from '../../raw-event';
+import { messageTracer } from '../../lib/message-tracer';
+import { EventMessage } from '../interfaces/event-message';
+import { ConfigurationManager } from '../configuration-manager';
+import { defaultLogger } from '../../lib/default-logger';
+import { Databag } from '../../lib/databag';
+import { Tracer } from '../../tracer';
+import { BackpressureHandler } from './backpressure-handler';
 
 const topicPartition = ({ topic, partition }: Message) => `${topic}:${partition}`;
 
 export class EventConsumer extends EventEmitter {
   private consumerStream: ConsumerGroupStream;
-  private readonly backpressureSubject = new Subject<number>();
+  private backpressureHandler: BackpressureHandler;
   private tracer = Tracer.instance();
-  public readonly backpressure = this.backpressureSubject.pipe(
-    scan((acc, value) => acc + value, 0),
-    share()
-  );
-  /* istanbul ignore next */
-  private actions = {
-    pause: of(() => this.consumerStream.pause()),
-    resume: of(() => this.consumerStream.resume()),
-    nothing: EMPTY
-  };
 
   constructor(
     private router: Router,
@@ -47,7 +38,11 @@ export class EventConsumer extends EventEmitter {
       (error) => { this.emit('error', error); }
     );
     this.consumerStream.resume();
-    this.handleBackpressure();
+    this.backpressureHandler = new BackpressureHandler(
+      this.consumerStream,
+      this.config.backpressureOptions.pause,
+      this.config.backpressureOptions.resume
+    );
   }
 
   stop(): Promise<any> {
@@ -55,26 +50,6 @@ export class EventConsumer extends EventEmitter {
       this.consumerStream.close(() => {
         resolve('Consumer disconnected');
       });
-    });
-  }
-
-  private handleBackpressure() {
-    const { pause, resume } = this.config.backpressureOptions;
-    /* istanbul ignore next */
-    if (pause === undefined || resume === undefined) return;
-    this.backpressure.pipe(
-      this.backpressureAction(pause, resume),
-      distinctUntilChanged(),
-      skip(1)
-    ).subscribe(action => action());
-  }
-
-  private backpressureAction(pause: number, resume: number) {
-    /* istanbul ignore next */
-    return flatMap((current: number) => {
-      if (current >= pause) return this.actions.pause;
-      if (current <= resume) return this.actions.resume;
-      return this.actions.nothing;
     });
   }
 
@@ -104,7 +79,7 @@ export class EventConsumer extends EventEmitter {
 
   private before() {
     return (obs: Observable<Databag<Message>>) => obs.pipe(
-      Databag.inside(this.eventRead()),
+      this.backpressureHandler.increment(),
       Databag.inside(this.buildEvent()),
       this.setupTracer(),
       Databag.inside(this.log('Consuming'))
@@ -141,18 +116,10 @@ export class EventConsumer extends EventEmitter {
 
   private after() {
     return (obs: Observable<Databag<{ message: Message }>>) => obs.pipe(
-      Databag.inside(this.eventHandled()),
+      this.backpressureHandler.decrement(),
       Databag.inside(this.log('Committing')),
       Databag.inside(this.commit())
     );
-  }
-
-  private eventRead() {
-    return tap(() => this.backpressureSubject.next(1));
-  }
-
-  private eventHandled() {
-    return tap(() => this.backpressureSubject.next(-1));
   }
 
   private buildEvent() {
