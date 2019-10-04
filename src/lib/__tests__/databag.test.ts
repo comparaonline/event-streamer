@@ -188,4 +188,22 @@ describe('Databag', () => {
       expect(results).toEqual(testValues.map(() => 0));
     });
   });
+
+  describe('#store', () => {
+    const testValues = [1, 2, 3, 4];
+    const obs = from(testValues).pipe(Databag.wrap());
+    it('stores the main value in an additional value', async () => {
+      const results = await obs.pipe(Databag.store('test'), toArray()).toPromise();
+      results.forEach(result => expect(result.get('test')).toEqual(result.data));
+    });
+  });
+
+  describe('#swap', () => {
+    const testValues = [1, 2, 3, 4];
+    const obs = from(testValues).pipe(Databag.wrap(), Databag.set('value', 'test'));
+    it('stores the main value in an additional value', async () => {
+      const results = await obs.pipe(Databag.swap('value'), toArray()).toPromise();
+      results.forEach(result => expect(result).toHaveProperty('data', 'test'));
+    });
+  });
 });

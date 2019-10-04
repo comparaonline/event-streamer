@@ -1,4 +1,4 @@
-import { Subject, of, EMPTY } from 'rxjs';
+import { Subject, of, EMPTY, MonoTypeOperatorFunction } from 'rxjs';
 import { scan, share, tap, distinctUntilChanged, skip, flatMap } from 'rxjs/operators';
 
 interface PausableStream {
@@ -34,12 +34,12 @@ export class BackpressureHandler {
       private resume: number = Infinity
     ) {}
 
-  public increment() {
-    return tap(() => this.backpressureSubject.next(1));
+  public increment<T>() {
+    return tap<T>(() => this.backpressureSubject.next(1));
   }
 
-  public decrement() {
-    return tap(() => this.backpressureSubject.next(-1));
+  public decrement<T>(): MonoTypeOperatorFunction<T> {
+    return tap<T>(() => this.backpressureSubject.next(-1));
   }
 
   public handle() {

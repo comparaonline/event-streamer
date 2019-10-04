@@ -3,41 +3,26 @@ import { OutputEvent, InputEvent } from './events';
 import { RawEvent } from './raw-event';
 import { Router } from './router';
 import { Subject } from 'rxjs';
-import { EventMessage } from './kafka/interfaces/event-message';
-import { Message } from 'kafka-node';
-import { EventEmitter } from 'events';
-
-const rawToEventMessage = (() => {
-  let offset = 0;
-  return (event: RawEvent): EventMessage => ({
-    event,
-    message: { offset: offset += 1, topic: 'test', value: JSON.stringify(event) }
-  });
-})();
+import { share } from 'rxjs/operators';
 
 export class TestServer extends Server {
   private outputEvents: OutputEvent[] = [];
-  private subject: Subject<EventMessage> = new Subject();
-  private emitter = new EventEmitter();
+  private subject: Subject<RawEvent> = new Subject();
+  private processed = this.subject.pipe(
+    this.router.route(),
+    share()
+  );
 
   constructor(
     private router: Router
   ) {
     super(router);
-    this.subject.pipe(
-      this.router.route(v => v)
-    ).subscribe(
-      next => this.emitter.emit('next', next)
-    );
   }
 
-  input<T extends RawEvent>(event: T): Promise<Message> {
-    const eventMessage = rawToEventMessage(event);
+  input<E extends RawEvent, T>(event: E): Promise<T> {
     return new Promise((resolve) => {
-      this.emitter.on('next', ({ message }: { message: Message }) => {
-        if (message.offset === eventMessage.message.offset) resolve(message);
-      });
-      this.subject.next(eventMessage);
+      this.processed.subscribe((event: T) => resolve(event));
+      this.subject.next(event);
     });
   }
 

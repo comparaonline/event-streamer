@@ -6,8 +6,6 @@ import { ConsumerGroupStream, Message } from 'kafka-node';
 import { Router } from '../../router';
 import { EventEmitter } from 'events';
 import { RawEvent } from '../../raw-event';
-import { messageTracer } from '../../lib/message-tracer';
-import { EventMessage } from '../interfaces/event-message';
 import { ConfigurationManager } from '../configuration-manager';
 import { defaultLogger } from '../../lib/default-logger';
 import { Databag } from '../../lib/databag';
@@ -29,20 +27,14 @@ export class EventConsumer extends EventEmitter {
   start(): void {
     this.consumerStream = this.createStream();
     this.consumerStream.on('error', error => this.emit('error', error));
-    fromEvent(this.consumerStream, 'data').pipe(
-      groupBy(topicPartition),
-      map(partition => this.handlePartition(partition)),
-      flatMap(partition => partition)
-    ).subscribe(
-      ({ message }) => this.emit('next', message),
-      (error) => { this.emit('error', error); }
-    );
-    this.consumerStream.resume();
     this.backpressureHandler = new BackpressureHandler(
       this.consumerStream,
       this.config.backpressureOptions.pause,
       this.config.backpressureOptions.resume
     );
+    this.processMessages();
+    this.consumerStream.resume();
+
   }
 
   stop(): Promise<any> {
@@ -51,6 +43,24 @@ export class EventConsumer extends EventEmitter {
         resolve('Consumer disconnected');
       });
     });
+  }
+
+  private processMessages() {
+    fromEvent<Message>(this.consumerStream, 'data').pipe(
+      this.backpressureHandler.increment(),
+      Databag.wrap(),
+      Databag.store('message'),
+      groupBy(bag => topicPartition(bag.data)),
+      map(partition => this.handlePartition(partition)),
+      flatMap(partition => partition),
+      Databag.swap<Message>('message'),
+      Databag.inside(this.commit()),
+      this.backpressureHandler.decrement(),
+      Databag.unwrap()
+    ).subscribe(
+      message => this.emit('next', message),
+      error => this.emit('error', error)
+    );
   }
 
   private createStream(): ConsumerGroupStream {
@@ -63,31 +73,28 @@ export class EventConsumer extends EventEmitter {
     return stream;
   }
 
-  private handlePartition(partition: GroupedObservable<string, Message>) {
+  private handlePartition(partition: GroupedObservable<string, Databag<Message>>) {
     return partition.pipe(
-      Databag.wrap(),
       Databag.setMany({
         partition: partition.key,
         consumerGroup: this.config.consumerOptions.groupId
       }),
       this.before(),
       this.process(),
-      this.after(),
-      Databag.unwrap()
+      this.after()
     );
   }
 
   private before() {
     return (obs: Observable<Databag<Message>>) => obs.pipe(
-      this.backpressureHandler.increment(),
       Databag.inside(this.buildEvent()),
       this.setupTracer(),
       Databag.inside(this.log('Consuming'))
     );
   }
   setupTracer() {
-    return (obs: Observable<Databag<{ message: Message, event: RawEvent }>>) => obs.pipe(
-      Databag.setWithBag('context', bag => this.tracer.startTracing(bag.data.event)
+    return (obs: Observable<Databag<RawEvent>>) => obs.pipe(
+      Databag.setWithBag('context', bag => this.tracer.startTracing(bag.data)
         .set('partition', bag.get('partition'))
         .set('consumerGroup', bag.get('consumerGroup'))
       )
@@ -103,38 +110,34 @@ export class EventConsumer extends EventEmitter {
   }
 
   private process() {
-    return (obs: Observable<Databag<EventMessage>>) => obs.pipe(
+    return (obs: Observable<Databag<RawEvent>>) => obs.pipe(
       this.trace('process'),
-      Databag.insideWithBag((bag) => {
-        const trace = messageTracer(bag.get('consumerGroup'), bag.get('partition'));
-        return this.router.route(trace);
-      }),
+      Databag.inside(this.router.route()),
       this.trace('process-finished'),
       this.trace('process-error', 'error')
     );
   }
 
   private after() {
-    return (obs: Observable<Databag<{ message: Message }>>) => obs.pipe(
-      this.backpressureHandler.decrement(),
-      Databag.inside(this.log('Committing')),
-      Databag.inside(this.commit())
+    return <T>(obs: Observable<Databag<T>>) => obs.pipe(
+      this.backpressureHandler.decrement()
     );
   }
 
-  private buildEvent() {
-    return map((message: Message) =>
-      ({ message, event: this.parseEvent(message.value.toString()) }));
-  }
-
   private log(message: string) {
-    return tap(({ event }: EventMessage) =>
+    return tap((event: RawEvent) =>
       defaultLogger.debug(`${message} ${JSON.stringify(event)}`));
   }
 
   private commit() {
-    return tap(({ message }: EventMessage) =>
-      this.consumerStream.commit(message, true));
+    return tap((message: Message) => {
+      defaultLogger.debug(`Committing ${JSON.stringify(message)}`);
+      return this.consumerStream.commit(message, true);
+    });
+  }
+
+  private buildEvent() {
+    return map((message: Message) => this.parseEvent(message.value.toString()));
   }
 
   private parseEvent(json: string): RawEvent {

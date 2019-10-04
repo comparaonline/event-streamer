@@ -7,7 +7,7 @@ type ValueGenerator<A> = (bag: Databag<A>) => any;
 
 export class Databag<T> {
   private additional = {};
-  private constructor(public data: T) {}
+  private constructor(public data: T) { }
 
   set(name: string, value: any) {
     this.additional[name] = value;
@@ -83,5 +83,17 @@ export class Databag<T> {
 
   static get<A, B = unknown>(name: string): OperatorFunction<Databag<B>, A> {
     return map(databag => databag.get<A>(name));
+  }
+
+  static store<A>(name: string): OperatorFunction<Databag<A>, Databag<A>> {
+    return map(databag => databag.set(name, databag.data));
+  }
+
+  static swap<A, B = unknown>(name: string): OperatorFunction<Databag<B>, Databag<A>> {
+    return map((databag) => {
+      const newBag = new Databag(databag.get<A>(name));
+      newBag.additional = databag.additional;
+      return newBag;
+    });
   }
 }
