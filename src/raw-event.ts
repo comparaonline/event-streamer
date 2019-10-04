@@ -6,4 +6,12 @@ export class RawEvent {
       && typeof obj.code === 'string'
       && obj.code !== '';
   }
+
+  static parse(json: string): RawEvent {
+    try {
+      return JSON.parse(json);
+    } catch (error) {
+      return { code: '' };
+    }
+  }
 }
