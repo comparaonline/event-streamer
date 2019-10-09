@@ -2,12 +2,13 @@ import { Observable, Subject } from 'rxjs';
 import { filter, map, share } from 'rxjs/operators';
 import { RawEvent } from '../raw-event';
 import { TracerContext } from './tracer-context';
+import { TracerEvent } from './tracer-event';
 
 interface ContextStream {
-  eventName: string;
+  eventName: TracerEvent;
   context: TracerContext;
 }
-export { TracerContext };
+export { TracerContext, TracerEvent };
 export class Tracer {
   private static readonly tracerInstance = new Tracer();
   private context = new Subject<ContextStream>();
@@ -20,7 +21,7 @@ export class Tracer {
     return new TracerContext(event);
   }
 
-  listen(eventName: string): Observable<TracerContext> {
+  listen(eventName: TracerEvent): Observable<TracerContext> {
     return this.context.pipe(
       filter(s => s.eventName === eventName),
       map(s => s.context),
@@ -28,8 +29,7 @@ export class Tracer {
     );
   }
 
-  emit(eventName: string, context: TracerContext): void {
+  emit(eventName: TracerEvent, context: TracerContext): void {
     this.context.next({ eventName, context });
   }
 }
-

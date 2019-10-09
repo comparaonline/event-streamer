@@ -8,6 +8,7 @@ import { eventEmitted } from '../../test/emitter-helpers';
 import { Tracer } from '../../tracer';
 import { tap } from 'rxjs/operators';
 import { TracerContext } from '../../tracer/tracer-context';
+import { TracerEvent } from '../../tracer/tracer-event';
 
 describe('KafkaConsumer', () => {
   let consumer: EventConsumer;
@@ -52,7 +53,7 @@ describe('KafkaConsumer', () => {
     it('emits a process event', async () => {
       const tracer = Tracer.instance();
       const emitted = jest.fn();
-      const subscription = tracer.listen('process').pipe(tap(emitted)).subscribe();
+      const subscription = tracer.listen(TracerEvent.process).pipe(tap(emitted)).subscribe();
       const message = testMessage();
       kafkaNode.spies.trigger('ConsumerGroupStream', 'data', message);
       await eventEmitted(consumer, 'next');
@@ -63,7 +64,9 @@ describe('KafkaConsumer', () => {
     it('emits a process-finished event', async () => {
       const tracer = Tracer.instance();
       const emitted = jest.fn();
-      const subscription = tracer.listen('process-finished').pipe(tap(emitted)).subscribe();
+      const subscription = tracer.listen(TracerEvent.processFinished).pipe(
+        tap(emitted)
+      ).subscribe();
       const message = testMessage();
       kafkaNode.spies.trigger('ConsumerGroupStream', 'data', message);
       await eventEmitted(consumer, 'next');
@@ -74,7 +77,9 @@ describe('KafkaConsumer', () => {
     it('does not emit a process-finished event', async () => {
       const tracer = Tracer.instance();
       const emitted = jest.fn();
-      const subscription = tracer.listen('process-error').pipe(tap(emitted)).subscribe();
+      const subscription = tracer.listen(TracerEvent.processError).pipe(
+        tap(emitted)
+      ).subscribe();
       const message = testMessage();
       kafkaNode.spies.trigger('ConsumerGroupStream', 'data', message);
       await eventEmitted(consumer, 'next');
@@ -87,7 +92,9 @@ describe('KafkaConsumer', () => {
     it('emits a process message', async () => {
       const tracer = Tracer.instance();
       const emitted = jest.fn();
-      const subscription = tracer.listen('process').pipe(tap(emitted)).subscribe();
+      const subscription = tracer.listen(TracerEvent.process).pipe(
+        tap(emitted)
+      ).subscribe();
       const message = testMessage('throw');
       kafkaNode.spies.trigger('ConsumerGroupStream', 'data', message);
       await eventEmitted(consumer, 'error');
@@ -98,7 +105,9 @@ describe('KafkaConsumer', () => {
     it('does not emit a process-finished event', async () => {
       const tracer = Tracer.instance();
       const emitted = jest.fn();
-      const subscription = tracer.listen('process-finished').pipe(tap(emitted)).subscribe();
+      const subscription = tracer.listen(TracerEvent.processFinished).pipe(
+        tap(emitted)
+      ).subscribe();
       const message = testMessage('throw');
       kafkaNode.spies.trigger('ConsumerGroupStream', 'data', message);
       await eventEmitted(consumer, 'error');
@@ -109,7 +118,9 @@ describe('KafkaConsumer', () => {
     it('emits a process-error event', async () => {
       const tracer = Tracer.instance();
       const emitted = jest.fn();
-      const subscription = tracer.listen('process-error').pipe(tap(emitted)).subscribe();
+      const subscription = tracer.listen(TracerEvent.processError).pipe(
+        tap(emitted)
+      ).subscribe();
       const message = testMessage('throw');
       kafkaNode.spies.trigger('ConsumerGroupStream', 'data', message);
       await eventEmitted(consumer, 'error');

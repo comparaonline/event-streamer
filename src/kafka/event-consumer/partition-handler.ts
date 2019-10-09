@@ -5,6 +5,7 @@ import { RawEvent } from '../../raw-event';
 import { Tracer } from '../../tracer';
 import { Router } from '../../router';
 import { tap, map } from 'rxjs/operators';
+import { TracerEvent } from '../../tracer/tracer-event';
 
 export class PartitionHandler {
   private tracer = Tracer.instance();
@@ -35,7 +36,7 @@ export class PartitionHandler {
     );
   }
 
-  private trace<A>(eventName: string, event: 'next' | 'error' | 'complete' = 'next') {
+  private trace<A>(eventName: TracerEvent, event: 'next' | 'error' | 'complete' = 'next') {
     const handler = (data: Databag<A>) =>
       this.tracer.emit(eventName, data.get('context'));
     return tap(...['next', 'error', 'complete']
@@ -45,10 +46,10 @@ export class PartitionHandler {
 
   private process() {
     return (obs: Observable<Databag<RawEvent>>) => obs.pipe(
-      this.trace('process'),
+      this.trace(TracerEvent.process),
       Databag.inside(this.router.route()),
-      this.trace('process-finished'),
-      this.trace('process-error', 'error')
+      this.trace(TracerEvent.processFinished),
+      this.trace(TracerEvent.processError, 'error')
     );
   }
 
