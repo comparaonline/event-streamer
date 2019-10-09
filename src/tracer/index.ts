@@ -7,7 +7,7 @@ interface ContextStream {
   eventName: string;
   context: TracerContext;
 }
-
+export { TracerContext };
 export class Tracer {
   private static readonly tracerInstance = new Tracer();
   private context = new Subject<ContextStream>();
@@ -32,3 +32,4 @@ export class Tracer {
     this.context.next({ eventName, context });
   }
 }
+
