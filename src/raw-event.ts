@@ -1,3 +1,5 @@
+import { tryParse } from './lib/try-parse';
+
 export class RawEvent {
   code: string;
 
@@ -8,10 +10,6 @@ export class RawEvent {
   }
 
   static parse(json: string): RawEvent {
-    try {
-      return JSON.parse(json);
-    } catch (error) {
-      return { code: '' };
-    }
+    return tryParse(json, { code: '' });
   }
 }
