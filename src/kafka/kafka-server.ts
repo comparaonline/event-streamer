@@ -1,3 +1,4 @@
+import * as opentracing from 'opentracing';
 import { Server } from '../server';
 import { Router } from '../router';
 import { OutputEvent } from '../events';
@@ -32,7 +33,7 @@ export class KafkaServer extends Server {
     return Promise.all([this.consumer.stop(), this.producer.stop()]);
   }
 
-  output(event: OutputEvent) {
-    return this.producer.produce(event);
+  output(event: OutputEvent, span?: opentracing.Span) {
+    return this.producer.produce(event, span);
   }
 }

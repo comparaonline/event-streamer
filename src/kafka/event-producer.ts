@@ -1,3 +1,4 @@
+import * as opentracing from 'opentracing';
 import {
   KafkaClient, HighLevelProducer
 } from 'kafka-node';
@@ -34,7 +35,8 @@ export class EventProducer extends EventEmitter {
     });
   }
 
-  produce(event: KafkaOutputEvent): Promise<void> {
+  produce(event: KafkaOutputEvent, span?: opentracing.Span): Promise<void> {
+    event._span = span;
     const { retries, delay, increase } = this.config.retryOptions;
     const fn = promisify(this.producer.send.bind(this.producer));
     return from<Promise<void>>(fn(this.message(event))).pipe(

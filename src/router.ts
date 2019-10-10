@@ -63,29 +63,29 @@ export class Router {
     );
   }
 
-  parRoute(): RouteResult {
+  parRoute(span?: opentracing.Span): RouteResult {
     return (obs: Observable<RawEvent>) => obs.pipe(
-      map(data => this.dispatch(data)),
+      map(data => this.dispatch(data, span)),
       concatMap(data => data)
     );
   }
 
-  parRouteSeqDispatch(): RouteResult {
+  parRouteSeqDispatch(span?: opentracing.Span): RouteResult {
     return (obs: Observable<RawEvent>) => obs.pipe(
         groupBy(event => event.code),
-        flatMap(obs => obs.pipe(this.seqRoute()))
+        flatMap(obs => obs.pipe(this.seqRoute(span)))
       );
   }
 
-  seqRoute(): RouteResult {
+  seqRoute(span?: opentracing.Span): RouteResult {
     return (obs: Observable<RawEvent>) => obs.pipe(
-      concatMap(data => this.dispatch(data))
+      concatMap(data => this.dispatch(data, span))
     );
   }
 
-  private dispatch(event: RawEvent) {
+  private dispatch(event: RawEvent, span?: opentracing.Span) {
     const route = this.getRoute(event);
-    return !route ? resolved : route.handle(event, this.server);
+    return !route ? resolved : route.handle(event, this.server, span);
   }
 }
 
@@ -98,14 +98,14 @@ export class Route {
     this.actionCtors.push(action);
   }
 
-  handle(rawEvent: RawEvent, server: Server): Promise<any> {
+  handle(rawEvent: RawEvent, server: Server, span?: opentracing.Span): Promise<any> {
     const event = new this.event(rawEvent);
-    return Promise.all(this.performances(event, server));
+    return Promise.all(this.performances(event, server, span));
   }
 
-  private performances(event: InputEvent, server: Server): Promise<any>[] {
+  private performances(event: InputEvent, server: Server, span?: opentracing.Span): Promise<any>[] {
     return this.actionCtors
-      .map(actionCtor => new actionCtor(server))
+      .map(actionCtor => new actionCtor(server, span))
       .map(action => action.perform(event));
   }
 }

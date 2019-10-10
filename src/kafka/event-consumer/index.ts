@@ -61,6 +61,7 @@ export class EventConsumer extends EventEmitter {
   private startTracing(): MonoTypeOperatorFunction<Databag<Message>> {
     return tap((databag) => {
       const message = databag.data;
+      const event = tryParse(message.value.toString(), { code: 'unknown' });
       const span = tracer.startSpan('event-streamer.event-consumer.consume', {
         references: [this.getParentSpan(message)]
           .filter((span): span is opentracing.SpanContext => span !== undefined)
@@ -68,7 +69,8 @@ export class EventConsumer extends EventEmitter {
         tags: {
           topic: message.topic,
           'service.name': `${this.config.consumerOptions.groupId}-events`,
-          'resource.name': tryParse(message.value.toString(), { code: 'unknown' }).code
+          'resource.name': event.code,
+          'kafka.event': event
         }
       });
       databag.set('span', span);
@@ -78,7 +80,7 @@ export class EventConsumer extends EventEmitter {
   private getParentSpan(message: Message) {
     const parsed = tryParse(message.value.toString(), { _span: undefined });
     /* istanbul ignore next */
-    return tracer.extract('FORMAT_TEXT_MAP', parsed._span || '') || undefined;
+    return tracer.extract(opentracing.FORMAT_TEXT_MAP, parsed._span || '') || undefined;
   }
 
   private finishTracing(): MonoTypeOperatorFunction<Databag<Message>> {
