@@ -1,5 +1,5 @@
 import { OperatorFunction, Observable, of } from 'rxjs';
-import { map, flatMap } from 'rxjs/operators';
+import { map, flatMap, catchError } from 'rxjs/operators';
 
 type DatabagOperator<A, B> = OperatorFunction<Databag<A>, Databag<B>>;
 type DynamicOperator<A, B> = (db: Databag<A>) => OperatorFunction<A, B>;
@@ -41,15 +41,25 @@ export class Databag<T> {
   }
 
   static unwrap<A>(): OperatorFunction<Databag<A>, A> {
-    return (obs: Observable<Databag<A>>) => obs.pipe(map(val => val.data));
+    return (obs: Observable<Databag<A>>) => obs.pipe(
+      map(bag => bag.data),
+      catchError((bag: Databag<Error>) => { throw bag.data; })
+    );
   }
 
   static rewrap<A, B>(bag: Databag<A>): OperatorFunction<B, Databag<B>> {
-    return map((value: B) => {
-      const newBag = new Databag(value);
-      newBag.additional = bag.additional;
-      return newBag;
-    });
+    return (obs: Observable<B>) => obs.pipe(
+      map((value: B) => {
+        const newBag = new Databag(value);
+        newBag.additional = bag.additional;
+        return newBag;
+      }),
+      catchError((error: Error) => {
+        const newBag = new Databag(error);
+        newBag.additional = bag.additional;
+        throw newBag;
+      })
+    );
   }
 
   static inside<A, B>(op: OperatorFunction<A, B>): DatabagOperator<A, B> {

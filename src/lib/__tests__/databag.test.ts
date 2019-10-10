@@ -1,6 +1,7 @@
 import { from, of } from 'rxjs';
 import { Databag } from '../databag';
 import { toArray, map, concatMap } from 'rxjs/operators';
+import { fail } from 'assert';
 
 describe('Databag', () => {
   describe('#wrap', () => {
@@ -204,6 +205,30 @@ describe('Databag', () => {
     it('stores the main value in an additional value', async () => {
       const results = await obs.pipe(Databag.swap('value'), toArray()).toPromise();
       results.forEach(result => expect(result).toHaveProperty('data', 'test'));
+    });
+  });
+
+  describe('with errors', () => {
+    const testValues = [3, 2, 1, 0];
+    const obs = from(testValues).pipe(
+      Databag.wrap(),
+      Databag.set('value', 'test'),
+      Databag.inside(map(v => v ? v : fail('test')))
+    );
+
+    it('returns the error wrapped in a databag', async () => {
+      const results = obs.toPromise();
+      await expect(results).rejects.toEqual(expect.any(Databag));
+    });
+
+    it('unwraps the error wrapped in a databag', async () => {
+      const results = obs.pipe(Databag.unwrap()).toPromise();
+      await expect(results).rejects.toThrow(/test/);
+    });
+
+    it('keeps the previous additional data in the error databag', async () => {
+      const results = obs.toPromise().catch(e => e.get('value'));
+      await expect(results).resolves.toEqual('test');
     });
   });
 });
