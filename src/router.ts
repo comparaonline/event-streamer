@@ -1,14 +1,17 @@
+import * as opentracing from 'opentracing';
 import { Server } from './server';
 import { InputEvent, InputEventCtor } from './events';
 import { RawEvent } from './raw-event';
 import { ActionCtor } from './action';
 import { Observable, OperatorFunction } from 'rxjs';
-import { map, concatMap, groupBy, flatMap } from 'rxjs/operators';
+import { map, concatMap, groupBy, flatMap, tap } from 'rxjs/operators';
+
+const tracer = opentracing.globalTracer();
 
 export const enum RouteStrategy {
-  PARALLEL_ROUTE_PARALLEL_DISPATCH,
-  PARALLEL_ROUTE_SEQUENTIAL_DISPATCH,
-  SEQUENTIAL_ROUTE
+  PARALLEL_ROUTE_PARALLEL_DISPATCH = 'parallel route, parallel dispatch',
+  PARALLEL_ROUTE_SEQUENTIAL_DISPATCH = 'parallel route, sequential dispatch',
+  SEQUENTIAL_ROUTE = 'sequential route'
 }
 type StrategyList = {
   [k in RouteStrategy]: () => RouteResult
@@ -42,8 +45,22 @@ export class Router {
       && this.routes.get(event.code);
   }
 
-  route(): RouteResult {
-    return this.routeStrategies[this.strategy]();
+  route(childOf?: opentracing.Span): RouteResult {
+    const span = tracer.startSpan('event-streamer.router.route', { childOf });
+    span.setTag('route.strategy', this.strategy);
+    return (obs: Observable<RawEvent>) => obs.pipe(
+      this.routeStrategies[this.strategy](),
+      tap(() => span.finish(), (error) => {
+        span.setTag(opentracing.Tags.ERROR, true);
+        span.log({
+          event: 'error',
+          'error.object': error,
+          message: error.message,
+          stack: error.stack
+        });
+        span.finish();
+      })
+    );
   }
 
   parRoute(): RouteResult {

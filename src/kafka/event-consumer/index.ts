@@ -61,13 +61,12 @@ export class EventConsumer extends EventEmitter {
   private startTracing(): MonoTypeOperatorFunction<Databag<Message>> {
     return tap((databag) => {
       const message = databag.data;
-      const span = tracer.startSpan('kafka.event.consume', {
+      const span = tracer.startSpan('event-streamer.event-consumer.consume', {
         references: [this.getParentSpan(message)]
           .filter((span): span is opentracing.SpanContext => span !== undefined)
           .map(span => opentracing.followsFrom(span)),
         tags: {
           topic: message.topic,
-          type: 'KafkaEventConsume',
           'service.name': `${this.config.consumerOptions.groupId}-events`,
           'resource.name': tryParse(message.value.toString(), { code: 'unknown' }).code
         }
