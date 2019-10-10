@@ -1,4 +1,5 @@
-import { fromEvent, Observable, OperatorFunction } from 'rxjs';
+import * as opentracing from 'opentracing';
+import { fromEvent, Observable, MonoTypeOperatorFunction } from 'rxjs';
 import {
   map, groupBy, tap, flatMap
 } from 'rxjs/operators';
@@ -10,9 +11,10 @@ import { defaultLogger } from '../../lib/default-logger';
 import { Databag } from '../../lib/databag';
 import { BackpressureHandler } from './backpressure-handler';
 import { PartitionHandler } from './partition-handler';
+import { tryParse } from '../../lib/try-parse';
 
 const topicPartition = ({ topic, partition }: Message) => `${topic}:${partition}`;
-
+const tracer = opentracing.globalTracer();
 export class EventConsumer extends EventEmitter {
   private consumerStream: ConsumerGroupStream;
   private backpressureHandler: BackpressureHandler;
@@ -45,23 +47,68 @@ export class EventConsumer extends EventEmitter {
     fromEvent<Message>(this.consumerStream, 'data').pipe(
       this.backpressureHandler.increment(),
       Databag.wrap(),
-      Databag.store('message'),
+      this.startTracing(),
       this.processPartition(),
-      Databag.swap<Message>('message'),
       Databag.inside(this.commit()),
       this.backpressureHandler.decrement(),
+      this.finishTracing(),
       Databag.unwrap()
     ).subscribe(
       message => this.emit('next', message),
       error => this.emit('error', error)
     );
   }
+  private startTracing(): MonoTypeOperatorFunction<Databag<Message>> {
+    return tap((databag) => {
+      const message = databag.data;
+      const span = tracer.startSpan('kafka.event.consume', {
+        references: [this.getParentSpan(message)]
+          .filter((span): span is opentracing.SpanContext => span !== undefined)
+          .map(span => opentracing.followsFrom(span)),
+        tags: {
+          topic: message.topic,
+          type: 'KafkaEventConsume',
+          'service.name': `${this.config.consumerOptions.groupId}-events`,
+          'resource.name': tryParse(message.value.toString(), { code: 'unknown' }).code
+        }
+      });
+      databag.set('span', span);
+    });
+  }
 
-  private processPartition(): OperatorFunction<Databag<Message>, Databag<unknown>> {
+  private getParentSpan(message: Message) {
+    const parsed = tryParse(message.value.toString(), { _span: undefined });
+    /* istanbul ignore next */
+    return tracer.extract('FORMAT_TEXT_MAP', parsed._span || '') || undefined;
+  }
+
+  private finishTracing(): MonoTypeOperatorFunction<Databag<Message>> {
     return (obs: Observable<Databag<Message>>) => obs.pipe(
+      tap(undefined, (databag: Databag<Error>) => {
+        const error = databag.data;
+        const span: opentracing.Span = databag.get('span');
+        span.setTag(opentracing.Tags.ERROR, true);
+        span.log({
+          event: 'error',
+          'error.object': error,
+          message: error.message,
+          stack: error.stack
+        });
+      }),
+      tap(
+        (databag: Databag<any>) => databag.get<opentracing.Span>('span').finish(),
+        (databag: Databag<any>) => databag.get<opentracing.Span>('span').finish()
+      )
+    );
+  }
+
+  private processPartition(): MonoTypeOperatorFunction<Databag<Message>> {
+    return (obs: Observable<Databag<Message>>) => obs.pipe(
+      Databag.store('message'),
       groupBy(bag => topicPartition(bag.data)),
       map(partition => this.partitionHandler.handle(partition)),
-      flatMap(partition => partition)
+      flatMap(partition => partition),
+      Databag.swap<Message>('message')
     );
   }
 
