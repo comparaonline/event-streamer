@@ -30,7 +30,7 @@ export abstract class OutputEvent {
   }
 
   toJSON() {
-    const encoded = { ...this.encode(), code: this.code, _span: undefined };
+    const encoded = { ...this.encode(), code: this.code, _span: {} };
     /* istanbul ignore next */
     if (this._span) {
       tracer.inject(this._span, opentracing.FORMAT_TEXT_MAP, encoded._span);
