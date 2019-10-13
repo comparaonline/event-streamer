@@ -14,7 +14,7 @@ export const enum RouteStrategy {
   SEQUENTIAL_ROUTE = 'sequential route'
 }
 type StrategyList = {
-  [k in RouteStrategy]: () => RouteResult
+  [k in RouteStrategy]: (span?: opentracing.Span) => RouteResult
 };
 type RouteResult<T = unknown> = OperatorFunction<RawEvent, T>;
 const resolved = Promise.resolve();
@@ -49,7 +49,7 @@ export class Router {
     const span = tracer.startSpan('event-streamer.router.route', { childOf });
     span.setTag('route.strategy', this.strategy);
     return (obs: Observable<RawEvent>) => obs.pipe(
-      this.routeStrategies[this.strategy](),
+      this.routeStrategies[this.strategy](span),
       tap(() => span.finish(), (error) => {
         span.setTag(opentracing.Tags.ERROR, true);
         span.log({

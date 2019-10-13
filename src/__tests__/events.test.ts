@@ -38,9 +38,9 @@ describe('OutputEvent', () => {
 
   it('returns the JSON representation on toString()', () => {
     const event = new TestEvent();
-    expect(JSON.parse(event.toString())).toEqual({
+    expect(JSON.parse(event.toString())).toEqual(expect.objectContaining({
       code: 'TestEvent'
-    });
+    }));
   });
 
   it('gets the event code from the class attribute', () => {
