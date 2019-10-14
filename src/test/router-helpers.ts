@@ -1,10 +1,10 @@
 import { testRouter } from './factories/test-router';
 import { RouteStrategy } from '../router';
 import { from } from 'rxjs';
-import { EventMessage } from '../kafka/interfaces/event-message';
+import { RawEvent } from '../raw-event';
 
-export const testRouting = async (messages: EventMessage[], strategy?: RouteStrategy) => {
+export const testRouting = async (messages: RawEvent[], strategy?: RouteStrategy) => {
   const router = testRouter();
   if (strategy) router.strategy = strategy;
-  await router.route(v => v)(from(messages)).toPromise();
+  await router.route()(from(messages)).toPromise();
 };

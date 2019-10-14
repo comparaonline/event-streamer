@@ -10,6 +10,6 @@ describe('Action', () => {
     const event = new TestOutputEvent();
     TestOutputAction.outputEvent = event;
     await action.perform();
-    expect(output).toHaveBeenCalledWith(event);
+    expect(output).toHaveBeenCalledWith(event, undefined);
   });
 });

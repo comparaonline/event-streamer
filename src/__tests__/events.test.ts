@@ -16,6 +16,14 @@ describe('InputEvent', () => {
     }
     expect(TestEvent.code).toEqual('Test');
   });
+
+  it('copies the properties from the raw event by default', () => {
+    class TestEvent extends InputEvent {
+      public value: string;
+    }
+    const testEvent = new TestEvent({ value: 'test' });
+    expect(testEvent).toHaveProperty('value', 'test');
+  });
 });
 
 describe('OutputEvent', () => {
@@ -30,9 +38,9 @@ describe('OutputEvent', () => {
 
   it('returns the JSON representation on toString()', () => {
     const event = new TestEvent();
-    expect(JSON.parse(event.toString())).toEqual({
+    expect(JSON.parse(event.toString())).toEqual(expect.objectContaining({
       code: 'TestEvent'
-    });
+    }));
   });
 
   it('gets the event code from the class attribute', () => {
