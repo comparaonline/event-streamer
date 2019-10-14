@@ -38,6 +38,7 @@ export class PartitionHandler {
         { childOf: bag.get('span'), tags: { 'span.type': 'Custom' } }
       ))),
       Databag.inside(map(message => RawEvent.parse(message.value.toString()))),
+      Databag.store('event'),
       tap(bag => bag.get<opentracing.Span>('build-event-span').finish())
     );
   }

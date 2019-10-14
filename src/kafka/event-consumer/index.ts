@@ -1,8 +1,6 @@
 import * as opentracing from 'opentracing';
 import { fromEvent, Observable, MonoTypeOperatorFunction } from 'rxjs';
-import {
-  map, groupBy, tap, flatMap
-} from 'rxjs/operators';
+import { map, groupBy, tap, flatMap } from 'rxjs/operators';
 import { ConsumerGroupStream, Message } from 'kafka-node';
 import { Router } from '../../router';
 import { EventEmitter } from 'events';
@@ -52,11 +50,19 @@ export class EventConsumer extends EventEmitter {
       Databag.inside(this.commit()),
       this.backpressureHandler.decrement(),
       this.finishTracing(),
+      this.emitErrors(),
       Databag.unwrap()
     ).subscribe(
-      message => this.emit('next', message),
-      error => this.emit('error', error)
+      message => this.emit('next', message)
     );
+  }
+
+  private emitErrors() {
+    return tap(undefined, (databag: Databag<Error>) => {
+      const error = databag.data;
+      const event = databag.get('event');
+      this.emit('error', error, event);
+    });
   }
   private startTracing(): MonoTypeOperatorFunction<Databag<Message>> {
     return tap((databag) => {
