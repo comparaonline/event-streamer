@@ -46,8 +46,13 @@ export class Router {
   }
 
   route(childOf?: opentracing.Span): RouteResult {
-    const span = tracer.startSpan('event-streamer.router.route', { childOf });
-    span.setTag('route.strategy', this.strategy);
+    const span = tracer.startSpan('event-streamer.router.route', {
+      childOf,
+      tags: {
+        'route.strategy': this.strategy,
+        'span.type': 'Custom'
+      }
+    });
     return (obs: Observable<RawEvent>) => obs.pipe(
       this.routeStrategies[this.strategy](span),
       tap(() => span.finish(), (error) => {

@@ -68,9 +68,11 @@ export class EventConsumer extends EventEmitter {
           .map(span => opentracing.followsFrom(span)),
         tags: {
           topic: message.topic,
-          'service.name': `${this.config.consumerOptions.groupId}-events`,
+          'service.name': this.config.consumerOptions.groupId,
           'resource.name': event.code,
-          'kafka.event': event
+          'kafka.event': event,
+          'span.type': 'Custom',
+          [opentracing.Tags.SPAN_KIND]: opentracing.Tags.SPAN_KIND_MESSAGING_CONSUMER
         }
       });
       databag.set('span', span);

@@ -35,7 +35,7 @@ export class PartitionHandler {
     return (obs: Observable<Databag<Message>>) => obs.pipe(
       tap(bag => bag.set('build-event-span', tracer.startSpan(
         'event-streamer.partition-handler.build-event',
-        { childOf: bag.get('span') }
+        { childOf: bag.get('span'), tags: { 'span.type': 'Custom' } }
       ))),
       Databag.inside(map(message => RawEvent.parse(message.value.toString()))),
       tap(bag => bag.get<opentracing.Span>('build-event-span').finish())
