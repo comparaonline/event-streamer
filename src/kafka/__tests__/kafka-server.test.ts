@@ -24,7 +24,7 @@ describe('KafkaServer', () => {
       const spy = jest.fn();
       server.on('error', spy);
       kafkaNode.spies.trigger('ConsumerGroupStream', 'error', error);
-      expect(spy).toHaveBeenCalledWith(error);
+      expect(spy).toHaveBeenCalledWith(error, undefined);
     });
   });
 

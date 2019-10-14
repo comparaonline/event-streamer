@@ -25,7 +25,7 @@ export class KafkaServer extends Server {
 
   start() {
     this.consumer.start();
-    this.consumer.on('error', error => this.emit('error', error));
+    this.consumer.on('error', (error, event) => this.emit('error', error, event));
     this.producer.start();
   }
 
