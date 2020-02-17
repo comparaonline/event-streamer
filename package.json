@@ -37,6 +37,7 @@
     "coverage": "jest --coverage"
   },
   "dependencies": {
+    "@comparaonline/backoff": "^1.0.0",
     "kafka-node": "^4.1.3",
     "opentracing": "^0.14.4",
     "reflect-metadata": "^0.1.10",

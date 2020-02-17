@@ -8,9 +8,16 @@ import { clientOptions } from './client-options';
 import { promisify } from 'util';
 import { ConfigurationManager } from './configuration-manager';
 import { defaultLogger } from '../lib/default-logger';
-import { from } from 'rxjs';
-import { retry } from '../lib/retry';
-import { tap } from 'rxjs/operators';
+import { of } from 'rxjs';
+import { backoff } from '@comparaonline/backoff';
+import { tap, flatMap } from 'rxjs/operators';
+
+interface Message {
+  topic: string;
+  messages: string;
+  key: string | undefined;
+}
+type ProducerFn = (_: Message[]) => Promise<void>;
 
 const tracer = opentracing.globalTracer();
 export class EventProducer extends EventEmitter {
@@ -40,10 +47,11 @@ export class EventProducer extends EventEmitter {
   produce(event: KafkaOutputEvent, span?: opentracing.Span): Promise<void> {
     const produceSpan = this.createSpan(event, span);
     event._span = span;
-    const { retries, delay, increase } = this.config.retryOptions;
-    const fn = promisify(this.producer.send.bind(this.producer));
-    return from<Promise<void>>(fn(this.message(event))).pipe(
-      retry(retries, delay, increase),
+    const { retries, delay } = this.config.retryOptions;
+    const produce = promisify<ProducerFn>(this.producer.send.bind(this.producer));
+    return of(this.message(event)).pipe(
+      flatMap(msg => produce(msg)),
+      backoff(retries, delay),
       tap(undefined, /* istanbul ignore next */ (error) => {
         produceSpan.setTag(opentracing.Tags.ERROR, true);
         produceSpan.log({
@@ -70,7 +78,7 @@ export class EventProducer extends EventEmitter {
     });
   }
 
-  private message(event: KafkaOutputEvent) {
+  private message(event: KafkaOutputEvent): Message[] {
     return [{
       topic: event.topic || this.config.producerTopic,
       messages: event.toString(),

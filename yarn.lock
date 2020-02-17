@@ -138,6 +138,11 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
+"@comparaonline/backoff@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@comparaonline/backoff/-/backoff-1.0.0.tgz#b2894ae190c11185efa583a9d2fe08e642700cbd"
+  integrity sha512-wZOoZuq2ed7mUGS9Ut4/amPxmIspVdOvAZPIU88G9s+RmDuJVEEOLBoE5Mn8dSb/rWnKjtkkqrGeiSqB4tgtrQ==
+
 "@fimbul/bifrost@^0.21.0":
   version "0.21.0"
   resolved "https://registry.yarnpkg.com/@fimbul/bifrost/-/bifrost-0.21.0.tgz#d0fafa25938fda475657a6a1e407a21bbe02c74e"

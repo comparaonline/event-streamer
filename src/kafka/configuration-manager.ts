@@ -52,8 +52,7 @@ export class ConfigurationManager {
     const options = this.config.producer.retry || { retries: 5, delay: 1000, increase: 2 };
     return {
       retries: options.retries,
-      delay: options.delay,
-      increase: options.increase
+      delay: options.delay
     };
   }
   private getter(elem: ConsumerConfig|ProducerConfig) {
