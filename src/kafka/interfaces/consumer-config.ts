@@ -4,4 +4,5 @@ export interface ConsumerConfig extends Partial<GlobalConfig> {
   groupId: string;
   topics: string[];
   backpressure?: BackpressureConfig;
+  enabled?: boolean;
 }

@@ -26,6 +26,10 @@ export class EventConsumer extends EventEmitter {
   start(): void {
     const { pause, resume } = this.config.backpressureOptions;
     const { groupId } = this.config.consumerOptions;
+
+    /* istanbul ignore next */
+    if (!this.config.consumerEnabled) return;
+
     this.consumerStream = this.createStream();
     this.backpressureHandler = new BackpressureHandler(this.consumerStream, pause, resume);
     this.partitionHandler = new PartitionHandler(groupId, this.router);
@@ -35,6 +39,10 @@ export class EventConsumer extends EventEmitter {
 
   stop(): Promise<any> {
     return new Promise((resolve) => {
+      /* istanbul ignore next */
+      if (!this.config.consumerEnabled) {
+        return resolve('Consumer disabled');
+      }
       this.consumerStream.close(() => {
         resolve('Consumer disconnected');
       });

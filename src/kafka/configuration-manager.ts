@@ -58,4 +58,9 @@ export class ConfigurationManager {
   private getter(elem: ConsumerConfig|ProducerConfig) {
     return <T>(property: string): T => elem[property] || this.config.global[property];
   }
+
+  get consumerEnabled() {
+    /* istanbul ignore next */
+    return this.config.consumer.hasOwnProperty('enabled') ? this.config.consumer.enabled : true;
+  }
 }
