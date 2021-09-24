@@ -17,9 +17,14 @@ const actions = (stream: PausableStream) => ({
   [Action.pause]: of(() => stream.pause()),
   [Action.resume]: of(() => stream.resume())
 });
-
+const MB = 1000000;
+const SEC = 2000;
 export class BackpressureHandler {
   private actions = actions(this.pausableStream);
+  current = 0;
+  minMemUsage = 0;
+  hasResumed = false;
+
   private readonly backpressureSubject = new Subject<number>();
   public readonly backpressure = this.backpressureSubject.pipe(
     scan((acc, value) => acc + value, 0),
@@ -31,15 +36,56 @@ export class BackpressureHandler {
       /* istanbul ignore next */
       private pause: number = Infinity,
       /* istanbul ignore next */
-      private resume: number = Infinity
-    ) {}
+      private resume: number = Infinity,
+
+      private collectorMetric: (obj:object) => void = () => {}
+    ) {
+    this.minMemUsage = process.memoryUsage().heapUsed;
+    setInterval(() => {
+      this.resumeOnReachedLimit();
+    },          SEC);
+  }
+
+  private pauseOnReachedLimit() {
+    if (process.memoryUsage().heapUsed > this.minMemUsage + this.pause * MB) {
+      this.hasResumed = false;
+      this.collectorMetric({ action: 'paused', heapUsed: process.memoryUsage().heapUsed });
+      this.pausableStream.pause();
+    }
+  }
+
+  private resumeOnReachedLimit() {
+    if (
+      !this.hasResumed &&
+      process.memoryUsage().heapUsed <= this.minMemUsage + (this.pause * MB / 2)
+    ) {
+      this.collectorMetric({ action: 'resumed', heapUsed: process.memoryUsage().heapUsed });
+      this.hasResumed = true;
+      this.pausableStream.resume();
+    }
+  }
+
+  private decrementCurrent() {
+    this.current = this.current - 1;
+  }
+
+  private incrementCurrent() {
+    this.current = this.current + 1;
+  }
 
   public increment<T>() {
-    return tap<T>(() => this.backpressureSubject.next(1));
+    return tap<T>(() => {
+      this.incrementCurrent();
+      this.pauseOnReachedLimit();
+      return this.backpressureSubject.next(1);
+    });
   }
 
   public decrement<T>(): MonoTypeOperatorFunction<T> {
-    return tap<T>(() => this.backpressureSubject.next(-1));
+    return tap<T>(() => {
+      this.decrementCurrent();
+      return this.backpressureSubject.next(-1);
+    });
   }
 
   public handle() {
