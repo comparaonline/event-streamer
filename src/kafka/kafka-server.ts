@@ -14,13 +14,12 @@ export class KafkaServer extends Server {
   constructor(
     router: Router,
     settings: Configuration,
-    logger = defaultLogger,
-    private collectorMetrics: (a: any) => void = () => {}
+    logger = defaultLogger
   ) {
     super(router);
     setLogger(logger);
     const config = new ConfigurationManager(settings);
-    this.consumer = new EventConsumer(router, config, this.collectorMetrics);
+    this.consumer = new EventConsumer(router, config);
     this.producer = new EventProducer(config);
   }
 

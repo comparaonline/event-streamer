@@ -20,8 +20,7 @@ export class EventConsumer extends EventEmitter {
 
   constructor(
     private router: Router,
-    private config: ConfigurationManager,
-    private collectorMetrics: (a: any) => void = () => {}
+    private config: ConfigurationManager
   ) { super(); }
 
   start(): void {
@@ -33,7 +32,7 @@ export class EventConsumer extends EventEmitter {
 
     this.consumerStream = this.createStream();
     this.backpressureHandler = new BackpressureHandler(
-      this.consumerStream, pause, resume, this.collectorMetrics
+      this.consumerStream, pause, resume
     );
     this.partitionHandler = new PartitionHandler(groupId, this.router);
     this.processMessages();

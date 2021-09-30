@@ -1,15 +1,29 @@
 import { Subject, of, EMPTY, MonoTypeOperatorFunction } from 'rxjs';
 import { scan, share, tap, distinctUntilChanged, skip, flatMap } from 'rxjs/operators';
+import { EventsEnum } from '../../notifier/events-enum';
+import { Notifier } from '../../notifier';
 
 interface PausableStream {
   pause(): unknown;
   resume(): unknown;
 }
 
+export interface MemoryMetrics {
+  action: MemoryAction;
+  heapUsed: number;
+}
+
 const enum Action {
   initial = 'initial',
   pause = 'pause',
   resume = 'resume'
+}
+
+export const enum MemoryAction {
+  initial = 'initial',
+  paused = 'paused',
+  resumed = 'resumed',
+  check = 'check'
 }
 
 const actions = (stream: PausableStream) => ({
@@ -24,7 +38,7 @@ export class BackpressureHandler {
   current = 0;
   minMemUsage = 0;
   hasResumed = false;
-
+  private notifier = Notifier.getInstance();
   private readonly backpressureSubject = new Subject<number>();
   public readonly backpressure = this.backpressureSubject.pipe(
     scan((acc, value) => acc + value, 0),
@@ -36,32 +50,41 @@ export class BackpressureHandler {
       /* istanbul ignore next */
       private pause: number = Infinity,
       /* istanbul ignore next */
-      private resume: number = Infinity,
-
-      private collectorMetric: (obj:object) => void = () => {}
-    ) {
+      private resume: number = Infinity
+   ) {
     this.minMemUsage = process.memoryUsage().heapUsed;
+    this.emitMemoryUsage(MemoryAction.initial, this.minMemUsage);
     setInterval(() => {
       this.resumeOnReachedLimit();
     },          SEC);
   }
 
+  private emitMemoryUsage (action: MemoryAction, heapUsed: number) {
+    this.notifier.emit(
+      EventsEnum.ON_MEMORY_USED,
+      <MemoryMetrics>{ action, heapUsed });
+  }
+
   private pauseOnReachedLimit() {
-    if (process.memoryUsage().heapUsed > this.minMemUsage + this.pause * MB) {
-      this.hasResumed = false;
-      this.collectorMetric({ action: 'paused', heapUsed: process.memoryUsage().heapUsed });
-      this.pausableStream.pause();
+    const heap = process.memoryUsage().heapUsed;
+    if (heap > this.minMemUsage + this.pause * MB) {
+      // this.hasResumed = false;
+      this.emitMemoryUsage(MemoryAction.paused, heap);
+     // this.pausableStream.pause();
     }
   }
 
   private resumeOnReachedLimit() {
+    const heap = process.memoryUsage().heapUsed;
+    this.emitMemoryUsage(MemoryAction.check, heap);
+
     if (
       !this.hasResumed &&
-      process.memoryUsage().heapUsed <= this.minMemUsage + (this.pause * MB / 2)
+      heap <= this.minMemUsage + (this.pause * MB / 2)
     ) {
-      this.collectorMetric({ action: 'resumed', heapUsed: process.memoryUsage().heapUsed });
-      this.hasResumed = true;
-      this.pausableStream.resume();
+      this.emitMemoryUsage(MemoryAction.resumed, heap);
+      // this.hasResumed = true;
+      // this.pausableStream.resume();
     }
   }
 
