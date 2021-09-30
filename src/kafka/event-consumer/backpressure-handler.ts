@@ -23,7 +23,8 @@ export const enum MemoryAction {
   initial = 'initial',
   paused = 'paused',
   resumed = 'resumed',
-  check = 'check'
+  check = 'check',
+  heapTotal = 'heapTotal'
 }
 
 const actions = (stream: PausableStream) => ({
@@ -53,6 +54,7 @@ export class BackpressureHandler {
       private resume: number = Infinity
    ) {
     this.minMemUsage = process.memoryUsage().heapUsed;
+    this.emitMemoryUsage(MemoryAction.heapTotal, process.memoryUsage().heapTotal);
     this.emitMemoryUsage(MemoryAction.initial, this.minMemUsage);
     setInterval(() => {
       this.resumeOnReachedLimit();
