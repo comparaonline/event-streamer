@@ -1,7 +1,7 @@
 import { Subject, of, EMPTY, MonoTypeOperatorFunction } from 'rxjs';
 import { scan, share, tap, distinctUntilChanged, skip, flatMap } from 'rxjs/operators';
-import { EventsEnum } from '../../notifier/events-enum';
-import { Notifier } from '../../notifier';
+import { EventsEnum } from '../notifier/events-enum';
+import { Notifier } from '../notifier';
 
 interface PausableStream {
   pause(): unknown;
@@ -35,12 +35,13 @@ const actions = (stream: PausableStream) => ({
 const MB = 1000000;
 const SEC = 2000;
 export class BackpressureHandler {
-  private actions = actions(this.pausableStream);
   current = 0;
   minMemUsage = 0;
   hasResumed = false;
-  private notifier = Notifier.getInstance();
+  private actions = actions(this.pausableStream);
   private readonly backpressureSubject = new Subject<number>();
+  private notifier = Notifier.getInstance();
+
   public readonly backpressure = this.backpressureSubject.pipe(
     scan((acc, value) => acc + value, 0),
     share()
@@ -56,9 +57,7 @@ export class BackpressureHandler {
     this.minMemUsage = process.memoryUsage().heapUsed;
     this.emitMemoryUsage(MemoryAction.heapTotal, process.memoryUsage().heapTotal);
     this.emitMemoryUsage(MemoryAction.initial, this.minMemUsage);
-    setInterval(() => {
-      this.resumeOnReachedLimit();
-    },          SEC);
+    setInterval(this.resumeOnReachedLimit, SEC);
   }
 
   private emitMemoryUsage (action: MemoryAction, heapUsed: number) {
@@ -67,25 +66,24 @@ export class BackpressureHandler {
       <MemoryMetrics>{ action, heapUsed });
   }
 
-  private pauseOnReachedLimit() {
+  pauseOnReachedLimit() {
     const heap = process.memoryUsage().heapUsed;
+    this.emitMemoryUsage(MemoryAction.check, heap);
     if (heap > this.minMemUsage + this.pause * MB) {
-      // this.hasResumed = false;
+      this.hasResumed = false;
       this.emitMemoryUsage(MemoryAction.paused, heap);
      // this.pausableStream.pause();
     }
   }
 
-  private resumeOnReachedLimit() {
+  resumeOnReachedLimit() {
     const heap = process.memoryUsage().heapUsed;
-    this.emitMemoryUsage(MemoryAction.check, heap);
-
     if (
       !this.hasResumed &&
       heap <= this.minMemUsage + (this.pause * MB / 2)
     ) {
       this.emitMemoryUsage(MemoryAction.resumed, heap);
-      // this.hasResumed = true;
+      this.hasResumed = true;
       // this.pausableStream.resume();
     }
   }
