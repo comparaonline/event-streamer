@@ -31,7 +31,9 @@ export class EventConsumer extends EventEmitter {
     if (!this.config.consumerEnabled) return;
 
     this.consumerStream = this.createStream();
-    this.backpressureHandler = new BackpressureHandler(this.consumerStream, pause, resume);
+    this.backpressureHandler = new BackpressureHandler(
+      this.consumerStream, pause, resume
+    );
     this.partitionHandler = new PartitionHandler(groupId, this.router);
     this.processMessages();
     this.consumerStream.resume();
