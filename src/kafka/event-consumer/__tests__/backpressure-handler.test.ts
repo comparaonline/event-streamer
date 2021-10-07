@@ -6,6 +6,7 @@ jest.useFakeTimers();
 
 const MAX_MB = 99999999999999;
 const MIN_MB = 1;
+const INTERVAL = 1000;
 const mockEmit = jest.fn();
 const mockMemoryUsage = jest.fn();
 
@@ -43,7 +44,7 @@ describe('BackpressureHandler', () => {
 
     // assert
     expect(setInterval).toHaveBeenCalledTimes(1);
-    expect(setInterval).toHaveBeenLastCalledWith(expect.any(Function), 2000);
+    expect(setInterval).toHaveBeenLastCalledWith(expect.any(Function), INTERVAL);
     expect(mockEmit).toHaveBeenNthCalledWith(
       1,
       EventsEnum.ON_MEMORY_USED,
@@ -128,7 +129,7 @@ describe('BackpressureHandler', () => {
 
       // assert
       expect(handler.hasResumed).toBeTruthy();
-      expect(mockEmit).toHaveBeenCalledTimes(1);
+      expect(mockEmit).toHaveBeenCalledTimes(2);
       expect(mockEmit).toHaveBeenCalledWith(
         EventsEnum.ON_MEMORY_USED,
         { action: MemoryAction.check, heapUsed: MIN_MB }
@@ -138,7 +139,8 @@ describe('BackpressureHandler', () => {
       // arrange
       process.memoryUsage = mockMemoryUsage;
       mockMemoryUsage.mockImplementation(() => ({
-        heapUsed: MAX_MB
+        heapUsed: MAX_MB,
+        rss: MAX_MB
       }));
 
       // act
@@ -146,7 +148,7 @@ describe('BackpressureHandler', () => {
 
       // assert
       expect(handler.hasResumed).toBeFalsy();
-      expect(mockEmit).toHaveBeenCalledTimes(2);
+      expect(mockEmit).toHaveBeenCalledTimes(3);
       expect(mockEmit).toHaveBeenNthCalledWith(
         1,
         EventsEnum.ON_MEMORY_USED,
@@ -154,6 +156,11 @@ describe('BackpressureHandler', () => {
       );
       expect(mockEmit).toHaveBeenNthCalledWith(
         2,
+        EventsEnum.ON_MEMORY_USED,
+        { action: MemoryAction.rss, heapUsed: MAX_MB }
+      );
+      expect(mockEmit).toHaveBeenNthCalledWith(
+        3,
         EventsEnum.ON_MEMORY_USED,
         { action: MemoryAction.paused, heapUsed: MAX_MB }
       );
