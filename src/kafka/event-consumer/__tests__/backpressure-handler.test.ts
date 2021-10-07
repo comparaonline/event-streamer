@@ -139,7 +139,8 @@ describe('BackpressureHandler', () => {
       // arrange
       process.memoryUsage = mockMemoryUsage;
       mockMemoryUsage.mockImplementation(() => ({
-        heapUsed: MAX_MB
+        heapUsed: MAX_MB,
+        rss: MAX_MB
       }));
 
       // act
@@ -156,12 +157,12 @@ describe('BackpressureHandler', () => {
       expect(mockEmit).toHaveBeenNthCalledWith(
         2,
         EventsEnum.ON_MEMORY_USED,
-        { action: MemoryAction.paused, heapUsed: MAX_MB }
+        { action: MemoryAction.rss, heapUsed: MAX_MB }
       );
       expect(mockEmit).toHaveBeenNthCalledWith(
         3,
         EventsEnum.ON_MEMORY_USED,
-        { action: MemoryAction.rss, heapUsed: MAX_MB }
+        { action: MemoryAction.paused, heapUsed: MAX_MB }
       );
     });
   });
