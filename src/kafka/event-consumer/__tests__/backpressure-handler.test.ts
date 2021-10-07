@@ -42,7 +42,7 @@ describe('BackpressureHandler', () => {
     new BackpressureHandler(stream, 10, 0);
 
     // assert
-    expect(setInterval).toHaveBeenCalledTimes(1);
+    expect(setInterval).toHaveBeenCalledTimes(2);
     expect(setInterval).toHaveBeenLastCalledWith(expect.any(Function), 2000);
     expect(mockEmit).toHaveBeenNthCalledWith(
       1,
@@ -128,7 +128,7 @@ describe('BackpressureHandler', () => {
 
       // assert
       expect(handler.hasResumed).toBeTruthy();
-      expect(mockEmit).toHaveBeenCalledTimes(1);
+      expect(mockEmit).toHaveBeenCalledTimes(2);
       expect(mockEmit).toHaveBeenCalledWith(
         EventsEnum.ON_MEMORY_USED,
         { action: MemoryAction.check, heapUsed: MIN_MB }
@@ -146,7 +146,7 @@ describe('BackpressureHandler', () => {
 
       // assert
       expect(handler.hasResumed).toBeFalsy();
-      expect(mockEmit).toHaveBeenCalledTimes(2);
+      expect(mockEmit).toHaveBeenCalledTimes(3);
       expect(mockEmit).toHaveBeenNthCalledWith(
         1,
         EventsEnum.ON_MEMORY_USED,
