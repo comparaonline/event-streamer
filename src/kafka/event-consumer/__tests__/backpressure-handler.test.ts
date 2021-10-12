@@ -121,7 +121,9 @@ describe('BackpressureHandler', () => {
       // arrange
       process.memoryUsage = mockMemoryUsage;
       mockMemoryUsage.mockImplementation(() => ({
-        heapUsed: MIN_MB
+        heapUsed: MIN_MB,
+        heapTotal: MIN_MB,
+        rss: MIN_MB
       }));
       handler.hasResumed = true;
       // act
@@ -129,10 +131,21 @@ describe('BackpressureHandler', () => {
 
       // assert
       expect(handler.hasResumed).toBeTruthy();
-      expect(mockEmit).toHaveBeenCalledTimes(2);
-      expect(mockEmit).toHaveBeenCalledWith(
+      expect(mockEmit).toHaveBeenCalledTimes(3);
+      expect(mockEmit).toHaveBeenNthCalledWith(
+        1,
         EventsEnum.ON_MEMORY_USED,
         { action: MemoryAction.check, heapUsed: MIN_MB }
+      );
+      expect(mockEmit).toHaveBeenNthCalledWith(
+        2,
+        EventsEnum.ON_MEMORY_USED,
+        { action: MemoryAction.rss, heapUsed: MIN_MB }
+      );
+      expect(mockEmit).toHaveBeenNthCalledWith(
+        3,
+        EventsEnum.ON_MEMORY_USED,
+        { action: MemoryAction.heapTotal, heapUsed: MIN_MB }
       );
     });
     it('should emit action paused', () => {
@@ -140,7 +153,8 @@ describe('BackpressureHandler', () => {
       process.memoryUsage = mockMemoryUsage;
       mockMemoryUsage.mockImplementation(() => ({
         heapUsed: MAX_MB,
-        rss: MAX_MB
+        rss: MAX_MB,
+        heapTotal: MAX_MB
       }));
 
       // act
@@ -148,7 +162,7 @@ describe('BackpressureHandler', () => {
 
       // assert
       expect(handler.hasResumed).toBeFalsy();
-      expect(mockEmit).toHaveBeenCalledTimes(3);
+      expect(mockEmit).toHaveBeenCalledTimes(4);
       expect(mockEmit).toHaveBeenNthCalledWith(
         1,
         EventsEnum.ON_MEMORY_USED,
@@ -161,6 +175,11 @@ describe('BackpressureHandler', () => {
       );
       expect(mockEmit).toHaveBeenNthCalledWith(
         3,
+        EventsEnum.ON_MEMORY_USED,
+        { action: MemoryAction.heapTotal, heapUsed: MAX_MB }
+      );
+      expect(mockEmit).toHaveBeenNthCalledWith(
+        4,
         EventsEnum.ON_MEMORY_USED,
         { action: MemoryAction.paused, heapUsed: MAX_MB }
       );
