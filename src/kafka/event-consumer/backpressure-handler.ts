@@ -61,7 +61,7 @@ export class BackpressureHandler {
     this.emitMemoryUsage(MemoryAction.initial, this.minMemUsage);
     setInterval(this.resumeOnReachedLimit, SEC);
     this.pause = this.memLimit;
-    this.resume = this.memLimit/2;
+    this.resume = this.memLimit / 2;
   }
 
   private emitMemoryUsage (action: MemoryAction, heapUsed: number) {
@@ -81,7 +81,7 @@ export class BackpressureHandler {
     if (heap > this.minMemUsage + this.pause * MB) {
       this.hasResumed = false;
       this.emitMemoryUsage(MemoryAction.paused, heap);
-     this.pausableStream.pause();
+      this.pausableStream.pause();
     }
   }
 
