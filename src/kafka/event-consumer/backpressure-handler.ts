@@ -42,7 +42,6 @@ export class BackpressureHandler {
   private actions = actions(this.pausableStream);
   private readonly backpressureSubject = new Subject<number>();
   private notifier = Notifier.getInstance();
-  private memLimit: number = 400;
 
   public readonly backpressure = this.backpressureSubject.pipe(
     scan((acc, value) => acc + value, 0),
@@ -60,8 +59,6 @@ export class BackpressureHandler {
     this.emitMemoryUsage(MemoryAction.heapTotal, process.memoryUsage().heapTotal);
     this.emitMemoryUsage(MemoryAction.initial, this.minMemUsage);
     setInterval(this.resumeOnReachedLimit, SEC);
-    this.pause = this.memLimit;
-    this.resume = this.memLimit / 2;
   }
 
   private emitMemoryUsage (action: MemoryAction, heapUsed: number) {
