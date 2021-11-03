@@ -156,30 +156,41 @@ describe('BackpressureHandler', () => {
         rss: MAX_MB,
         heapTotal: MAX_MB
       }));
+      handler = new BackpressureHandler(stream, 10, 0, 100);
 
       // act
       handler.pauseOnReachedLimit();
 
       // assert
       expect(handler.hasResumed).toBeFalsy();
-      expect(mockEmit).toHaveBeenCalledTimes(4);
+      expect(mockEmit).toHaveBeenCalledTimes(6);
       expect(mockEmit).toHaveBeenNthCalledWith(
         1,
-        EventsEnum.ON_MEMORY_USED,
-        { action: MemoryAction.check, heapUsed: MAX_MB }
-      );
-      expect(mockEmit).toHaveBeenNthCalledWith(
-        2,
-        EventsEnum.ON_MEMORY_USED,
-        { action: MemoryAction.rss, heapUsed: MAX_MB }
-      );
-      expect(mockEmit).toHaveBeenNthCalledWith(
-        3,
         EventsEnum.ON_MEMORY_USED,
         { action: MemoryAction.heapTotal, heapUsed: MAX_MB }
       );
       expect(mockEmit).toHaveBeenNthCalledWith(
+        2,
+        EventsEnum.ON_MEMORY_USED,
+        { action: MemoryAction.initial, heapUsed: MAX_MB }
+      );
+      expect(mockEmit).toHaveBeenNthCalledWith(
+        3,
+        EventsEnum.ON_MEMORY_USED,
+        { action: MemoryAction.check, heapUsed: MAX_MB }
+      );
+      expect(mockEmit).toHaveBeenNthCalledWith(
         4,
+        EventsEnum.ON_MEMORY_USED,
+        { action: MemoryAction.rss, heapUsed: MAX_MB }
+      );
+      expect(mockEmit).toHaveBeenNthCalledWith(
+        5,
+        EventsEnum.ON_MEMORY_USED,
+        { action: MemoryAction.heapTotal, heapUsed: MAX_MB }
+      );
+      expect(mockEmit).toHaveBeenNthCalledWith(
+        6,
         EventsEnum.ON_MEMORY_USED,
         { action: MemoryAction.paused, heapUsed: MAX_MB }
       );
@@ -191,7 +202,8 @@ describe('BackpressureHandler', () => {
       // arrange
       process.memoryUsage = mockMemoryUsage;
       mockMemoryUsage.mockImplementation(() => ({
-        heapUsed: MIN_MB
+        heapUsed: MIN_MB,
+        rss: MIN_MB
       }));
 
       // act
