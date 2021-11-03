@@ -5,6 +5,14 @@ import { testMessage } from '../../test/factories/test-message';
 import { testInvalidMessage } from '../../test/factories/test-invalid-message';
 import { configurationManager } from '../../test/factories/configurations';
 import { eventEmitted } from '../../test/emitter-helpers';
+const mockMemoryUsage = jest.fn();
+const MIN_MB = 1;
+
+process.memoryUsage = mockMemoryUsage;
+mockMemoryUsage.mockImplementation(() => ({
+  heapUsed: MIN_MB,
+  rss: MIN_MB
+}));
 
 describe('KafkaConsumer', () => {
   let consumer: EventConsumer;

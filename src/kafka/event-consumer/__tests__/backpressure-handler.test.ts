@@ -191,7 +191,8 @@ describe('BackpressureHandler', () => {
       // arrange
       process.memoryUsage = mockMemoryUsage;
       mockMemoryUsage.mockImplementation(() => ({
-        heapUsed: MIN_MB
+        heapUsed: MIN_MB,
+        rss: MIN_MB
       }));
 
       // act
