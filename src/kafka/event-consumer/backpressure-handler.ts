@@ -53,7 +53,9 @@ export class BackpressureHandler {
       /* istanbul ignore next */
       private pause: number = Infinity,
       /* istanbul ignore next */
-      private resume: number = Infinity
+      private resume: number = Infinity,
+      /* istanbul ignore next */
+      private topMB: number = Infinity
    ) {
     this.minMemUsage = process.memoryUsage().heapUsed;
     this.emitMemoryUsage(MemoryAction.heapTotal, process.memoryUsage().heapTotal);
@@ -75,7 +77,7 @@ export class BackpressureHandler {
     this.emitMemoryUsage(MemoryAction.rss, rss);
     this.emitMemoryUsage(MemoryAction.heapTotal, heapTotal);
 
-    if (rss > this.pause * MB) {
+    if (rss > this.topMB * MB) {
       this.hasResumed = false;
       this.emitMemoryUsage(MemoryAction.paused, heap);
       this.pausableStream.pause();
@@ -87,7 +89,7 @@ export class BackpressureHandler {
     const heap = process.memoryUsage().heapUsed;
     if (
       !this.hasResumed &&
-      rss <= (this.pause * MB / 2)
+      rss <= (this.topMB * MB / 2)
     ) {
       this.emitMemoryUsage(MemoryAction.resumed, heap);
       this.hasResumed = true;
