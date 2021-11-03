@@ -78,6 +78,7 @@ export class BackpressureHandler {
     if (rss > this.pause * MB) {
       this.hasResumed = false;
       this.emitMemoryUsage(MemoryAction.paused, heap);
+      this.emitMemoryUsage(MemoryAction.rss, rss);
       this.pausableStream.pause();
     }
   }
@@ -90,6 +91,7 @@ export class BackpressureHandler {
       rss <= (this.pause * MB) / 2
     ) {
       this.emitMemoryUsage(MemoryAction.resumed, heap);
+      this.emitMemoryUsage(MemoryAction.rss, rss);
       this.hasResumed = true;
       this.pausableStream.resume();
     }
