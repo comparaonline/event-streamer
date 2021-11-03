@@ -75,7 +75,7 @@ export class BackpressureHandler {
     this.emitMemoryUsage(MemoryAction.rss, rss);
     this.emitMemoryUsage(MemoryAction.heapTotal, heapTotal);
 
-    if (heap > this.minMemUsage + this.pause * MB) {
+    if (rss > this.pause * MB) {
       this.hasResumed = false;
       this.emitMemoryUsage(MemoryAction.paused, heap);
       this.pausableStream.pause();
@@ -83,10 +83,11 @@ export class BackpressureHandler {
   }
 
   resumeOnReachedLimit() {
+    const rss = process.memoryUsage().rss;
     const heap = process.memoryUsage().heapUsed;
     if (
       !this.hasResumed &&
-      heap <= this.minMemUsage + (this.pause * MB / 2)
+      rss <= (this.pause * MB) / 2
     ) {
       this.emitMemoryUsage(MemoryAction.resumed, heap);
       this.hasResumed = true;
