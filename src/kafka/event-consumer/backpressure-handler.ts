@@ -34,6 +34,7 @@ const actions = (stream: PausableStream) => ({
   [Action.resume]: of(() => stream.resume())
 });
 const MB = 1000000;
+const FOUR_HUNDRED = 400;
 
 export class BackpressureHandler {
   current = 0;
@@ -55,7 +56,7 @@ export class BackpressureHandler {
       /* istanbul ignore next */
       private resume: number = Infinity,
       /* istanbul ignore next */
-      private topMB: number = 400
+      private topMB: number = FOUR_HUNDRED
    ) {
     this.minMemUsage = process.memoryUsage().heapUsed;
     this.emitMemoryUsage(MemoryAction.heapTotal, process.memoryUsage().heapTotal);
