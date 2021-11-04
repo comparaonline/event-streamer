@@ -135,7 +135,6 @@ describe('BackpressureHandler', () => {
       await testTap(handler.decrement());
       expect(stream.pause).toHaveBeenCalledTimes(1);
       expect(stream.resume).toHaveBeenCalledTimes(1);
-
       expect(mockEmit).toHaveBeenCalledTimes(27);
       expect(mockEmit).toHaveBeenNthCalledWith(
         27,

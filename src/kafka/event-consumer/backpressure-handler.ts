@@ -116,7 +116,7 @@ export class BackpressureHandler {
   }
 
   private shouldPauseConsumer(current: number, rss: number): boolean {
-    const shouldPause = current >= this.pause || rss > this.topMB;
+    const shouldPause = current >= this.pause || rss > this.topMB * MB;
     if (shouldPause) {
       this.emitMemoryUsage(MemoryAction.paused, rss);
     }
