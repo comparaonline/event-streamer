@@ -4,9 +4,6 @@ import { EventsEnum } from '../../notifier/events-enum';
 
 jest.useFakeTimers();
 
-const MAX_MB = 99999999999999;
-const MIN_MB = 1;
-const INTERVAL = 1000;
 const mockEmit = jest.fn();
 const mockMemoryUsage = jest.fn();
 
@@ -43,8 +40,6 @@ describe('BackpressureHandler', () => {
     new BackpressureHandler(stream, 10, 0);
 
     // assert
-    expect(setInterval).toHaveBeenCalledTimes(1);
-    expect(setInterval).toHaveBeenLastCalledWith(expect.any(Function), INTERVAL);
     expect(mockEmit).toHaveBeenNthCalledWith(
       1,
       EventsEnum.ON_MEMORY_USED,
@@ -81,11 +76,31 @@ describe('BackpressureHandler', () => {
     afterEach(() => subscription.unsubscribe());
 
     it('stops when it gets to the pause limit', async () => {
+      const ONE_HUNDRED = 100;
+      process.memoryUsage = mockMemoryUsage;
+      mockMemoryUsage.mockImplementation(() => ({
+        heapUsed: 1,
+        heapTotal: 2,
+        rss: ONE_HUNDRED
+      }));
+
       await testTap(handler.increment());
       await testTap(handler.increment());
       await testTap(handler.increment());
       expect(stream.pause).toHaveBeenCalledTimes(1);
       expect(stream.resume).not.toHaveBeenCalled();
+      expect(mockEmit).toHaveBeenCalledTimes(12);
+      [
+        { action: MemoryAction.heapTotal, heapUsed: 2 },
+        { action: MemoryAction.initial, heapUsed: 1 },
+        { action: MemoryAction.heapUsed, heapUsed: 1 },
+        { action: MemoryAction.rss, heapUsed: ONE_HUNDRED },
+        { action: MemoryAction.heapTotal, heapUsed: 2 }
+      ].forEach((event, index) => expect(mockEmit).toHaveBeenNthCalledWith(
+        index + 1,
+        EventsEnum.ON_MEMORY_USED,
+        event
+      ));
     });
 
     it('stops calling pause when over the limit', async () => {
@@ -98,6 +113,13 @@ describe('BackpressureHandler', () => {
     });
 
     it('calls resume when it goes below the limit after calling pause', async () => {
+      const ONE_HUNDRED = 100;
+      process.memoryUsage = mockMemoryUsage;
+      mockMemoryUsage.mockImplementation(() => ({
+        heapUsed: 1,
+        heapTotal: 2,
+        rss: ONE_HUNDRED
+      }));
       await testTap(handler.increment());
       await testTap(handler.increment());
       await testTap(handler.increment());
@@ -113,121 +135,13 @@ describe('BackpressureHandler', () => {
       await testTap(handler.decrement());
       expect(stream.pause).toHaveBeenCalledTimes(1);
       expect(stream.resume).toHaveBeenCalledTimes(1);
-    });
-  });
 
-  describe('pauseOnReachedLimit', () => {
-    it('should not emit action paused', () => {
-      // arrange
-      process.memoryUsage = mockMemoryUsage;
-      mockMemoryUsage.mockImplementation(() => ({
-        heapUsed: MIN_MB,
-        heapTotal: MIN_MB,
-        rss: MIN_MB
-      }));
-      handler.hasResumed = true;
-      // act
-      handler.pauseOnReachedLimit();
-
-      // assert
-      expect(handler.hasResumed).toBeTruthy();
-      expect(mockEmit).toHaveBeenCalledTimes(3);
+      expect(mockEmit).toHaveBeenCalledTimes(27);
       expect(mockEmit).toHaveBeenNthCalledWith(
-        1,
+        27,
         EventsEnum.ON_MEMORY_USED,
-        { action: MemoryAction.check, heapUsed: MIN_MB }
+        { action: MemoryAction.resumed, heapUsed: ONE_HUNDRED }
       );
-      expect(mockEmit).toHaveBeenNthCalledWith(
-        2,
-        EventsEnum.ON_MEMORY_USED,
-        { action: MemoryAction.rss, heapUsed: MIN_MB }
-      );
-      expect(mockEmit).toHaveBeenNthCalledWith(
-        3,
-        EventsEnum.ON_MEMORY_USED,
-        { action: MemoryAction.heapTotal, heapUsed: MIN_MB }
-      );
-    });
-    it('should emit action paused', () => {
-      // arrange
-      process.memoryUsage = mockMemoryUsage;
-      mockMemoryUsage.mockImplementation(() => ({
-        heapUsed: MAX_MB,
-        rss: MAX_MB,
-        heapTotal: MAX_MB
-      }));
-      handler = new BackpressureHandler(stream, 10, 0, 100);
-
-      // act
-      handler.pauseOnReachedLimit();
-
-      // assert
-      expect(handler.hasResumed).toBeFalsy();
-      expect(mockEmit).toHaveBeenCalledTimes(6);
-      expect(mockEmit).toHaveBeenNthCalledWith(
-        1,
-        EventsEnum.ON_MEMORY_USED,
-        { action: MemoryAction.heapTotal, heapUsed: MAX_MB }
-      );
-      expect(mockEmit).toHaveBeenNthCalledWith(
-        2,
-        EventsEnum.ON_MEMORY_USED,
-        { action: MemoryAction.initial, heapUsed: MAX_MB }
-      );
-      expect(mockEmit).toHaveBeenNthCalledWith(
-        3,
-        EventsEnum.ON_MEMORY_USED,
-        { action: MemoryAction.check, heapUsed: MAX_MB }
-      );
-      expect(mockEmit).toHaveBeenNthCalledWith(
-        4,
-        EventsEnum.ON_MEMORY_USED,
-        { action: MemoryAction.rss, heapUsed: MAX_MB }
-      );
-      expect(mockEmit).toHaveBeenNthCalledWith(
-        5,
-        EventsEnum.ON_MEMORY_USED,
-        { action: MemoryAction.heapTotal, heapUsed: MAX_MB }
-      );
-      expect(mockEmit).toHaveBeenNthCalledWith(
-        6,
-        EventsEnum.ON_MEMORY_USED,
-        { action: MemoryAction.paused, heapUsed: MAX_MB }
-      );
-    });
-  });
-
-  describe('resumeOnReachedLimit', () => {
-    it('should emit action resumed', () => {
-      // arrange
-      process.memoryUsage = mockMemoryUsage;
-      mockMemoryUsage.mockImplementation(() => ({
-        heapUsed: MIN_MB,
-        rss: MIN_MB
-      }));
-
-      // act
-      handler.resumeOnReachedLimit();
-
-      // assert
-      expect(handler.hasResumed).toBeTruthy();
-      expect(mockEmit).toHaveBeenCalledTimes(1);
-      expect(mockEmit).toHaveBeenCalledWith(
-        EventsEnum.ON_MEMORY_USED,
-        { action: MemoryAction.resumed, heapUsed: MIN_MB }
-      );
-    });
-
-    it('should not emit action resumed', () => {
-      // arrange
-      handler.hasResumed = true;
-
-      // act
-      handler.resumeOnReachedLimit();
-
-      // assert
-      expect(handler.hasResumed).toBeTruthy();
-      expect(mockEmit).toHaveBeenCalledTimes(0);
     });
   });
 });
