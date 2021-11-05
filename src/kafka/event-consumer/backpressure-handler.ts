@@ -23,7 +23,7 @@ export const enum MemoryAction {
   initial = 'initial',
   paused = 'paused',
   resumed = 'resumed',
-  heapUsed = 'heapUsed',
+  check = 'check',
   heapTotal = 'heapTotal',
   rss = 'rss'
 }
