@@ -65,19 +65,25 @@ export class BackpressureHandler {
     setInterval(this.checkMem, HALF_SEC);
   }
 
-  checkMem() {
+  checkMem = () => {
     const heap = process.memoryUsage().heapUsed;
     const rss = process.memoryUsage().rss;
     const heapTotal = process.memoryUsage().heapTotal;
+
     this.emitMemoryUsage(MemoryAction.check, heap);
     this.emitMemoryUsage(MemoryAction.rss, rss);
     this.emitMemoryUsage(MemoryAction.heapTotal, heapTotal);
   }
 
   private emitMemoryUsage (action: MemoryAction, memUsed: number) {
-    this.notifier.emit(
-      EventsEnum.ON_MEMORY_USED,
-      <MemoryMetrics>{ action, memUsed });
+    try {
+      this.notifier.emit(
+        EventsEnum.ON_MEMORY_USED,
+        <MemoryMetrics>{ action, memUsed });
+    } catch (e) {
+      /* istanbul ignore next */
+      console.error('emitMemoryUsage error sending metrics', e);
+    }
   }
 
   private decrementCurrent() {
