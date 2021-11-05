@@ -82,6 +82,7 @@ describe('BackpressureHandler', () => {
         heapTotal: 2,
         rss: ONE_HUNDRED
       }));
+
       process.memoryUsage = mockMemoryUsage;
 
       await testTap(handler.increment());
@@ -165,6 +166,7 @@ describe('BackpressureHandler', () => {
         EventsEnum.ON_MEMORY_USED,
         event
       ));
+
     });
   });
 });

@@ -23,7 +23,7 @@ export const enum MemoryAction {
   initial = 'initial',
   paused = 'paused',
   resumed = 'resumed',
-  check = 'check',
+  heapUsed = 'heapUsed',
   heapTotal = 'heapTotal',
   rss = 'rss'
 }
@@ -36,6 +36,7 @@ const actions = (stream: PausableStream) => ({
 const MB = 1000000;
 const FOUR_HUNDRED = 400;
 const HALF_SEC = 500;
+
 export class BackpressureHandler {
   current = 0;
   minMemUsage = 0;
