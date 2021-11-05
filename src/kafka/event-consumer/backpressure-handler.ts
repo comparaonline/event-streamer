@@ -23,7 +23,7 @@ export const enum MemoryAction {
   initial = 'initial',
   paused = 'paused',
   resumed = 'resumed',
-  check = 'check',
+  heapUsed = 'heapUsed',
   heapTotal = 'heapTotal',
   rss = 'rss'
 }
@@ -34,7 +34,8 @@ const actions = (stream: PausableStream) => ({
   [Action.resume]: of(() => stream.resume())
 });
 const MB = 1000000;
-const SEC = 1000;
+const FOUR_HUNDRED = 400;
+
 export class BackpressureHandler {
   current = 0;
   minMemUsage = 0;
@@ -55,46 +56,17 @@ export class BackpressureHandler {
       /* istanbul ignore next */
       private resume: number = Infinity,
       /* istanbul ignore next */
-      private topMB: number = Infinity
+      private topMB: number = FOUR_HUNDRED
    ) {
     this.minMemUsage = process.memoryUsage().heapUsed;
     this.emitMemoryUsage(MemoryAction.heapTotal, process.memoryUsage().heapTotal);
     this.emitMemoryUsage(MemoryAction.initial, this.minMemUsage);
-    setInterval(this.resumeOnReachedLimit, SEC);
   }
 
   private emitMemoryUsage (action: MemoryAction, heapUsed: number) {
     this.notifier.emit(
       EventsEnum.ON_MEMORY_USED,
       <MemoryMetrics>{ action, heapUsed });
-  }
-
-  pauseOnReachedLimit() {
-    const heap = process.memoryUsage().heapUsed;
-    const rss = process.memoryUsage().rss;
-    const heapTotal = process.memoryUsage().heapTotal;
-    this.emitMemoryUsage(MemoryAction.check, heap);
-    this.emitMemoryUsage(MemoryAction.rss, rss);
-    this.emitMemoryUsage(MemoryAction.heapTotal, heapTotal);
-
-    if (rss > this.topMB * MB) {
-      this.hasResumed = false;
-      this.emitMemoryUsage(MemoryAction.paused, heap);
-      this.pausableStream.pause();
-    }
-  }
-
-  resumeOnReachedLimit() {
-    const rss = process.memoryUsage().rss;
-    const heap = process.memoryUsage().heapUsed;
-    if (
-      !this.hasResumed &&
-      rss <= (this.topMB * MB / 2)
-    ) {
-      this.emitMemoryUsage(MemoryAction.resumed, heap);
-      this.hasResumed = true;
-      this.pausableStream.resume();
-    }
   }
 
   private decrementCurrent() {
@@ -108,7 +80,6 @@ export class BackpressureHandler {
   public increment<T>() {
     return tap<T>(() => {
       this.incrementCurrent();
-      this.pauseOnReachedLimit();
       return this.backpressureSubject.next(1);
     });
   }
@@ -130,8 +101,38 @@ export class BackpressureHandler {
   }
 
   private chooseAction(prev: Action, current: number) {
-    return current >= this.pause ? Action.pause : (
-      prev === Action.pause && current <= this.resume ? Action.resume : prev
+    const heap = process.memoryUsage().heapUsed;
+    const rss = process.memoryUsage().rss;
+    const heapTotal = process.memoryUsage().heapTotal;
+    this.emitMemoryUsage(MemoryAction.heapUsed, heap);
+    this.emitMemoryUsage(MemoryAction.rss, rss);
+    this.emitMemoryUsage(MemoryAction.heapTotal, heapTotal);
+
+    const shouldPause = this.shouldPauseConsumer(current, rss);
+    const shouldResume = this.shouldResumeConsumer(prev, current, rss);
+
+    return shouldPause ? Action.pause : (
+      shouldResume ? Action.resume : prev
     );
+  }
+
+  private shouldPauseConsumer(current: number, rss: number): boolean {
+    const shouldPause = current >= this.pause || rss > this.topMB * MB;
+    if (shouldPause) {
+      this.emitMemoryUsage(MemoryAction.paused, rss);
+    }
+    return shouldPause;
+  }
+
+  private shouldResumeConsumer(prev: Action, current: number, rss: number): boolean {
+    const shouldResume = prev === Action.pause &&
+      current <= this.resume &&
+      rss < (this.topMB * MB) / 2;
+
+    if (shouldResume) {
+      this.emitMemoryUsage(MemoryAction.resumed, rss);
+    }
+
+    return shouldResume;
   }
 }
