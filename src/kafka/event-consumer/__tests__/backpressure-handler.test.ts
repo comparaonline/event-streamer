@@ -78,7 +78,7 @@ describe('BackpressureHandler', () => {
     it('stops when it gets to the pause limit', async () => {
       const ONE_HUNDRED = 100;
       mockMemoryUsage.mockImplementation(() => ({
-        heapUsed: 7,
+        heapUsed: 1,
         heapTotal: 2,
         rss: ONE_HUNDRED
       }));
