@@ -10,7 +10,7 @@ interface PausableStream {
 
 export interface MemoryMetrics {
   action: MemoryAction;
-  heapUsed: number;
+  memUsed: number;
 }
 
 const enum Action {
@@ -23,7 +23,7 @@ export const enum MemoryAction {
   initial = 'initial',
   paused = 'paused',
   resumed = 'resumed',
-  heapUsed = 'heapUsed',
+  check = 'check',
   heapTotal = 'heapTotal',
   rss = 'rss'
 }
@@ -35,11 +35,10 @@ const actions = (stream: PausableStream) => ({
 });
 const MB = 1000000;
 const FOUR_HUNDRED = 400;
-
+const HALF_SEC = 500;
 export class BackpressureHandler {
   current = 0;
   minMemUsage = 0;
-  hasResumed = false;
   private actions = actions(this.pausableStream);
   private readonly backpressureSubject = new Subject<number>();
   private notifier = Notifier.getInstance();
@@ -61,12 +60,23 @@ export class BackpressureHandler {
     this.minMemUsage = process.memoryUsage().heapUsed;
     this.emitMemoryUsage(MemoryAction.heapTotal, process.memoryUsage().heapTotal);
     this.emitMemoryUsage(MemoryAction.initial, this.minMemUsage);
+    /* istanbul ignore next */
+    setInterval(this.checkMem, HALF_SEC);
   }
 
-  private emitMemoryUsage (action: MemoryAction, heapUsed: number) {
+  checkMem() {
+    const heap = process.memoryUsage().heapUsed;
+    const rss = process.memoryUsage().rss;
+    const heapTotal = process.memoryUsage().heapTotal;
+    this.emitMemoryUsage(MemoryAction.check, heap);
+    this.emitMemoryUsage(MemoryAction.rss, rss);
+    this.emitMemoryUsage(MemoryAction.heapTotal, heapTotal);
+  }
+
+  private emitMemoryUsage (action: MemoryAction, memUsed: number) {
     this.notifier.emit(
       EventsEnum.ON_MEMORY_USED,
-      <MemoryMetrics>{ action, heapUsed });
+      <MemoryMetrics>{ action, memUsed });
   }
 
   private decrementCurrent() {
@@ -101,12 +111,8 @@ export class BackpressureHandler {
   }
 
   private chooseAction(prev: Action, current: number) {
-    const heap = process.memoryUsage().heapUsed;
     const rss = process.memoryUsage().rss;
-    const heapTotal = process.memoryUsage().heapTotal;
-    this.emitMemoryUsage(MemoryAction.heapUsed, heap);
     this.emitMemoryUsage(MemoryAction.rss, rss);
-    this.emitMemoryUsage(MemoryAction.heapTotal, heapTotal);
 
     const shouldPause = this.shouldPauseConsumer(current, rss);
     const shouldResume = this.shouldResumeConsumer(prev, current, rss);
