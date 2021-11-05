@@ -43,12 +43,12 @@ describe('BackpressureHandler', () => {
     expect(mockEmit).toHaveBeenNthCalledWith(
       1,
       EventsEnum.ON_MEMORY_USED,
-      { action: MemoryAction.heapTotal, heapUsed: 2 }
+      { action: MemoryAction.heapTotal, memUsed: 2 }
     );
     expect(mockEmit).toHaveBeenNthCalledWith(
       2,
       EventsEnum.ON_MEMORY_USED,
-      { action: MemoryAction.initial, heapUsed: 1 }
+      { action: MemoryAction.initial, memUsed: 1 }
     );
   });
 
@@ -77,25 +77,24 @@ describe('BackpressureHandler', () => {
 
     it('stops when it gets to the pause limit', async () => {
       const ONE_HUNDRED = 100;
-      process.memoryUsage = mockMemoryUsage;
       mockMemoryUsage.mockImplementation(() => ({
         heapUsed: 1,
         heapTotal: 2,
         rss: ONE_HUNDRED
       }));
 
+      process.memoryUsage = mockMemoryUsage;
+
       await testTap(handler.increment());
       await testTap(handler.increment());
       await testTap(handler.increment());
       expect(stream.pause).toHaveBeenCalledTimes(1);
       expect(stream.resume).not.toHaveBeenCalled();
-      expect(mockEmit).toHaveBeenCalledTimes(12);
+      expect(mockEmit).toHaveBeenCalledTimes(6);
       [
-        { action: MemoryAction.heapTotal, heapUsed: 2 },
-        { action: MemoryAction.initial, heapUsed: 1 },
-        { action: MemoryAction.heapUsed, heapUsed: 1 },
-        { action: MemoryAction.rss, heapUsed: ONE_HUNDRED },
-        { action: MemoryAction.heapTotal, heapUsed: 2 }
+        { action: MemoryAction.heapTotal, memUsed: 2 },
+        { action: MemoryAction.initial, memUsed: 1 },
+        { action: MemoryAction.rss, memUsed: ONE_HUNDRED }
       ].forEach((event, index) => expect(mockEmit).toHaveBeenNthCalledWith(
         index + 1,
         EventsEnum.ON_MEMORY_USED,
@@ -135,12 +134,39 @@ describe('BackpressureHandler', () => {
       await testTap(handler.decrement());
       expect(stream.pause).toHaveBeenCalledTimes(1);
       expect(stream.resume).toHaveBeenCalledTimes(1);
-      expect(mockEmit).toHaveBeenCalledTimes(27);
+      expect(mockEmit).toHaveBeenCalledTimes(13);
       expect(mockEmit).toHaveBeenNthCalledWith(
-        27,
+        13,
         EventsEnum.ON_MEMORY_USED,
-        { action: MemoryAction.resumed, heapUsed: ONE_HUNDRED }
+        { action: MemoryAction.resumed, memUsed: ONE_HUNDRED }
       );
+    });
+  });
+  describe('checkMem', () => {
+    it('should emit actions', () => {
+      // arrange
+      process.memoryUsage = mockMemoryUsage;
+      mockMemoryUsage.mockImplementation(() => ({
+        heapUsed: 1,
+        rss: 3,
+        heapTotal: 2
+      }));
+
+      // act
+      handler.checkMem();
+
+      // assert
+      expect(mockEmit).toHaveBeenCalledTimes(3);
+      [
+        { action: MemoryAction.check, memUsed: 1 },
+        { action: MemoryAction.rss, memUsed: 3 },
+        { action: MemoryAction.heapTotal, memUsed: 2 }
+      ].forEach((event, index) => expect(mockEmit).toHaveBeenNthCalledWith(
+        index + 1,
+        EventsEnum.ON_MEMORY_USED,
+        event
+      ));
+
     });
   });
 });
