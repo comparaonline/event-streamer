@@ -111,7 +111,7 @@ export class BackpressureHandler {
 
   public handle() {
     return this.backpressure.pipe(
-      scan((acc, current) => this.chooseAction(acc, current),   Action.initial),
+      scan((acc, current) => this.chooseAction(acc, current), Action.initial),
       distinctUntilChanged(),
       skip(1),
       flatMap(action => this.actions[action])
