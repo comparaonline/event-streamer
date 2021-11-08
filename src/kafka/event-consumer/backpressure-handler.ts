@@ -97,7 +97,7 @@ export class BackpressureHandler {
 
   public increment<T>() {
     return tap<T>(() => {
-      defaultLogger.debug('BackpressureHandler.increment');
+      console.log('BackpressureHandler.increment');
       this.incrementCurrent();
       return this.backpressureSubject.next(1);
     });
@@ -110,10 +110,10 @@ export class BackpressureHandler {
     });
   }
 
-  public async handle() {
-    return await this.backpressure.pipe(
+  public handle() {
+    return this.backpressure.pipe(
       scan((acc, current) => {
-        defaultLogger.debug('BackpressureHandler.handle scan');
+        console.log('BackpressureHandler.handle scan');
         return this.chooseAction(acc, current);
       },   Action.initial),
       distinctUntilChanged(),
@@ -130,37 +130,32 @@ export class BackpressureHandler {
     const shouldResume = this.shouldResumeConsumer(prev, current, rss);
 
     return shouldPause ? Action.pause : (
-      shouldResume ? Action.resume : prev
+      shouldResume || current === 0 ? Action.resume : prev
     );
   }
 
   private shouldPauseConsumer(current: number, rss: number): boolean {
-    const shouldPause = current >= this.pause || rss > this.topMB * MB;
-    defaultLogger.debug(`BackpressureHandler.shouldPauseConsumer rss ${rss}`);
-    defaultLogger.debug(
-      `BackpressureHandler.shouldPauseConsumer this.topMB * MB ${this.topMB * MB}`
-    );
+    const shouldPause = current >= this.pause || this.hasReachedSuperiorMemoryLimit(rss);
 
     if (shouldPause) {
       this.emitMemoryUsage(MemoryAction.paused, rss);
     }
-    defaultLogger.debug(`BackpressureHandler.shouldPauseConsumer shouldPause ${shouldPause}`);
+
     return shouldPause;
   }
 
   private shouldResumeConsumer(prev: Action, current: number, rss: number): boolean {
     const shouldResume = prev === Action.pause &&
-      current <= this.resume &&
-      rss < (this.topMB * MB) / 2;
-    defaultLogger.debug(`BackpressureHandler.shouldResumeConsumer rss, ${rss}`);
-    defaultLogger.debug(
-      `BackpressureHandler.shouldResumeConsumer this.topMB * MB / 2,
-      ${(this.topMB * MB) / 2}`
-    );
+      current <= this.resume;
+
     if (shouldResume) {
       this.emitMemoryUsage(MemoryAction.resumed, rss);
     }
-    defaultLogger.debug(`BackpressureHandler.shouldResumeConsumer shouldResume ${shouldResume}`);
+
     return shouldResume;
+  }
+
+  private hasReachedSuperiorMemoryLimit(rss: number) {
+    return rss > this.topMB * MB;
   }
 }

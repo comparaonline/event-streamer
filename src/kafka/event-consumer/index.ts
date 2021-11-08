@@ -23,7 +23,7 @@ export class EventConsumer extends EventEmitter {
     private config: ConfigurationManager
   ) { super(); }
 
-  async start(): Promise<void> {
+  start(): void {
     const { pause, resume, topMB } = this.config.backpressureOptions;
     const { groupId } = this.config.consumerOptions;
 
@@ -34,7 +34,7 @@ export class EventConsumer extends EventEmitter {
     this.backpressureHandler = new BackpressureHandler(
       this.consumerStream, pause, resume, topMB
     );
-    await this.backpressureHandler.handle();
+    this.backpressureHandler.handle();
     this.partitionHandler = new PartitionHandler(groupId, this.router);
     this.processMessages();
     this.consumerStream.resume();
