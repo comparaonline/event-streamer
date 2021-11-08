@@ -97,7 +97,6 @@ export class BackpressureHandler {
 
   public increment<T>() {
     return tap<T>(() => {
-      console.log('BackpressureHandler.increment');
       this.incrementCurrent();
       return this.backpressureSubject.next(1);
     });
@@ -112,10 +111,7 @@ export class BackpressureHandler {
 
   public handle() {
     return this.backpressure.pipe(
-      scan((acc, current) => {
-        console.log('BackpressureHandler.handle scan');
-        return this.chooseAction(acc, current);
-      },   Action.initial),
+      scan((acc, current) => this.chooseAction(acc, current),   Action.initial),
       distinctUntilChanged(),
       skip(1),
       flatMap(action => this.actions[action])
