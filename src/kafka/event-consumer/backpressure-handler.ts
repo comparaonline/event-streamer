@@ -126,7 +126,7 @@ export class BackpressureHandler {
     const shouldResume = this.shouldResumeConsumer(prev, current, rss);
 
     return shouldPause ? Action.pause : (
-      shouldResume || current === 0 ? Action.resume : prev
+      shouldResume? Action.resume : prev
     );
   }
 
