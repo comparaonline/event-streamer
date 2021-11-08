@@ -72,7 +72,7 @@ describe('BackpressureHandler', () => {
     const resume = 1;
     let subscription: Subscription;
     beforeEach(() => handler = new BackpressureHandler(stream, pause, resume));
-    beforeEach(async () => subscription = handler.handle() || fail('Subscription undefined'));
+    beforeEach(() => subscription = handler.handle() || fail('Subscription undefined'));
     afterEach(() => subscription.unsubscribe());
 
     it('stops when it gets to the pause limit', async () => {
