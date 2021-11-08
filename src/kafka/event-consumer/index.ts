@@ -34,6 +34,7 @@ export class EventConsumer extends EventEmitter {
     this.backpressureHandler = new BackpressureHandler(
       this.consumerStream, pause, resume, topMB
     );
+    this.backpressureHandler.handle();
     this.partitionHandler = new PartitionHandler(groupId, this.router);
     this.processMessages();
     this.consumerStream.resume();
@@ -63,7 +64,7 @@ export class EventConsumer extends EventEmitter {
       this.emitErrors(),
       Databag.unwrap()
     ).subscribe(
-      message => this.emit('next', message)
+        (message: any) => this.emit('next', message)
     );
   }
 

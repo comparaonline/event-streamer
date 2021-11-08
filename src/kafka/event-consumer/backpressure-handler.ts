@@ -2,6 +2,7 @@ import { Subject, of, EMPTY, MonoTypeOperatorFunction } from 'rxjs';
 import { scan, share, tap, distinctUntilChanged, skip, flatMap } from 'rxjs/operators';
 import { EventsEnum } from '../notifier/events-enum';
 import { Notifier } from '../notifier';
+import { defaultLogger } from '../../lib/default-logger';
 
 interface PausableStream {
   pause(): unknown;
@@ -82,7 +83,7 @@ export class BackpressureHandler {
         <MemoryMetrics>{ action, memUsed });
     } catch (e) {
       /* istanbul ignore next */
-      console.error('emitMemoryUsage error sending metrics', e);
+      defaultLogger.error(`emitMemoryUsage error sending metrics ${e}`);
     }
   }
 
@@ -130,22 +131,27 @@ export class BackpressureHandler {
   }
 
   private shouldPauseConsumer(current: number, rss: number): boolean {
-    const shouldPause = current >= this.pause || rss > this.topMB * MB;
+    const shouldPause = current >= this.pause || this.hasReachedSuperiorMemoryLimit(rss);
+
     if (shouldPause) {
       this.emitMemoryUsage(MemoryAction.paused, rss);
     }
+
     return shouldPause;
   }
 
   private shouldResumeConsumer(prev: Action, current: number, rss: number): boolean {
     const shouldResume = prev === Action.pause &&
-      current <= this.resume &&
-      rss < (this.topMB * MB) / 2;
+      current <= this.resume;
 
     if (shouldResume) {
       this.emitMemoryUsage(MemoryAction.resumed, rss);
     }
 
     return shouldResume;
+  }
+
+  private hasReachedSuperiorMemoryLimit(rss: number) {
+    return rss > this.topMB * MB;
   }
 }
