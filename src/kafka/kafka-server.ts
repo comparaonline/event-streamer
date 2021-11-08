@@ -23,8 +23,8 @@ export class KafkaServer extends Server {
     this.producer = new EventProducer(config);
   }
 
-  start() {
-    this.consumer.start();
+  async start() {
+    await this.consumer.start();
     this.consumer.on('error', (error, event) => this.emit('error', error, event));
     this.producer.start();
   }

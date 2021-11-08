@@ -8,9 +8,9 @@ import { TestOutputEvent } from '../../test/factories/test-output-event';
 describe('KafkaServer', () => {
   let server: KafkaServer;
   beforeEach(() => kafkaNode.reset());
-  beforeEach(() => {
+  beforeEach(async () => {
     server = new KafkaServer(testRouter(), configuration);
-    server.start();
+    await server.start();
   });
 
   describe('basic events', () => {

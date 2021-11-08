@@ -17,9 +17,9 @@ mockMemoryUsage.mockImplementation(() => ({
 describe('KafkaConsumer', () => {
   let consumer: EventConsumer;
   beforeEach(() => kafkaNode.reset());
-  beforeEach(() => {
+  beforeEach(async () => {
     consumer = new EventConsumer(testRouter(), configurationManager);
-    consumer.start();
+    await consumer.start();
   });
 
   it('process a message', async () => {
