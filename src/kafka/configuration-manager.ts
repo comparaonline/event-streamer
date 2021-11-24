@@ -35,7 +35,7 @@ export class ConfigurationManager {
     const get = this.getter(this.config.consumer);
     return {
       pause: (get<BackpressureConfig>('backpressure') || /* istanbul ignore next */{}).pause,
-      topMB: (get<BackpressureConfig>('backpressure') || /* istanbul ignore next */{}).topMB
+      resume: (get<BackpressureConfig>('backpressure') || /* istanbul ignore next */{}).resume
     };
   }
 

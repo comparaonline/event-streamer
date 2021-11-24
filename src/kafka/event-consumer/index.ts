@@ -24,7 +24,7 @@ export class EventConsumer extends EventEmitter {
   ) { super(); }
 
   start(): void {
-    const { pause, topMB } = this.config.backpressureOptions;
+    const { pause } = this.config.backpressureOptions;
     const { groupId } = this.config.consumerOptions;
 
     /* istanbul ignore next */
@@ -32,7 +32,7 @@ export class EventConsumer extends EventEmitter {
 
     this.consumerStream = this.createStream();
     this.backpressureHandler = new BackpressureHandler(
-      this.consumerStream, pause, topMB
+      this.consumerStream, pause
     );
     // this.backpressureHandler.handle();
     this.partitionHandler = new PartitionHandler(groupId, this.router);
