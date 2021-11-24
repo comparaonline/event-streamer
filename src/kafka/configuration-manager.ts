@@ -7,6 +7,8 @@ import { ProducerConfig } from './interfaces/producer-config';
 import { BackpressureConfig } from './interfaces/backpressure-config';
 import { ProducerRetryOptions } from './interfaces/producer-retry-options';
 
+const MB = 1024;
+
 export class ConfigurationManager {
   constructor(
     private config: Configuration,
@@ -22,7 +24,11 @@ export class ConfigurationManager {
       kafkaHost: get('kafkaHost'),
       ssl: get('ssl'),
       sslOptions: get('sslOptions'),
-      sasl: get('sasl')
+      sasl: get('sasl'),
+      fetchMaxWaitMs: 20000,
+      fetchMinBytes: 3 * MB,
+      fetchMaxBytes: 10 * MB
+
     };
   }
 

@@ -98,12 +98,15 @@ export class BackpressureHandler {
   public increment<T>() {
     return tap<T>(() => {
       this.incrementCurrent();
+      defaultLogger.debug(`Incrementing current: ${this.current}`);
       return this.backpressureSubject.next(1);
     });
   }
 
   public decrement<T>(): MonoTypeOperatorFunction<T> {
     return tap<T>(() => {
+      defaultLogger.debug(`Decrementing current: ${this.current}`);
+
       this.decrementCurrent();
       return this.backpressureSubject.next(-1);
     });
