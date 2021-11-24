@@ -7,6 +7,8 @@ import { ProducerConfig } from './interfaces/producer-config';
 import { BackpressureConfig } from './interfaces/backpressure-config';
 import { ProducerRetryOptions } from './interfaces/producer-retry-options';
 
+const MB = 1024 * 1024;
+
 export class ConfigurationManager {
   constructor(
     private config: Configuration,
@@ -22,7 +24,10 @@ export class ConfigurationManager {
       kafkaHost: get('kafkaHost'),
       ssl: get('ssl'),
       sslOptions: get('sslOptions'),
-      sasl: get('sasl')
+      sasl: get('sasl'),
+      fetchMaxWaitMs: get('fetchMaxWaitMs') || 300,
+      fetchMinBytes: get('fetchMinBytes') || 0.5 * MB,
+      fetchMaxBytes: get('fetchMaxBytes') || 5 * MB
     };
   }
 
@@ -30,8 +35,7 @@ export class ConfigurationManager {
     const get = this.getter(this.config.consumer);
     return {
       pause: (get<BackpressureConfig>('backpressure') || /* istanbul ignore next */{}).pause,
-      resume: (get<BackpressureConfig>('backpressure') || /* istanbul ignore next */{}).resume,
-      topMB: (get<BackpressureConfig>('backpressure') || /* istanbul ignore next */{}).topMB
+      resume: (get<BackpressureConfig>('backpressure') || /* istanbul ignore next */{}).resume
     };
   }
 
