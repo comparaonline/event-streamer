@@ -1,7 +1,7 @@
 pipeline {
   agent any
   options {
-    timeout(time: 1, unit: 'HOURS')
+    timeout(time: 0.5, unit: 'HOURS')
   }
   stages {
     stage('Prepare') {
@@ -11,7 +11,7 @@ pipeline {
     }
     stage('Build') {
         steps {
-            sh 'yarn compile'
+            sh 'yarn build'
         }
     }
     stage('Test') {
