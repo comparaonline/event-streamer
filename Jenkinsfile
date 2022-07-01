@@ -16,7 +16,7 @@ pipeline {
     }
     stage('Test') {
         steps {
-            sh 'yarn test'
+            sh 'docker-compose -f docker-compose.yml run --rm app'
         }
     }
     stage('Publish') {
