@@ -1,3 +1,5 @@
+import { RetryOptions } from 'kafka-node';
+
 export enum ProducerPartitionerType {
   DEFAULT = 0,
   RANDOM = 1,
@@ -23,6 +25,7 @@ export interface Config {
     /** Default is CYCLIC (2) */
     partitionerType?: ProducerPartitionerType;
     additionalHosts?: string[];
+    retryOptions?: RetryOptions;
   };
   /** This is required if you want to create a consumer */
   consumer?: {

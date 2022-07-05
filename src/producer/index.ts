@@ -80,7 +80,8 @@ export async function emit(
         return new Promise((resolve, reject) => {
           const client = new KafkaClient({
             autoConnect: true,
-            kafkaHost: host
+            kafkaHost: host,
+            connectRetryOptions: config.producer?.retryOptions
           });
 
           const producer = new Producer(client, {

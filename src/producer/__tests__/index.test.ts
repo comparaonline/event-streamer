@@ -1,6 +1,7 @@
 import { Producer } from 'kafka-node';
-import { emit } from '..';
+import { clearEmittedEvents, emit, getEmittedEvents } from '..';
 import { setConfig } from '../../config';
+import { ProducerPartitionerType } from '../../interfaces';
 
 const defaultHeaderData = {
   attributes: 0,
@@ -188,6 +189,17 @@ describe('producer', () => {
   });
 
   describe('emit error', () => {
+    beforeEach(() => {
+      setConfig({
+        host: 'my-invalid-host:9092',
+        producer: {
+          retryOptions: {
+            retries: 0
+          },
+          partitionerType: ProducerPartitionerType.DEFAULT
+        }
+      });
+    });
     it('Should throw an exception because data must be and object - string sended', async () => {
       await expect(emit({ data: 'my-data', topic: 'topic' })).rejects.toThrowError(
         'Data must be an object'
@@ -198,6 +210,93 @@ describe('producer', () => {
       await expect(emit({ data: null as any, topic: 'topic' })).rejects.toThrowError(
         'Data must be an object'
       );
+    });
+
+    it('Should throw an exception because event code - empty', async () => {
+      await expect(emit({ data: {}, topic: 'topic', eventName: '' })).rejects.toThrowError(
+        'Invalid message code'
+      );
+    });
+
+    it('Should throw an exception because event code - inside data', async () => {
+      await expect(
+        emit({
+          data: {
+            code: 'MyEventName'
+          },
+          topic: 'topic'
+        })
+      ).rejects.toThrowError('Reserved object keyword "code" inside data');
+    });
+
+    it('should fail connection', async () => {
+      await expect(
+        emit({
+          data: {},
+          topic: 'any-topic'
+        })
+      ).rejects.toThrow('getaddrinfo EAI_AGAIN my-invalid-host');
+    }, 12000);
+
+    it('should fail connection by overwrite', async () => {
+      await expect(
+        emit(
+          {
+            data: {},
+            topic: 'any-topic'
+          },
+          ['another-host:9092']
+        )
+      ).rejects.toThrow('getaddrinfo EAI_AGAIN another-host');
+    }, 12000);
+  });
+
+  describe('emit testing mode - success', () => {
+    beforeEach(() => {
+      setConfig({
+        host: 'anyhost:9092',
+        onlyTesting: true
+      });
+    });
+
+    it('should emit pushing the event to the array', async () => {
+      const myEvent = {
+        topic: 'test',
+        data: {
+          a: 'a'
+        },
+        eventName: 'MyEvent'
+      };
+      await emit(myEvent);
+      let emittedEvents = getEmittedEvents();
+      expect(emittedEvents.length).toBe(1);
+      expect(emittedEvents[0]).toMatchObject({
+        topic: myEvent.topic,
+        messages: [
+          JSON.stringify({
+            ...myEvent.data,
+            code: myEvent.eventName
+          })
+        ]
+      });
+      clearEmittedEvents();
+      emittedEvents = getEmittedEvents();
+      expect(emittedEvents.length).toBe(0);
+    });
+  });
+
+  describe('emit testing mode - fail', () => {
+    beforeEach(() => {
+      setConfig({
+        host: 'anyhost:9092',
+        onlyTesting: false
+      });
+    });
+
+    it('should not be able to get emitted events or clear events', () => {
+      const error = 'This method only can be called on only testing mode';
+      expect(getEmittedEvents).toThrow(error);
+      expect(clearEmittedEvents).toThrow(error);
     });
   });
 });
