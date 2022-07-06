@@ -30,6 +30,7 @@ export class ConsumerRouter {
   private commit(): void {
     if (this.consumer != null && !this.autoCommit) {
       this.consumer.commit(true, (error, data) => {
+        /* istanbul ignore next */
         if (error != null) {
           debug(Debug.ERROR, error);
         }
@@ -43,6 +44,7 @@ export class ConsumerRouter {
   public add(topic: string, eventName: string, handler: Callback<any>): void;
   public add(topic: string, eventNames: string[], handler: Callback<any>): void;
   public add(topics: string[], eventNames: string[], handler: Callback<any>): void;
+  public add(topics: string[], eventNames: string, handler: Callback<any>): void;
   public add(
     param1: string | string[],
     param2: string | string[] | Callback<any>,
@@ -82,7 +84,7 @@ export class ConsumerRouter {
     );
   }
 
-  public start(): Promise<void> {
+  public async start(): Promise<void> {
     if (this.routes.length === 0) {
       throw new Error('Missing routes, please add minimum 1 route');
     }
@@ -114,7 +116,9 @@ export class ConsumerRouter {
           const content = getParsedJson<{ code?: string }>(message.value);
 
           if (content != null) {
-            this.consumer?.pause();
+            if (this.consumer != null) {
+              this.consumer.pause();
+            }
             debug(Debug.DEBUG, 'Message offset', message.offset);
             Promise.all(
               this.routes
@@ -134,7 +138,9 @@ export class ConsumerRouter {
                 debug(Debug.DEBUG, 'Committing with', results.length, 'matches');
               }
               this.commit();
-              this.consumer?.resume();
+              if (this.consumer != null) {
+                this.consumer.resume();
+              }
             });
           } else {
             debug(Debug.DEBUG, 'Committing without content');
@@ -142,6 +148,7 @@ export class ConsumerRouter {
           }
         });
 
+        /* istanbul ignore next */
         this.consumer.on('error', (error) => {
           reject(error);
         });

@@ -1,4 +1,4 @@
-import { KafkaClient } from 'kafka-node';
+import { KafkaClient, Producer } from 'kafka-node';
 import { getConfig } from '../config';
 
 export function sleep(ms: number): Promise<void> {
@@ -31,5 +31,36 @@ export async function createTopic(topicName: string): Promise<void> {
         resolve();
       }
     );
+  });
+}
+
+export async function sendRawMessage(topicName: string, content: string | string[]): Promise<void> {
+  const config = getConfig();
+  return new Promise((resolve, reject) => {
+    const client = new KafkaClient({
+      autoConnect: true,
+      kafkaHost: config.host
+    });
+    const producer = new Producer(client, {
+      partitionerType: 2
+    });
+
+    producer.on('ready', () => {
+      producer.send(
+        [
+          {
+            topic: topicName,
+            messages: content
+          }
+        ],
+        (error) => {
+          if (error != null) {
+            reject(error);
+          }
+          resolve();
+          producer.close();
+        }
+      );
+    });
   });
 }
