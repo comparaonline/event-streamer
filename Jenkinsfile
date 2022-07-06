@@ -19,17 +19,18 @@ pipeline {
         anyOf {
           branch "master"
           branch "release"
-      }
-        steps {
-          nvm(env.NODE_VERSION) {
-            sh 'yarn build'
-          }
         }
+      }
+      steps {
+        nvm(env.NODE_VERSION) {
+          sh 'yarn build'
+        }
+      }
     }
     stage('Test') {
-        steps {
-            sh 'docker-compose -f docker-compose.yml run --rm app'
-        }
+      steps {
+          sh 'docker-compose -f docker-compose.yml run --rm app'
+      }
     }
     stage('Publish') {
       when {
