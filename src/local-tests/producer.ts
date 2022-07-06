@@ -3,12 +3,12 @@ import { Debug } from '../interfaces';
 import { data } from './data';
 
 setConfig({
-  host: 'localhost:9092',
+  host: 'kafka:9092',
   debug: Debug.TRACE
 });
 
 async function main(): Promise<void> {
-  for (let index = 0; index < 100000; index++) {
+  for (let index = 0; index < 10; index++) {
     const result = await emit({
       topic: 'topic-a',
       data: {

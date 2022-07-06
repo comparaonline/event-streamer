@@ -3,7 +3,7 @@ import { setConfig } from '../index';
 import { Debug } from '../interfaces';
 
 setConfig({
-  host: 'localhost:9092',
+  host: 'kafka:9092',
   consumer: {
     groupId: 'collection',
     fetchSizeInMB: 0.5
