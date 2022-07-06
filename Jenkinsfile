@@ -1,7 +1,7 @@
 pipeline {
   agent any
   options {
-    timeout(time: 0.5, unit: 'HOURS')
+    timeout(time: 30, unit: 'MINUTES')
   }
   stages {
     stage('Prepare') {
