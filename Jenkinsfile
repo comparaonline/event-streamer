@@ -3,15 +3,27 @@ pipeline {
   options {
     timeout(time: 30, unit: 'MINUTES')
   }
+  environment {
+    NODE_VERSION = "14.17.0"
+  }
   stages {
     stage('Prepare') {
       steps {
-        sh 'yarn install'
+        nvm(env.NODE_VERSION) {
+          sh 'yarn install'
+        }
       }
     }
     stage('Build') {
+      when {
+        anyOf {
+          branch "master"
+          branch "release"
+      }
         steps {
+          nvm(env.NODE_VERSION) {
             sh 'yarn build'
+          }
         }
     }
     stage('Test') {
