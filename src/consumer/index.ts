@@ -75,13 +75,13 @@ export class ConsumerRouter {
   public async input({ data, topic, eventName }: Output): Promise<void> {
     validateTestingConfig();
     const code = stringToUpperCamelCase(eventName ?? topic);
-    Promise.all(
-      this.routes
-        .filter(
-          (route) => topic === route.topic && (route.eventName == null || route.eventName === code)
-        )
-        .map((route) => route.callback({ ...data, code }, emit))
+    const routes = this.routes.filter(
+      (route) => topic === route.topic && (route.eventName == null || route.eventName === code)
     );
+
+    for (const route of routes) {
+      await route.callback({ ...data, code }, emit);
+    }
   }
 
   public async start(): Promise<void> {
