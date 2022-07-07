@@ -47,10 +47,11 @@ export interface Output {
   data: Object | Object[];
 }
 
-export type Callback<T extends Object> = (
-  input: T,
-  emit: (message: Output) => Promise<any>
-) => void;
+export interface Input {
+  code?: string;
+}
+
+export type Callback<T extends Input> = (input: T, emit: (message: Output) => Promise<any>) => void;
 
 export interface Route {
   topic: string;

@@ -1,7 +1,7 @@
 import { ConsumerGroup, Message } from 'kafka-node';
 import { getConfig } from '../config';
 import { debug, getParsedJson, stringToUpperCamelCase, validateTestingConfig } from '../helpers';
-import { Callback, Debug, Output, Route } from '../interfaces';
+import { Input, Callback, Debug, Output, Route } from '../interfaces';
 import { emit } from '../producer';
 
 export class ConsumerRouter {
@@ -113,7 +113,7 @@ export class ConsumerRouter {
         });
 
         this.consumer.on('message', (message: Message) => {
-          const content = getParsedJson<{ code?: string }>(message.value);
+          const content = getParsedJson<Input>(message.value);
 
           if (content != null) {
             if (this.consumer != null) {
