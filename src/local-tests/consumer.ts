@@ -22,12 +22,10 @@ async function main(): Promise<void> {
   let processedMessages = 0;
   console.time('process');
   consumer.add('topic-a', async (data) => {
-    // console.log(1, 'Before sleep', data.id);
     await sleep(100);
-    console.log(1, 'After sleep', data.id);
     processedMessages++;
-    console.log({ processedMessages: processedMessages });
-    if (data.id === 99999) {
+    console.log(`Message id: ${data.id} - processed on queue: ${processedMessages}`);
+    if (data.last === true) {
       console.timeEnd('process');
     }
   });
