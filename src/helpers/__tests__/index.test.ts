@@ -38,20 +38,24 @@ describe('Helpers', () => {
 
   describe('validateTestingConfig', () => {
     it('Should throw an exception', () => {
+      // act
       setConfig({
         host: 'localhost',
         onlyTesting: false
       });
 
+      // assert
       expect(validateTestingConfig).toThrow();
     });
 
     it('Should not throw an exception', () => {
+      // act
       setConfig({
         host: 'localhost',
         onlyTesting: true
       });
 
+      // assert
       expect(validateTestingConfig()).toBe(undefined);
     });
   });

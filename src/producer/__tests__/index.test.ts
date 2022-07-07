@@ -22,17 +22,20 @@ describe('producer', () => {
       });
     });
     it('Should emit a single event with different topic and code', async () => {
+      // arrange
       const sendSpy = jest.spyOn(Producer.prototype, 'send');
       const closeSpy = jest.spyOn(Producer.prototype, 'close');
 
       const eventName = 'EventCode';
 
+      // act
       const response = await emit({
         topic: defaultHeaderData.topic,
         data: defaultBodyData,
         eventName
       });
 
+      // assert
       expect(sendSpy).toHaveBeenCalled();
       expect(sendSpy).toHaveBeenCalledWith(
         [
@@ -62,16 +65,19 @@ describe('producer', () => {
     });
 
     it('Should emit a single event with same topic and code in upper camel case', async () => {
+      // arrange
       const sendSpy = jest.spyOn(Producer.prototype, 'send');
       const closeSpy = jest.spyOn(Producer.prototype, 'close');
 
       const eventName = 'TopicA';
 
+      // act
       await emit({
         topic: defaultHeaderData.topic,
         data: defaultBodyData
       });
 
+      // assert
       expect(sendSpy).toHaveBeenCalledWith(
         [
           {
@@ -91,11 +97,13 @@ describe('producer', () => {
     });
 
     it('Should emit a two events in the same topic and event', async () => {
+      // arrange
       const sendSpy = jest.spyOn(Producer.prototype, 'send');
       const closeSpy = jest.spyOn(Producer.prototype, 'close');
 
       const eventName = 'EventCode';
 
+      // act
       await emit({
         topic: defaultHeaderData.topic,
         eventName,
@@ -111,6 +119,7 @@ describe('producer', () => {
         ]
       });
 
+      // assert
       expect(sendSpy).toHaveBeenCalledWith(
         [
           {
@@ -136,9 +145,11 @@ describe('producer', () => {
     });
 
     it('Should emit a two events in different topics', async () => {
+      // arrange
       const sendSpy = jest.spyOn(Producer.prototype, 'send');
       const closeSpy = jest.spyOn(Producer.prototype, 'close');
 
+      // act
       await emit([
         {
           topic: 'topic-a',
@@ -156,6 +167,7 @@ describe('producer', () => {
         }
       ]);
 
+      // assert
       expect(sendSpy).toHaveBeenCalledWith(
         [
           {
@@ -262,6 +274,7 @@ describe('producer', () => {
     });
 
     it('should emit pushing the event to the array', async () => {
+      // arrange
       const myEvent = {
         topic: 'test',
         data: {
@@ -269,7 +282,10 @@ describe('producer', () => {
         },
         eventName: 'MyEvent'
       };
+      // act
       await emit(myEvent);
+
+      // assert
       let emittedEvents = getEmittedEvents();
       expect(emittedEvents.length).toBe(1);
       expect(emittedEvents[0]).toMatchObject({
