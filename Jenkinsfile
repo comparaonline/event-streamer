@@ -1,23 +1,36 @@
 pipeline {
   agent any
   options {
-    timeout(time: 0.5, unit: 'HOURS')
+    timeout(time: 30, unit: 'MINUTES')
+  }
+  environment {
+    NODE_VERSION = "14.17.0"
   }
   stages {
     stage('Prepare') {
       steps {
-        sh 'yarn install'
+        nvm(env.NODE_VERSION) {
+          sh 'yarn install'
+        }
       }
     }
     stage('Build') {
-        steps {
-            sh 'yarn build'
+      when {
+        anyOf {
+          branch "master"
+          branch "release"
         }
+      }
+      steps {
+        nvm(env.NODE_VERSION) {
+          sh 'yarn build'
+        }
+      }
     }
     stage('Test') {
-        steps {
-            sh 'docker-compose -f docker-compose.yml run --rm app'
-        }
+      steps {
+          sh 'docker-compose -f docker-compose.yml run --rm app'
+      }
     }
     stage('Publish') {
       when {
