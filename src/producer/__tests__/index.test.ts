@@ -235,7 +235,9 @@ describe('producer', () => {
           data: {},
           topic: 'any-topic'
         })
-      ).rejects.toThrow('getaddrinfo EAI_AGAIN my-invalid-host');
+      ).rejects.toThrow(
+        /getaddrinfo ENOTFOUND my-invalid-host|getaddrinfo EAI_AGAIN my-invalid-host/gim
+      );
     }, 12000);
 
     it('should fail connection by overwrite', async () => {
@@ -247,7 +249,7 @@ describe('producer', () => {
           },
           ['another-host:9092']
         )
-      ).rejects.toThrow('getaddrinfo EAI_AGAIN another-host');
+      ).rejects.toThrow(/getaddrinfo ENOTFOUND another-host|getaddrinfo EAI_AGAIN another-host/gim);
     }, 12000);
   });
 
