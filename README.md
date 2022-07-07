@@ -56,7 +56,7 @@ setConfig({
 | consumer | Object | Object | *required to start consumer* |
 | consumer.groupId | string | Kafka group id | **required** |
 | consumer.autoCommit | boolean | Choose commit method, if autoCommit is set to true performance will be increased but also some messages can be lost | *optional* <br/> default: false |
-| consumer.fetchSizeInMB | number | It determines the max pool of messages to be fetched from the broker. <br/>**`IMPORTANT:`** If your application expects messages bigger than 3MB then increase this value, otherwise consumer partition will be stuck | *optional* <br/> default: 3 |
+| consumer.fetchSizeInMB | number | It determines the max pool of messages to be fetched from the broker. <br/>**`IMPORTANT:`** If your application expects messages bigger than 3MB then increase this value, otherwise consumer partition will be stuck and think about your implementation | *optional* <br/> default: 3 |
 | debug | false or Debug | Increase library logging based on Debug level | *optional* default: false |
 | onlyTesting | boolean | Avoid kafka server communication, instead of send/consume messages it will be enable extra methods for unit testing | *optional* <br/> default: false
 
