@@ -49,6 +49,51 @@ function getHosts(
   return [defaultHost, ...toArray(secondaries)];
 }
 
+const connections: Record<string, { producer: Producer; timeout?: NodeJS.Timeout }> = {};
+
+async function createProducer(host: string): Promise<Producer> {
+  const config = getConfig();
+  return new Promise((resolve, reject) => {
+    const client = new KafkaClient({
+      autoConnect: true,
+      kafkaHost: host,
+      connectRetryOptions: config.producer?.retryOptions
+    });
+
+    const producer = new Producer(client, {
+      partitionerType: config.producer?.partitionerType ?? ProducerPartitionerType.CYCLIC
+    });
+
+    producer.on('ready', () => {
+      resolve(producer);
+    });
+
+    producer.on('error', (error) => {
+      reject(error);
+    });
+  });
+}
+
+async function getProducer(host: string): Promise<Producer> {
+  const config = getConfig();
+  if (connections[host] == null) {
+    const producer = await createProducer(host);
+    connections[host] = { producer };
+  }
+
+  const connection = connections[host];
+
+  if (connection.timeout != null) {
+    clearTimeout(connection.timeout);
+  }
+  connection.timeout = setTimeout(() => {
+    connection.producer.removeAllListeners();
+    connection.producer.close();
+    delete connections[host];
+  }, config.producer?.connectionTTL ?? 5000);
+  return connection.producer;
+}
+
 export async function emit(
   output: Output | Output[],
   overwriteHosts?: string | string[]
@@ -76,33 +121,17 @@ export async function emit(
     const hosts = getHosts(config.host, config.producer?.additionalHosts, overwriteHosts);
 
     return Promise.all(
-      hosts.map((host): Promise<EmitResponse> => {
+      hosts.map(async (host): Promise<EmitResponse> => {
+        const producer = await getProducer(host);
         return new Promise((resolve, reject) => {
-          const client = new KafkaClient({
-            autoConnect: true,
-            kafkaHost: host,
-            connectRetryOptions: config.producer?.retryOptions
-          });
-
-          const producer = new Producer(client, {
-            partitionerType: config.producer?.partitionerType ?? ProducerPartitionerType.CYCLIC
-          });
-
-          producer.on('ready', () => {
-            producer.send(normalizePayloads(payloads), (error, result: EmitResponse) => {
-              /* istanbul ignore next */
-              if (error != null) {
-                debug(Debug.ERROR, result);
-                reject(error);
-              }
-              debug(Debug.INFO, 'Emitted', result);
-              resolve(result);
-              producer.close();
-            });
-          });
-
-          producer.on('error', (error) => {
-            reject(error);
+          producer.send(normalizePayloads(payloads), (error, result: EmitResponse) => {
+            /* istanbul ignore next */
+            if (error != null) {
+              debug(Debug.ERROR, result);
+              reject(error);
+            }
+            debug(Debug.INFO, 'Emitted', result);
+            resolve(result);
           });
         });
       })

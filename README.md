@@ -6,6 +6,8 @@ Event Streamer is a library for connect micro services based on kafka event comm
 
 This is a wrap of [kafka-node](https://www.npmjs.com/package/kafka-node) simplifying connection, errors and topic with subject (event name, event code).
 
+This library is not intended to consume two different clusters at the same time, but you can produce in two or more clusters at the same time.
+
 ## Installation
 
 yarn:
@@ -52,6 +54,7 @@ setConfig({
 | producer | Object | Object | *optional* |
 | producer.partitionerType | ProducerPartitionerType (number) | Choose how the producer will send the messages | *optional* <br/> default: CYCLIC (2) |
 | producer.additionalHosts | string[] | Additional hosts to send a message. This is useful if you need to send information to two or more different clusters | *optional* |
+| producer.connectionTTL | number | Time in ms that the connection will be keep open after last message was sent | *optional* <br/> default: 5000 |
 | producer.retryOptions | RetryOptions (Object) | kafka-node retry options: retries, factor, minTimeout, maxTimeout and randomize | *optional* |
 | consumer | Object | Object | *required to start consumer* |
 | consumer.groupId | string | Kafka group id | **required** |
@@ -81,7 +84,7 @@ If a subject is not provided then the topic will be transformed to UpperCamelCas
 
 ### Producing
 
-Event streamer will create and close kafka client on demand to avoid keeping open connections.
+Event streamer will create and close kafka client on demand to avoid keeping open connections, this connection will be reused until TTL is reached (TTL is renewed after each execution).
 Produced events will be delivered the `data` object into a single topic as JSON string with the corresponding subject.
 
 #### Single event
