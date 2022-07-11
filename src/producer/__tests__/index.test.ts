@@ -15,194 +15,214 @@ const defaultBodyData = {
   lastName: 'Doe'
 };
 
+const CONNECTION_TTL = 2000;
+const AFTER_CONNECTION_TTL = 5000;
+const TEST_TIMEOUT = 30000;
+
 describe('producer', () => {
   describe('emit success', () => {
     beforeEach(() => {
       setConfig({
         host: 'kafka:9092',
         producer: {
-          connectionTTL: 500
+          connectionTTL: CONNECTION_TTL
         }
       });
     });
-    it('Should emit a single event with different topic and code', async () => {
-      // arrange
-      const sendSpy = jest.spyOn(Producer.prototype, 'send');
-      const closeSpy = jest.spyOn(Producer.prototype, 'close');
+    it(
+      'Should emit a single event with different topic and code',
+      async () => {
+        // arrange
+        const sendSpy = jest.spyOn(Producer.prototype, 'send');
+        const closeSpy = jest.spyOn(Producer.prototype, 'close');
 
-      const eventName = 'EventCode';
+        const eventName = 'EventCode';
 
-      // act
-      const response = await emit({
-        topic: defaultHeaderData.topic,
-        data: defaultBodyData,
-        eventName
-      });
+        // act
+        const response = await emit({
+          topic: defaultHeaderData.topic,
+          data: defaultBodyData,
+          eventName
+        });
 
-      // assert
-      expect(sendSpy).toHaveBeenCalled();
-      expect(sendSpy).toHaveBeenCalledWith(
-        [
-          {
-            ...defaultHeaderData,
-            messages: [
-              JSON.stringify({
-                ...defaultBodyData,
-                code: eventName
-              })
-            ]
-          }
-        ],
-        expect.any(Function)
-      );
-      expect(closeSpy).not.toHaveBeenCalled();
+        // assert
+        expect(sendSpy).toHaveBeenCalled();
+        expect(sendSpy).toHaveBeenCalledWith(
+          [
+            {
+              ...defaultHeaderData,
+              messages: [
+                JSON.stringify({
+                  ...defaultBodyData,
+                  code: eventName
+                })
+              ]
+            }
+          ],
+          expect.any(Function)
+        );
+        expect(closeSpy).not.toHaveBeenCalled();
 
-      const topicsOffset = response.find((messages) => messages[defaultHeaderData.topic] != null);
-      expect(topicsOffset).toBeDefined();
+        const topicsOffset = response.find((messages) => messages[defaultHeaderData.topic] != null);
+        expect(topicsOffset).toBeDefined();
 
-      if (topicsOffset != null) {
-        const topicOffset = topicsOffset[defaultHeaderData.topic];
-        expect(topicOffset).toBeDefined();
-        expect(typeof topicOffset[String(defaultHeaderData.partition)]).toBe('number');
-      }
-      sendSpy.mockClear();
-    });
-
-    it('Should emit a single event with same topic and code in upper camel case', async () => {
-      // arrange
-      const sendSpy = jest.spyOn(Producer.prototype, 'send');
-      const closeSpy = jest.spyOn(Producer.prototype, 'close');
-
-      const eventName = 'TopicA';
-
-      // act
-      await emit({
-        topic: defaultHeaderData.topic,
-        data: defaultBodyData
-      });
-
-      // assert
-      expect(sendSpy).toHaveBeenCalledWith(
-        [
-          {
-            ...defaultHeaderData,
-            messages: [
-              JSON.stringify({
-                ...defaultBodyData,
-                code: eventName
-              })
-            ]
-          }
-        ],
-        expect.any(Function)
-      );
-      expect(closeSpy).not.toHaveBeenCalled();
-      sendSpy.mockClear();
-    });
-
-    it('Should emit a two events in the same topic and event', async () => {
-      // arrange
-      const sendSpy = jest.spyOn(Producer.prototype, 'send');
-      const closeSpy = jest.spyOn(Producer.prototype, 'close');
-
-      const eventName = 'EventCode';
-
-      // act
-      await emit({
-        topic: defaultHeaderData.topic,
-        eventName,
-        data: [
-          {
-            ...defaultBodyData,
-            id: 1
-          },
-          {
-            ...defaultBodyData,
-            id: 2
-          }
-        ]
-      });
-
-      // assert
-      expect(sendSpy).toHaveBeenCalledWith(
-        [
-          {
-            ...defaultHeaderData,
-            messages: [
-              JSON.stringify({
-                ...defaultBodyData,
-                id: 1,
-                code: eventName
-              }),
-              JSON.stringify({
-                ...defaultBodyData,
-                id: 2,
-                code: eventName
-              })
-            ]
-          }
-        ],
-        expect.any(Function)
-      );
-      expect(closeSpy).not.toHaveBeenCalled();
-      sendSpy.mockClear();
-    });
-
-    it('Should emit a two events in different topics', async () => {
-      // arrange
-      const sendSpy = jest.spyOn(Producer.prototype, 'send');
-      const closeSpy = jest.spyOn(Producer.prototype, 'close');
-
-      // act
-      await emit([
-        {
-          topic: 'topic-a',
-          eventName: 'event-name-a',
-          data: {
-            id: 'topic-a-1'
-          }
-        },
-        {
-          topic: 'topic-b',
-          eventName: 'event-name-b',
-          data: {
-            id: 'topic-b-1'
-          }
+        if (topicsOffset != null) {
+          const topicOffset = topicsOffset[defaultHeaderData.topic];
+          expect(topicOffset).toBeDefined();
+          expect(typeof topicOffset[String(defaultHeaderData.partition)]).toBe('number');
         }
-      ]);
+        sendSpy.mockClear();
+      },
+      TEST_TIMEOUT
+    );
 
-      // assert
-      expect(sendSpy).toHaveBeenCalledWith(
-        [
+    it(
+      'Should emit a single event with same topic and code in upper camel case',
+      async () => {
+        // arrange
+        const sendSpy = jest.spyOn(Producer.prototype, 'send');
+        const closeSpy = jest.spyOn(Producer.prototype, 'close');
+
+        const eventName = 'TopicA';
+
+        // act
+        await emit({
+          topic: defaultHeaderData.topic,
+          data: defaultBodyData
+        });
+
+        // assert
+        expect(sendSpy).toHaveBeenCalledWith(
+          [
+            {
+              ...defaultHeaderData,
+              messages: [
+                JSON.stringify({
+                  ...defaultBodyData,
+                  code: eventName
+                })
+              ]
+            }
+          ],
+          expect.any(Function)
+        );
+        expect(closeSpy).not.toHaveBeenCalled();
+        sendSpy.mockClear();
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Should emit a two events in the same topic and event',
+      async () => {
+        // arrange
+        const sendSpy = jest.spyOn(Producer.prototype, 'send');
+        const closeSpy = jest.spyOn(Producer.prototype, 'close');
+
+        const eventName = 'EventCode';
+
+        // act
+        await emit({
+          topic: defaultHeaderData.topic,
+          eventName,
+          data: [
+            {
+              ...defaultBodyData,
+              id: 1
+            },
+            {
+              ...defaultBodyData,
+              id: 2
+            }
+          ]
+        });
+
+        // assert
+        expect(sendSpy).toHaveBeenCalledWith(
+          [
+            {
+              ...defaultHeaderData,
+              messages: [
+                JSON.stringify({
+                  ...defaultBodyData,
+                  id: 1,
+                  code: eventName
+                }),
+                JSON.stringify({
+                  ...defaultBodyData,
+                  id: 2,
+                  code: eventName
+                })
+              ]
+            }
+          ],
+          expect.any(Function)
+        );
+        expect(closeSpy).not.toHaveBeenCalled();
+        sendSpy.mockClear();
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Should emit a two events in different topics',
+      async () => {
+        // arrange
+        const sendSpy = jest.spyOn(Producer.prototype, 'send');
+        const closeSpy = jest.spyOn(Producer.prototype, 'close');
+
+        // act
+        await emit([
           {
-            partition: defaultHeaderData.partition,
-            attributes: defaultHeaderData.attributes,
             topic: 'topic-a',
-            messages: [
-              JSON.stringify({
-                id: 'topic-a-1',
-                code: 'EventNameA'
-              })
-            ]
+            eventName: 'event-name-a',
+            data: {
+              id: 'topic-a-1'
+            }
           },
           {
-            partition: defaultHeaderData.partition,
-            attributes: defaultHeaderData.attributes,
             topic: 'topic-b',
-            messages: [
-              JSON.stringify({
-                id: 'topic-b-1',
-                code: 'EventNameB'
-              })
-            ]
+            eventName: 'event-name-b',
+            data: {
+              id: 'topic-b-1'
+            }
           }
-        ],
-        expect.any(Function)
-      );
-      await sleep(600);
-      expect(closeSpy).toHaveBeenCalled();
-      sendSpy.mockClear();
-    });
+        ]);
+
+        // assert
+        expect(sendSpy).toHaveBeenCalledWith(
+          [
+            {
+              partition: defaultHeaderData.partition,
+              attributes: defaultHeaderData.attributes,
+              topic: 'topic-a',
+              messages: [
+                JSON.stringify({
+                  id: 'topic-a-1',
+                  code: 'EventNameA'
+                })
+              ]
+            },
+            {
+              partition: defaultHeaderData.partition,
+              attributes: defaultHeaderData.attributes,
+              topic: 'topic-b',
+              messages: [
+                JSON.stringify({
+                  id: 'topic-b-1',
+                  code: 'EventNameB'
+                })
+              ]
+            }
+          ],
+          expect.any(Function)
+        );
+        await sleep(AFTER_CONNECTION_TTL);
+        expect(closeSpy).toHaveBeenCalled();
+        sendSpy.mockClear();
+      },
+      TEST_TIMEOUT
+    );
   });
 
   describe('emit error', () => {
