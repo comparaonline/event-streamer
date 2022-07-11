@@ -2,6 +2,7 @@ import { Producer } from 'kafka-node';
 import { clearEmittedEvents, emit, getEmittedEvents } from '..';
 import { setConfig } from '../../config';
 import { ProducerPartitionerType } from '../../interfaces';
+import { sleep } from '../../test/helpers';
 
 const defaultHeaderData = {
   attributes: 0,
@@ -18,7 +19,10 @@ describe('producer', () => {
   describe('emit success', () => {
     beforeEach(() => {
       setConfig({
-        host: 'kafka:9092'
+        host: 'kafka:9092',
+        producer: {
+          connectionTTL: 500
+        }
       });
     });
     it('Should emit a single event with different topic and code', async () => {
@@ -51,7 +55,7 @@ describe('producer', () => {
         ],
         expect.any(Function)
       );
-      expect(closeSpy).toHaveBeenCalled();
+      expect(closeSpy).not.toHaveBeenCalled();
 
       const topicsOffset = response.find((messages) => messages[defaultHeaderData.topic] != null);
       expect(topicsOffset).toBeDefined();
@@ -92,7 +96,7 @@ describe('producer', () => {
         ],
         expect.any(Function)
       );
-      expect(closeSpy).toHaveBeenCalled();
+      expect(closeSpy).not.toHaveBeenCalled();
       sendSpy.mockClear();
     });
 
@@ -140,7 +144,7 @@ describe('producer', () => {
         ],
         expect.any(Function)
       );
-      expect(closeSpy).toHaveBeenCalled();
+      expect(closeSpy).not.toHaveBeenCalled();
       sendSpy.mockClear();
     });
 
@@ -195,6 +199,7 @@ describe('producer', () => {
         ],
         expect.any(Function)
       );
+      await sleep(600);
       expect(closeSpy).toHaveBeenCalled();
       sendSpy.mockClear();
     });
