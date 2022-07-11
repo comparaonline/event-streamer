@@ -24,6 +24,8 @@ export interface Config {
   producer?: {
     /** Default is CYCLIC (2) */
     partitionerType?: ProducerPartitionerType;
+    /** Connection keep alive after send messages to reuse it. Default 5000 ms */
+    connectionTTL?: number;
     additionalHosts?: string[];
     retryOptions?: RetryOptions;
   };
