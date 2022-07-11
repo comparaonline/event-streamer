@@ -94,6 +94,17 @@ async function getProducer(host: string): Promise<Producer> {
   return connection.producer;
 }
 
+export function closeAll(): void {
+  for (const host in connections) {
+    if (connections[host] != null) {
+      clearTimeout(connections[host].timeout);
+      connections[host].producer.removeAllListeners();
+      connections[host].producer.close();
+      delete connections[host];
+    }
+  }
+}
+
 export async function emit(
   output: Output | Output[],
   overwriteHosts?: string | string[]

@@ -181,6 +181,27 @@ describe('consumer', () => {
       // assert
       expect(handler).not.toHaveBeenCalled();
     }, 30000);
+
+    it('Receive a single message and close the connection', async () => {
+      // arrange
+      const handler = jest.fn();
+      const id = uuid();
+      const topic = `my-random-topic-${id}`;
+
+      await createTopic(topic);
+
+      const closeSpy = jest.spyOn(ConsumerGroup.prototype, 'close');
+
+      // act
+      const consumer = new ConsumerRouter();
+      consumer.add(topic, handler);
+
+      await consumer.start();
+      await consumer.stop();
+
+      // assert
+      expect(closeSpy).toHaveBeenCalled();
+    }, 30000);
   });
 
   describe('Consume testing mode', () => {

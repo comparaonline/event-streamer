@@ -1,5 +1,5 @@
 import { Producer } from 'kafka-node';
-import { clearEmittedEvents, emit, getEmittedEvents } from '..';
+import { clearEmittedEvents, closeAll, emit, getEmittedEvents } from '..';
 import { setConfig } from '../../config';
 import { ProducerPartitionerType } from '../../interfaces';
 import { sleep } from '../../test/helpers';
@@ -218,6 +218,46 @@ describe('producer', () => {
           expect.any(Function)
         );
         await sleep(AFTER_CONNECTION_TTL);
+        expect(closeSpy).toHaveBeenCalled();
+        sendSpy.mockClear();
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Should create and close a producer',
+      async () => {
+        // arrange
+        const sendSpy = jest.spyOn(Producer.prototype, 'send');
+        const closeSpy = jest.spyOn(Producer.prototype, 'close');
+
+        // act
+        await emit({
+          topic: 'topic-a',
+          eventName: 'event-name-a',
+          data: {
+            id: 'topic-a-1'
+          }
+        });
+
+        // assert
+        expect(sendSpy).toHaveBeenCalledWith(
+          [
+            {
+              partition: defaultHeaderData.partition,
+              attributes: defaultHeaderData.attributes,
+              topic: 'topic-a',
+              messages: [
+                JSON.stringify({
+                  id: 'topic-a-1',
+                  code: 'EventNameA'
+                })
+              ]
+            }
+          ],
+          expect.any(Function)
+        );
+        await closeAll();
         expect(closeSpy).toHaveBeenCalled();
         sendSpy.mockClear();
       },
