@@ -84,6 +84,16 @@ export class ConsumerRouter {
     }
   }
 
+  public async stop(): Promise<void> {
+    if (this.consumer != null) {
+      /* istanbul ignore next */
+      this.consumer.close((e) => {
+        console.error(e);
+      });
+      this.consumer = null;
+    }
+  }
+
   public async start(): Promise<void> {
     if (this.routes.length === 0) {
       throw new Error('Missing routes, please add minimum 1 route');
