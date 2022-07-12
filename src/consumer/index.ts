@@ -1,31 +1,14 @@
 import { ConsumerGroup, Message } from 'kafka-node';
 import { getConfig } from '../config';
+import { DEFAULT } from '../constants';
 import { debug, getParsedJson, stringToUpperCamelCase, validateTestingConfig } from '../helpers';
 import { Input, Callback, Debug, Output, Route } from '../interfaces';
 import { emit } from '../producer';
 
 export class ConsumerRouter {
   private routes: Route[] = [];
-  private groupId: string;
-  private host: string;
-  private autoCommit: boolean;
-  private fetchSizeInMB: number;
   private consumer: ConsumerGroup | null = null;
-  private onlyTesting: boolean;
-
-  constructor() {
-    const config = getConfig();
-
-    if (config.consumer?.groupId == null || config.consumer.groupId.trim() === '') {
-      throw new Error('Missing configuration config.consumer.groupId for consumer');
-    }
-
-    this.groupId = config.consumer.groupId;
-    this.host = config.host;
-    this.autoCommit = config.consumer.autoCommit ?? false;
-    this.fetchSizeInMB = config.consumer.fetchSizeInMB ?? 3;
-    this.onlyTesting = config.onlyTesting ?? false;
-  }
+  private autoCommit: boolean = DEFAULT.autoCommit;
 
   private commit(): void {
     if (this.consumer != null && !this.autoCommit) {
@@ -95,22 +78,37 @@ export class ConsumerRouter {
   }
 
   public async start(): Promise<void> {
+    const config = getConfig();
+
+    if (config.consumer?.groupId == null || config.consumer.groupId.trim() === '') {
+      throw new Error('Missing configuration config.consumer.groupId for consumer');
+    }
+
+    const groupId = config.consumer.groupId;
+    const kafkaHost = config.host;
+    const fetchSizeInMB = config.consumer.fetchSizeInMB ?? DEFAULT.fetchSizeInMB;
+    const onlyTesting = config.onlyTesting ?? DEFAULT.onlyTesting;
+
+    if (config.consumer.autoCommit != null) {
+      this.autoCommit = config.consumer.autoCommit;
+    }
+
     if (this.routes.length === 0) {
       throw new Error('Missing routes, please add minimum 1 route');
     }
-    if (this.onlyTesting) {
+    if (onlyTesting) {
       return Promise.resolve();
     } else {
       return new Promise((resolve, reject) => {
         const MB = 1024 * 1024;
         this.consumer = new ConsumerGroup(
           {
-            groupId: this.groupId,
-            kafkaHost: this.host,
+            groupId,
+            kafkaHost,
             autoCommit: this.autoCommit,
             encoding: 'utf8',
             fetchMaxWaitMs: 100,
-            fetchMaxBytes: MB * this.fetchSizeInMB
+            fetchMaxBytes: MB * fetchSizeInMB
           },
           this.routes
             .map((route) => route.topic)

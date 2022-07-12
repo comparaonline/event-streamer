@@ -1,7 +1,8 @@
 import { getConfig } from '../config';
 import { Producer, KafkaClient } from 'kafka-node';
-import { Debug, Output, ProducerPartitionerType } from '../interfaces';
+import { Debug, Output } from '../interfaces';
 import { debug, stringToUpperCamelCase, toArray, validateTestingConfig } from '../helpers';
+import { DEFAULT } from '../constants';
 
 interface EmitResponse {
   [topicName: string]: {
@@ -61,7 +62,7 @@ async function createProducer(host: string): Promise<Producer> {
     });
 
     const producer = new Producer(client, {
-      partitionerType: config.producer?.partitionerType ?? ProducerPartitionerType.CYCLIC
+      partitionerType: config.producer?.partitionerType ?? DEFAULT.partitionerType
     });
 
     producer.on('ready', () => {
@@ -90,7 +91,7 @@ async function getProducer(host: string): Promise<Producer> {
     connection.producer.removeAllListeners();
     connection.producer.close();
     delete connections[host];
-  }, config.producer?.connectionTTL ?? 5000);
+  }, config.producer?.connectionTTL ?? DEFAULT.connectionTTL);
   return connection.producer;
 }
 
