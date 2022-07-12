@@ -289,19 +289,21 @@ describe('consumer', () => {
       await expect(consumer.start()).rejects.toThrow('Missing routes, please add minimum 1 route');
     });
 
-    it('Should not work offline - missing group id', () => {
+    it('Should not work offline - missing group id', async () => {
       // arrange
       setConfig({
         host: 'any-kafka:9092'
       });
 
+      const consumer = new ConsumerRouter();
+
       // act & assert
-      expect(() => new ConsumerRouter()).toThrow(
+      await expect(consumer.start()).rejects.toThrow(
         'Missing configuration config.consumer.groupId for consumer'
       );
     });
 
-    it('Should not work offline - empty group id', () => {
+    it('Should not work offline - empty group id', async () => {
       // arrange
       setConfig({
         host: 'any-kafka:9092',
@@ -310,8 +312,10 @@ describe('consumer', () => {
         }
       });
 
+      const consumer = new ConsumerRouter();
+
       // act & assert
-      expect(() => new ConsumerRouter()).toThrow(
+      await expect(consumer.start()).rejects.toThrow(
         'Missing configuration config.consumer.groupId for consumer'
       );
     });
