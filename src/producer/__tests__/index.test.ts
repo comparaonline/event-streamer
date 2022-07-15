@@ -2,7 +2,7 @@ import { clearEmittedEvents, closeAll, emit, getEmittedEvents, getProducer } fro
 import { setConfig } from '../../config';
 import waitForExpect from 'wait-for-expect';
 
-waitForExpect.defaults.timeout = 50000;
+waitForExpect.defaults.timeout = 100000;
 waitForExpect.defaults.interval = 1000;
 
 const defaultTopic = 'topic-a';
@@ -15,7 +15,7 @@ const defaultBodyData = {
 const KAFKA_HOST_9092 = 'kafka:9092';
 
 const CONNECTION_TTL = 2000;
-const TEST_TIMEOUT = 30000;
+const TEST_TIMEOUT = 120000;
 
 describe('producer', () => {
   describe('emit success', () => {
