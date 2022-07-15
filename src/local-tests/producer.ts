@@ -8,10 +8,18 @@ setConfig({
 });
 
 async function main(): Promise<void> {
-  const total = 100000;
+  const total = 100;
   for (let index = 0; index <= total; index++) {
     const result = await emit({
       topic: 'topic-a',
+      data: {
+        id: index,
+        last: index === total,
+        data
+      }
+    });
+    await emit({
+      topic: 'topic-b',
       data: {
         id: index,
         last: index === total,

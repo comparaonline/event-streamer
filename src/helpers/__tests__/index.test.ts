@@ -34,6 +34,10 @@ describe('Helpers', () => {
     it('Should return null from an invalid json string', () => {
       expect(getParsedJson('{ "firstNa')).toBe(null);
     });
+
+    it('Should return null from null', () => {
+      expect(getParsedJson(null)).toBe(null);
+    });
   });
 
   describe('validateTestingConfig', () => {

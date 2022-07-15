@@ -1,207 +1,301 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { ConsumerRouter } from '..';
 import { setConfig } from '../../config';
 import { v4 as uuid } from 'uuid';
 import { emit } from '../../producer';
 import { createTopic, sendRawMessage, sleep } from '../../test/helpers';
 import { stringToUpperCamelCase } from '../../helpers';
-import { ConsumerGroup } from 'kafka-node';
+import { Config, Strategy, Unlimited } from '../../interfaces';
+
+const TEST_TIMEOUT = 50000;
+
+interface Params {
+  strategy?: Strategy;
+  maxMessagesPerTopic?: number | Unlimited;
+  maxMessagesPerSpecificTopic?: Record<string, number | Unlimited>;
+}
+
+function generateConfig(params: Params): Config {
+  return {
+    host: 'kafka:9092',
+    consumer: {
+      groupId: 'my-group-id',
+      ...params
+    }
+  };
+}
 
 describe('consumer', () => {
   describe('Consume online mode', () => {
     beforeEach(() => {
-      setConfig({
-        host: 'kafka:9092',
-        consumer: {
-          groupId: 'my-group-id'
-        }
-      });
+      jest.clearAllMocks();
     });
 
-    it('Receive a single message without event code', async () => {
-      // arrange
-      const handler = jest.fn();
-      const id = uuid();
-      const topic = `my-random-topic-${id}`;
+    it(
+      'Receive a single message without event code',
+      async () => {
+        // arrange
+        const handler = jest.fn();
+        const id = uuid();
+        const topic = `my-random-topic-${id}`;
+        setConfig(generateConfig({ strategy: 'one-by-one' }));
 
-      await createTopic(topic);
-      const someData = {
-        prop: 'a'
-      };
+        await createTopic(topic);
+        const someData = {
+          prop: 'a'
+        };
 
-      // act
-      const consumer = new ConsumerRouter();
-      consumer.add(topic, handler);
+        // act
+        const consumer = new ConsumerRouter();
+        consumer.add(topic, handler);
 
-      await consumer.start();
+        await consumer.start();
 
-      await emit({
-        data: someData,
-        topic
-      });
-
-      await sleep(1000);
-
-      // assert
-      expect(handler).toHaveBeenCalledWith(
-        {
-          ...someData,
-          code: stringToUpperCamelCase(topic)
-        },
-        emit
-      );
-    }, 10000);
-
-    it('Receive two of three message by event code', async () => {
-      // arrange
-      const handlerA = jest.fn();
-      const handlerB = jest.fn();
-      const handlerC = jest.fn();
-      const id = uuid();
-      const topic = `my-random-topic-${id}`;
-
-      const commitSpy = jest.spyOn(ConsumerGroup.prototype, 'commit');
-
-      await createTopic(topic);
-      const someData = {
-        prop: 'a'
-      };
-
-      // act
-      const consumer = new ConsumerRouter();
-
-      consumer.add(topic, handlerA);
-      consumer.add(topic, 'EventCodeB', handlerB);
-      consumer.add(topic, ['EventCodeC', 'EventCodeD'], handlerC);
-
-      await consumer.start();
-
-      await emit({
-        data: someData,
-        topic,
-        eventName: 'event-code-c'
-      });
-
-      await emit({
-        data: someData,
-        topic,
-        eventName: 'event-code-e'
-      });
-
-      await sleep(1000);
-
-      // assert
-      expect(handlerA).toHaveBeenCalledTimes(2);
-      expect(handlerC).toHaveBeenCalledTimes(1);
-      expect(handlerB).toHaveBeenCalledTimes(0);
-      expect(commitSpy).toHaveBeenCalled();
-    }, 30000);
-
-    it('Receive a message on multi topics', async () => {
-      // arrange
-      const handlerA = jest.fn();
-      const handlerB = jest.fn();
-      const handlerC = jest.fn();
-
-      const topicA = `my-random-topic-${uuid()}`;
-      const topicB = `my-random-topic-${uuid()}`;
-
-      await createTopic(topicA);
-      await createTopic(topicB);
-      const someData = {
-        prop: 'a'
-      };
-
-      // act
-
-      const consumer = new ConsumerRouter();
-
-      consumer.add([topicA, topicB], 'EventCodeA', handlerA);
-      consumer.add(topicA, 'EventCodeB', handlerB);
-      consumer.add(topicB, 'EventCodeC', handlerC);
-
-      await consumer.start();
-
-      await emit([
-        {
+        await emit({
           data: someData,
-          topic: topicA,
-          eventName: 'event-code-a'
-        },
-        {
+          topic
+        });
+
+        await sleep(1000);
+
+        // assert
+        expect(handler).toHaveBeenCalledWith(
+          {
+            ...someData,
+            code: stringToUpperCamelCase(topic)
+          },
+          emit
+        );
+
+        await consumer.stop();
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Receive two of three message by event code',
+      async () => {
+        // arrange
+        const handlerA = jest.fn();
+        const handlerB = jest.fn();
+        const handlerC = jest.fn();
+        const id = uuid();
+        const topic = `my-random-topic-${id}`;
+        setConfig(generateConfig({ strategy: 'topic', maxMessagesPerTopic: 10 }));
+
+        await createTopic(topic);
+        const someData = {
+          prop: 'a'
+        };
+
+        // act
+        const consumer = new ConsumerRouter();
+
+        consumer.add(topic, handlerA);
+        consumer.add(topic, 'EventCodeB', handlerB);
+        consumer.add(topic, ['EventCodeC', 'EventCodeD'], handlerC);
+
+        await consumer.start();
+
+        await emit({
           data: someData,
-          topic: topicA,
-          eventName: 'event-code-b'
-        },
-        {
-          data: someData,
-          topic: topicA,
+          topic,
           eventName: 'event-code-c'
-        },
-        {
+        });
+
+        await emit({
           data: someData,
-          topic: topicB,
-          eventName: 'event-code-a'
-        },
-        {
-          data: someData,
-          topic: topicB,
-          eventName: 'event-code-b'
-        },
-        {
-          data: someData,
-          topic: topicB,
-          eventName: 'event-code-c'
+          topic,
+          eventName: 'event-code-e'
+        });
+
+        await sleep(20000);
+
+        // assert
+        expect(handlerA).toHaveBeenCalledTimes(2);
+        expect(handlerC).toHaveBeenCalledTimes(1);
+        expect(handlerB).toHaveBeenCalledTimes(0);
+
+        await consumer.stop();
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Receive a message on multi topics',
+      async () => {
+        // arrange
+        const handlerA = jest.fn();
+        const handlerB = jest.fn();
+        const handlerC = jest.fn();
+
+        const topicA = `my-random-topic-${uuid()}`;
+        const topicB = `my-random-topic-${uuid()}`;
+
+        setConfig(
+          generateConfig({
+            maxMessagesPerSpecificTopic: {
+              topicA: 'unlimited',
+              topicB: 100
+            }
+          })
+        );
+
+        await createTopic(topicA);
+        await createTopic(topicB);
+        const someData = {
+          prop: 'a'
+        };
+
+        // act
+
+        const consumer = new ConsumerRouter();
+
+        consumer.add([topicA, topicB], 'EventCodeA', handlerA);
+        consumer.add(topicA, 'EventCodeB', handlerB);
+        consumer.add(topicB, 'EventCodeC', handlerC);
+
+        await consumer.start();
+
+        await emit([
+          {
+            data: someData,
+            topic: topicA,
+            eventName: 'event-code-a'
+          },
+          {
+            data: someData,
+            topic: topicA,
+            eventName: 'event-code-b'
+          },
+          {
+            data: someData,
+            topic: topicA,
+            eventName: 'event-code-c'
+          },
+          {
+            data: someData,
+            topic: topicB,
+            eventName: 'event-code-a'
+          },
+          {
+            data: someData,
+            topic: topicB,
+            eventName: 'event-code-b'
+          },
+          {
+            data: someData,
+            topic: topicB,
+            eventName: 'event-code-c'
+          }
+        ]);
+        await sleep(20000);
+
+        // assert
+        expect(handlerA).toHaveBeenCalledTimes(2);
+        expect(handlerB).toHaveBeenCalledTimes(1);
+        expect(handlerC).toHaveBeenCalledTimes(1);
+
+        await consumer.stop();
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Receive a single message but wont process it',
+      async () => {
+        // arrange
+        const handler = jest.fn();
+        const id = uuid();
+        const topic = `my-random-topic-${id}`;
+        setConfig(
+          generateConfig({
+            maxMessagesPerSpecificTopic: {}
+          })
+        );
+        const consumer = new ConsumerRouter();
+        await createTopic(topic);
+
+        // act
+        consumer.add(topic, handler);
+
+        await consumer.start();
+
+        await sendRawMessage(topic, 'invalid JSON');
+        await sendRawMessage(topic, null);
+
+        await sleep(1000);
+
+        // assert
+        expect(handler).not.toHaveBeenCalled();
+
+        await consumer.stop();
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Should trigger queue',
+      async () => {
+        // arrange
+        setConfig(generateConfig({ maxMessagesPerTopic: 1 }));
+        const consumer = new ConsumerRouter();
+        const handler = jest.fn();
+        const id = uuid();
+        const topic = `my-random-topic-${id}`;
+        await createTopic(topic);
+
+        // act
+        consumer.add(topic, handler);
+        await consumer.start();
+
+        const pauseSpy = jest.spyOn(consumer['consumer']!, 'pause');
+        const resumeSpy = jest.spyOn(consumer['consumer']!, 'resume');
+
+        for (let i = 0; i < 100; i++) {
+          await emit({
+            topic,
+            data: {}
+          });
         }
-      ]);
-      await sleep(1000);
 
-      // assert
-      expect(handlerA).toHaveBeenCalledTimes(2);
-      expect(handlerB).toHaveBeenCalledTimes(1);
-      expect(handlerC).toHaveBeenCalledTimes(1);
-    }, 30000);
+        await sleep(1000);
 
-    it('Receive a single message but wont process it', async () => {
-      // arrange
-      const consumer = new ConsumerRouter();
-      const handler = jest.fn();
-      const id = uuid();
-      const topic = `my-random-topic-${id}`;
-      await createTopic(topic);
+        // assert
+        expect(handler).toHaveBeenCalled();
+        expect(pauseSpy).toHaveBeenCalledWith([{ topic }]);
+        expect(resumeSpy).toHaveBeenCalledWith([{ topic }]);
 
-      // act
-      consumer.add(topic, handler);
+        await consumer.stop();
+      },
+      TEST_TIMEOUT
+    );
 
-      await consumer.start();
+    it(
+      'Receive a single message and close the connection',
+      async () => {
+        // arrange
+        setConfig(generateConfig({}));
+        const handler = jest.fn();
+        const id = uuid();
+        const topic = `my-random-topic-${id}`;
 
-      await sendRawMessage(topic, 'invalid JSON');
+        await createTopic(topic);
 
-      await sleep(1000);
+        // act
+        const consumer = new ConsumerRouter();
+        consumer.add(topic, handler);
+        await consumer.start();
 
-      // assert
-      expect(handler).not.toHaveBeenCalled();
-    }, 30000);
+        const disconnectSpy = jest.spyOn(consumer['consumer']!, 'disconnect');
 
-    it('Receive a single message and close the connection', async () => {
-      // arrange
-      const handler = jest.fn();
-      const id = uuid();
-      const topic = `my-random-topic-${id}`;
+        await consumer.stop();
 
-      await createTopic(topic);
-
-      const closeSpy = jest.spyOn(ConsumerGroup.prototype, 'close');
-
-      // act
-      const consumer = new ConsumerRouter();
-      consumer.add(topic, handler);
-
-      await consumer.start();
-      await consumer.stop();
-
-      // assert
-      expect(closeSpy).toHaveBeenCalled();
-    }, 30000);
+        // assert
+        expect(disconnectSpy).toHaveBeenCalled();
+      },
+      TEST_TIMEOUT
+    );
   });
 
   describe('Consume testing mode', () => {
@@ -276,9 +370,7 @@ describe('consumer', () => {
       setConfig({
         host: 'any-kafka:9092',
         consumer: {
-          groupId: 'group-id',
-          autoCommit: true,
-          fetchSizeInMB: 1
+          groupId: 'group-id'
         },
         onlyTesting: true
       });
@@ -298,9 +390,7 @@ describe('consumer', () => {
       const consumer = new ConsumerRouter();
 
       // act & assert
-      await expect(consumer.start()).rejects.toThrow(
-        'Missing configuration config.consumer.groupId for consumer'
-      );
+      await expect(consumer.start()).rejects.toThrow('Missing configuration config.consumer.groupId for consumer');
     });
 
     it('Should not work offline - empty group id', async () => {
@@ -315,9 +405,7 @@ describe('consumer', () => {
       const consumer = new ConsumerRouter();
 
       // act & assert
-      await expect(consumer.start()).rejects.toThrow(
-        'Missing configuration config.consumer.groupId for consumer'
-      );
+      await expect(consumer.start()).rejects.toThrow('Missing configuration config.consumer.groupId for consumer');
     });
   });
 });

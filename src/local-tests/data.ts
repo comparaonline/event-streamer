@@ -1078,8 +1078,7 @@ export const data = [
     email: 'farrellestes@jamnation.com',
     phone: '+1 (910) 441-3903',
     address: '232 Summit Street, Dola, Missouri, 3203',
-    about:
-      'Non voluptate incididunt sint officia ad eiusmod mollit. Irure nisi sunt minim dolor. Duis nostrud tempor magna labore.\r\n',
+    about: 'Non voluptate incididunt sint officia ad eiusmod mollit. Irure nisi sunt minim dolor. Duis nostrud tempor magna labore.\r\n',
     registered: '2019-03-20T12:37:38 +03:00',
     latitude: -8.844715,
     longitude: 83.704053,
@@ -4992,8 +4991,7 @@ export const data = [
     email: 'hannahmcdowell@translink.com',
     phone: '+1 (849) 402-3432',
     address: '705 Dahill Road, Sultana, Mississippi, 1290',
-    about:
-      'Anim officia occaecat in ex consectetur sit nulla dolor enim enim. Cillum minim anim est ut. Dolor laboris nisi duis do.\r\n',
+    about: 'Anim officia occaecat in ex consectetur sit nulla dolor enim enim. Cillum minim anim est ut. Dolor laboris nisi duis do.\r\n',
     registered: '2014-02-16T04:34:55 +03:00',
     latitude: 20.349194,
     longitude: -83.690408,

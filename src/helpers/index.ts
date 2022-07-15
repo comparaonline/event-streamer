@@ -6,13 +6,14 @@ export function toArray<T>(input?: T | T[]): T[] {
 }
 
 export function stringToUpperCamelCase(input: string): string {
-  return (
-    input.charAt(0).toUpperCase() + input.slice(1).replace(/[-_ ]./g, (x) => x[1].toUpperCase())
-  );
+  return input.charAt(0).toUpperCase() + input.slice(1).replace(/[-_ ]./g, (x) => x[1].toUpperCase());
 }
 
-export function getParsedJson<T extends Object>(input: string | Buffer): T | null {
+export function getParsedJson<T extends Object>(input: string | Buffer | null): T | null {
   try {
+    if (input == null) {
+      return null;
+    }
     return JSON.parse(typeof input === 'string' ? input : input.toString());
   } catch (e) {
     return null;

@@ -1,9 +1,18 @@
-import { ProducerPartitionerType } from '../interfaces';
+import { logLevel } from 'kafkajs';
+import { Strategy } from '../interfaces';
 
-export const DEFAULT = {
-  autoCommit: false,
-  fetchSizeInMB: 3,
+interface Default {
+  maxMessagesPerTopic: number;
+  onlyTesting: boolean;
+  connectionTTL: number;
+  strategy: Strategy;
+  kafkaJSLogs: logLevel;
+}
+
+export const DEFAULT: Default = {
+  maxMessagesPerTopic: 10,
   onlyTesting: false,
   connectionTTL: 5000,
-  partitionerType: ProducerPartitionerType.CYCLIC
+  strategy: 'topic',
+  kafkaJSLogs: logLevel.NOTHING
 };

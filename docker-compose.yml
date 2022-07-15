@@ -11,6 +11,7 @@ services:
       - TS_NODE_FILES=true
       - NODE_ENV=development
       - NODE_CONFIG_ENV=development
+      - KAFKAJS_NO_PARTITIONER_WARNING=1
     volumes:
       - '.:/code'
       - /code/node_modules
