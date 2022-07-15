@@ -109,7 +109,7 @@ describe('consumer', () => {
           eventName: 'event-code-e'
         });
 
-        await sleep(20000);
+        await sleep(30000);
 
         // assert
         expect(handlerA).toHaveBeenCalledTimes(2);
@@ -259,7 +259,7 @@ describe('consumer', () => {
           });
         }
 
-        await sleep(1000);
+        await sleep(10000);
 
         // assert
         expect(handler).toHaveBeenCalled();
