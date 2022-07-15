@@ -26,6 +26,22 @@ async function main(): Promise<void> {
         data
       }
     });
+    await emit({
+      topic: 'topic-c',
+      data: {
+        id: index,
+        last: index === total,
+        data
+      }
+    });
+    await emit({
+      topic: 'topic-d',
+      data: {
+        id: index,
+        last: index === total,
+        data
+      }
+    });
     console.log(result);
   }
 }

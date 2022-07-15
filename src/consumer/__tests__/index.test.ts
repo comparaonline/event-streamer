@@ -6,8 +6,12 @@ import { emit } from '../../producer';
 import { createTopic, sendRawMessage, sleep } from '../../test/helpers';
 import { stringToUpperCamelCase } from '../../helpers';
 import { Config, Strategy, Unlimited } from '../../interfaces';
+import waitForExpect from 'wait-for-expect';
 
-const TEST_TIMEOUT = 50000;
+waitForExpect.defaults.timeout = 50000;
+waitForExpect.defaults.interval = 1000;
+
+const TEST_TIMEOUT = 60000;
 
 interface Params {
   strategy?: Strategy;
@@ -56,9 +60,11 @@ describe('consumer', () => {
           topic
         });
 
-        await sleep(1000);
-
         // assert
+        await waitForExpect(() => {
+          expect(handler).toHaveBeenCalled();
+        });
+
         expect(handler).toHaveBeenCalledWith(
           {
             ...someData,
@@ -109,9 +115,12 @@ describe('consumer', () => {
           eventName: 'event-code-e'
         });
 
-        await sleep(30000);
-
         // assert
+        await waitForExpect(() => {
+          expect(handlerA).toHaveBeenCalled();
+        });
+        await sleep(1000);
+
         expect(handlerA).toHaveBeenCalledTimes(2);
         expect(handlerC).toHaveBeenCalledTimes(1);
         expect(handlerB).toHaveBeenCalledTimes(0);
@@ -189,9 +198,12 @@ describe('consumer', () => {
             eventName: 'event-code-c'
           }
         ]);
-        await sleep(20000);
+        await waitForExpect(() => {
+          expect(handlerA).toHaveBeenCalled();
+        });
 
         // assert
+        await sleep(1000);
         expect(handlerA).toHaveBeenCalledTimes(2);
         expect(handlerB).toHaveBeenCalledTimes(1);
         expect(handlerC).toHaveBeenCalledTimes(1);
@@ -259,9 +271,11 @@ describe('consumer', () => {
           });
         }
 
-        await sleep(10000);
-
         // assert
+        await waitForExpect(() => {
+          expect(handler).toHaveBeenCalled();
+        });
+        await sleep(1000);
         expect(handler).toHaveBeenCalled();
         expect(pauseSpy).toHaveBeenCalledWith([{ topic }]);
         expect(resumeSpy).toHaveBeenCalledWith([{ topic }]);

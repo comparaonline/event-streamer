@@ -1,6 +1,9 @@
 import { clearEmittedEvents, closeAll, emit, getEmittedEvents, getProducer } from '..';
 import { setConfig } from '../../config';
-import { sleep } from '../../test/helpers';
+import waitForExpect from 'wait-for-expect';
+
+waitForExpect.defaults.timeout = 50000;
+waitForExpect.defaults.interval = 1000;
 
 const defaultTopic = 'topic-a';
 
@@ -12,7 +15,6 @@ const defaultBodyData = {
 const KAFKA_HOST_9092 = 'kafka:9092';
 
 const CONNECTION_TTL = 2000;
-const AFTER_CONNECTION_TTL = 5000;
 const TEST_TIMEOUT = 30000;
 
 describe('producer', () => {
@@ -206,8 +208,9 @@ describe('producer', () => {
           ]
         });
 
-        await sleep(AFTER_CONNECTION_TTL);
-        expect(disconnectSpy).toHaveBeenCalled();
+        await waitForExpect(() => {
+          expect(disconnectSpy).toHaveBeenCalled();
+        });
         sendSpy.mockClear();
       },
       TEST_TIMEOUT
