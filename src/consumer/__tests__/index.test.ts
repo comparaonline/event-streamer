@@ -3,15 +3,11 @@ import { ConsumerRouter } from '..';
 import { setConfig } from '../../config';
 import { v4 as uuid } from 'uuid';
 import { emit } from '../../producer';
-import { createTopic, sendRawMessage, sleep } from '../../test/helpers';
+import { createTopic, handlerToCall, sendRawMessage, sleep } from '../../test/helpers';
 import { stringToUpperCamelCase } from '../../helpers';
 import { Config, Strategy, Unlimited } from '../../interfaces';
-import waitForExpect from 'wait-for-expect';
 
-waitForExpect.defaults.timeout = 50000;
-waitForExpect.defaults.interval = 1000;
-
-const TEST_TIMEOUT = 60000;
+const TEST_TIMEOUT = 120000;
 
 interface Params {
   strategy?: Strategy;
@@ -61,9 +57,7 @@ describe('consumer', () => {
         });
 
         // assert
-        await waitForExpect(() => {
-          expect(handler).toHaveBeenCalled();
-        });
+        await handlerToCall(handler);
 
         expect(handler).toHaveBeenCalledWith(
           {
@@ -116,9 +110,7 @@ describe('consumer', () => {
         });
 
         // assert
-        await waitForExpect(() => {
-          expect(handlerA).toHaveBeenCalled();
-        });
+        await handlerToCall(handlerA);
         await sleep(1000);
 
         expect(handlerA).toHaveBeenCalledTimes(2);
@@ -198,9 +190,7 @@ describe('consumer', () => {
             eventName: 'event-code-c'
           }
         ]);
-        await waitForExpect(() => {
-          expect(handlerA).toHaveBeenCalled();
-        });
+        await handlerToCall(handlerA);
 
         // assert
         await sleep(1000);
@@ -272,9 +262,7 @@ describe('consumer', () => {
         }
 
         // assert
-        await waitForExpect(() => {
-          expect(handler).toHaveBeenCalled();
-        });
+        await handlerToCall(handler);
         await sleep(1000);
         expect(handler).toHaveBeenCalled();
         expect(pauseSpy).toHaveBeenCalledWith([{ topic }]);

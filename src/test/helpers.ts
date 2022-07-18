@@ -8,6 +8,12 @@ export function sleep(ms: number): Promise<void> {
   });
 }
 
+export async function handlerToCall(handler: jest.Mock | jest.SpyInstance): Promise<void> {
+  while (handler.mock.calls.length === 0) {
+    await sleep(100);
+  }
+}
+
 export async function createTopic(topicName: string): Promise<void> {
   const config = getConfig();
   const client = new Kafka({

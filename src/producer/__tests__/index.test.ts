@@ -1,9 +1,6 @@
 import { clearEmittedEvents, closeAll, emit, getEmittedEvents, getProducer } from '..';
 import { setConfig } from '../../config';
-import waitForExpect from 'wait-for-expect';
-
-waitForExpect.defaults.timeout = 100000;
-waitForExpect.defaults.interval = 1000;
+import { handlerToCall } from '../../test/helpers';
 
 const defaultTopic = 'topic-a';
 
@@ -208,9 +205,7 @@ describe('producer', () => {
           ]
         });
 
-        await waitForExpect(() => {
-          expect(disconnectSpy).toHaveBeenCalled();
-        });
+        await handlerToCall(disconnectSpy);
         sendSpy.mockClear();
       },
       TEST_TIMEOUT
