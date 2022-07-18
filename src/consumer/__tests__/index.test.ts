@@ -7,7 +7,7 @@ import { createTopic, handlerToCall, sendRawMessage, sleep } from '../../test/he
 import { stringToUpperCamelCase } from '../../helpers';
 import { Config, Strategy, Unlimited } from '../../interfaces';
 
-const TEST_TIMEOUT = 120000;
+const TEST_TIMEOUT = 240000;
 
 interface Params {
   strategy?: Strategy;
@@ -110,7 +110,7 @@ describe('consumer', () => {
         });
 
         // assert
-        await handlerToCall(handlerA);
+        await handlerToCall(handlerC);
         await sleep(1000);
 
         expect(handlerA).toHaveBeenCalledTimes(2);
@@ -190,7 +190,7 @@ describe('consumer', () => {
             eventName: 'event-code-c'
           }
         ]);
-        await handlerToCall(handlerA);
+        await handlerToCall(handlerC);
 
         // assert
         await sleep(1000);
