@@ -1,6 +1,6 @@
 import { Consumer, EachMessagePayload, Kafka } from 'kafkajs';
 import { getConfig } from '../config';
-import { DEFAULT } from '../constants';
+import { DEFAULT_CONFIG } from '../constants';
 import { debug, getParsedJson, stringToUpperCamelCase, validateTestingConfig } from '../helpers';
 import { Input, Callback, Debug, Output, Route, Strategy } from '../interfaces';
 import { emit } from '../producer';
@@ -97,7 +97,7 @@ export class ConsumerRouter {
 
     const groupId = config.consumer.groupId;
     const kafkaHost = config.host;
-    const onlyTesting = config.onlyTesting ?? DEFAULT.onlyTesting;
+    const onlyTesting = config.onlyTesting ?? DEFAULT_CONFIG.onlyTesting;
 
     if (this.routes.length === 0) {
       throw new Error('Missing routes, please add minimum 1 route');
@@ -119,9 +119,9 @@ export class ConsumerRouter {
 
       this.initQueues(topics);
 
-      const maxMessagesPerTopic = config.consumer.maxMessagesPerTopic ?? DEFAULT.maxMessagesPerTopic;
+      const maxMessagesPerTopic = config.consumer.maxMessagesPerTopic ?? DEFAULT_CONFIG.maxMessagesPerTopic;
 
-      const strategy: Strategy = config.consumer.strategy ?? DEFAULT.strategy;
+      const strategy: Strategy = config.consumer.strategy ?? DEFAULT_CONFIG.strategy;
 
       await this.consumer.run({
         eachMessage: async ({ topic, message }: EachMessagePayload) => {

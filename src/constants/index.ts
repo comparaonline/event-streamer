@@ -9,7 +9,7 @@ interface Default {
   kafkaJSLogs: logLevel;
 }
 
-export const DEFAULT: Default = {
+export const DEFAULT_CONFIG: Default = {
   maxMessagesPerTopic: 10,
   onlyTesting: false,
   connectionTTL: 5000,

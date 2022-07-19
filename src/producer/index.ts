@@ -2,7 +2,7 @@ import { getConfig } from '../config';
 import { Producer, Kafka, RecordMetadata } from 'kafkajs';
 import { Debug, Output } from '../interfaces';
 import { debug, stringToUpperCamelCase, toArray, validateTestingConfig } from '../helpers';
-import { DEFAULT } from '../constants';
+import { DEFAULT_CONFIG } from '../constants';
 
 type EmitResponse = RecordMetadata[];
 
@@ -74,7 +74,7 @@ export async function getProducer(host: string): Promise<Producer> {
   connection.timeout = setTimeout(() => {
     connection.producer.disconnect();
     delete connections[host];
-  }, config.producer?.connectionTTL ?? DEFAULT.connectionTTL);
+  }, config.producer?.connectionTTL ?? DEFAULT_CONFIG.connectionTTL);
   return connection.producer;
 }
 
