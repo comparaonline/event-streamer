@@ -1,3 +1,4 @@
+import { DEFAULT_CONFIG } from '../constants';
 import { Config } from '../interfaces';
 
 let config: Config | null = null;
@@ -11,4 +12,7 @@ export function getConfig(): Config {
 
 export function setConfig(newConfig: Config): void {
   config = newConfig;
+  if (config.kafkaJSLogs == null) {
+    config.kafkaJSLogs = DEFAULT_CONFIG.kafkaJSLogs;
+  }
 }

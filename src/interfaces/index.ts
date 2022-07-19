@@ -1,12 +1,4 @@
-import { RetryOptions } from 'kafka-node';
-
-export enum ProducerPartitionerType {
-  DEFAULT = 0,
-  RANDOM = 1,
-  CYCLIC = 2,
-  KEYED = 3,
-  CUSTOM = 4
-}
+import { logLevel, RetryOptions } from 'kafkajs';
 
 export enum Debug {
   NONE = 6,
@@ -18,12 +10,13 @@ export enum Debug {
   FATAL = 5
 }
 
+export type Unlimited = 'unlimited';
+export type Strategy = 'topic' | 'one-by-one';
+
 export interface Config {
   host: string;
   /** Only set this if you need change producer configuration */
   producer?: {
-    /** Default is CYCLIC (2) */
-    partitionerType?: ProducerPartitionerType;
     /** Connection keep alive after send messages to reuse it. Default 5000 ms */
     connectionTTL?: number;
     additionalHosts?: string[];
@@ -32,12 +25,15 @@ export interface Config {
   /** This is required if you want to create a consumer */
   consumer?: {
     groupId: string;
-    /** By default this library will handle it with autoCommit on false */
-    autoCommit?: boolean;
-    /** Default will be 3MB */
-    fetchSizeInMB?: number;
+    /** Chose if you want to create topic queues or process all the messages in a single queue 1 by 1. Default topic  */
+    strategy?: Strategy;
+    /** How many messages will be processed at the same time in a single topic. Default 20 */
+    maxMessagesPerTopic?: number | Unlimited;
+    /** Object with topic-name as key and number of messages to be processed as value */
+    maxMessagesPerSpecificTopic?: Record<string, number | Unlimited>;
   };
   debug?: false | Debug;
+  kafkaJSLogs?: logLevel;
   /** set to true if you want to avoid connecting to kafka and make some functionalities available */
   onlyTesting?: boolean;
 }

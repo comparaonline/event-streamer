@@ -52,15 +52,16 @@ setConfig({
 | --- | --- | --- | --- |
 | host | string | Kafka broker, it also can be separated using colons (Eg: `kafka-broker-1:9092,kafka-broker-2:9092`) | **required** |
 | producer | Object | Object | *optional* |
-| producer.partitionerType | ProducerPartitionerType (number) | Choose how the producer will send the messages | *optional* <br/> default: CYCLIC (2) |
 | producer.additionalHosts | string[] | Additional hosts to send a message. This is useful if you need to send information to two or more different clusters | *optional* |
 | producer.connectionTTL | number | Time in ms that the connection will be keep open after last message was sent | *optional* <br/> default: 5000 |
 | producer.retryOptions | RetryOptions (Object) | kafka-node retry options: retries, factor, minTimeout, maxTimeout and randomize | *optional* |
 | consumer | Object | Object | *required to start consumer* |
 | consumer.groupId | string | Kafka group id | **required** |
-| consumer.autoCommit | boolean | Choose commit method, if autoCommit is set to true performance will be increased but also some messages can be lost | *optional* <br/> default: false |
-| consumer.fetchSizeInMB | number | It determines the max pool of messages to be fetched from the broker. <br/>**`IMPORTANT:`** If your application expects messages bigger than 3MB then increase this value, otherwise consumer partition will be stuck and think about your implementation :) | *optional* <br/> default: 3 |
+| consumer.strategy | Strategy ('topic'/'one-by-one') | Chose if you want to create topic queues or process all the messages in a single queue. <br/> *topic*: each topic will have an exclusive queue and fetch messages from kafka based on queue size. When queue is full it will stop fetching for this specific topic and resume it when some handler ends. **Lag can be caused if queue size is too small** <br/>  *one-by-one*: all the message will be handle in a single queue and it will need to wait previous message handler to finish before start to process a new message | *optional* <br/> default: 'topic'
+| consumer.maxMessagesPerTopic | number/'unlimited' | Set global queue size | *optional* <br/> default: 20 |
+| consumer.maxMessagesPerSpecificTopic | Object (key: string, value: maxMessagesPerTopic) | Set specific topic queue size. You can also use 'unlimited' for a specific topic | *optional* <br/> default: empty object |
 | debug | false or Debug | Increase library logging based on Debug level | *optional* default: false |
+| kafkaJSLogs | kafkajs.logLevel | Set kafkajs logs for connection, commits and streamings | *optional* default: kafkajs.logLevel.NOTHING |
 | onlyTesting | boolean | Avoid kafka server communication, instead of send/consume messages it will be enable extra methods for unit testing | *optional* <br/> default: false
 
 ## Usage

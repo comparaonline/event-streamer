@@ -1,6 +1,6 @@
 {
   "name": "@comparaonline/event-streamer",
-  "version": "8.1.2",
+  "version": "8.2.0",
   "description": "Simple event-streaming framework",
   "repository": "comparaonline/event-streamer",
   "author": {
@@ -36,7 +36,7 @@
     "test-producer": "ts-node src/local-tests/producer.ts"
   },
   "dependencies": {
-    "kafka-node": "^5.0.0"
+    "kafkajs": "^2.1.0"
   },
   "devDependencies": {
     "@comparaonline/test-helpers": "^1.1.0",

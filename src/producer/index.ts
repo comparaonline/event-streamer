@@ -1,29 +1,27 @@
 import { getConfig } from '../config';
-import { Producer, KafkaClient } from 'kafka-node';
+import { Producer, Kafka, RecordMetadata } from 'kafkajs';
 import { Debug, Output } from '../interfaces';
 import { debug, stringToUpperCamelCase, toArray, validateTestingConfig } from '../helpers';
-import { DEFAULT } from '../constants';
+import { DEFAULT_CONFIG } from '../constants';
 
-interface EmitResponse {
-  [topicName: string]: {
-    [partitionNumberAsString: string]: number;
-  };
-}
+type EmitResponse = RecordMetadata[];
 
 interface Payload {
   topic: string;
-  messages: string[];
+  messages: Array<{
+    value: string;
+  }>;
 }
 
 function normalizePayloads(payloads: Output[]): Payload[] {
   return payloads.map(({ topic, data, eventName }: Output) => ({
     topic,
-    messages: toArray(data).map((message) =>
-      JSON.stringify({
+    messages: toArray(data).map((message) => ({
+      value: JSON.stringify({
         ...message,
         code: stringToUpperCamelCase(eventName ?? topic)
       })
-    )
+    }))
   }));
 }
 
@@ -39,11 +37,7 @@ export function clearEmittedEvents(): void {
   onlyTestingEmittedEvents = [];
 }
 
-function getHosts(
-  defaultHost: string,
-  secondaries?: string | string[],
-  overwrite?: string | string[]
-): string[] {
+function getHosts(defaultHost: string, secondaries?: string | string[], overwrite?: string | string[]): string[] {
   if (overwrite != null) {
     return toArray(overwrite);
   }
@@ -52,30 +46,20 @@ function getHosts(
 
 const connections: Record<string, { producer: Producer; timeout?: NodeJS.Timeout }> = {};
 
-async function createProducer(host: string): Promise<Producer> {
+export async function createProducer(host: string): Promise<Producer> {
   const config = getConfig();
-  return new Promise((resolve, reject) => {
-    const client = new KafkaClient({
-      autoConnect: true,
-      kafkaHost: host,
-      connectRetryOptions: config.producer?.retryOptions
-    });
-
-    const producer = new Producer(client, {
-      partitionerType: config.producer?.partitionerType ?? DEFAULT.partitionerType
-    });
-
-    producer.on('ready', () => {
-      resolve(producer);
-    });
-
-    producer.on('error', (error) => {
-      reject(error);
-    });
+  const kafka = new Kafka({
+    brokers: host.split(','),
+    retry: config.producer?.retryOptions,
+    logLevel: config.kafkaJSLogs
   });
+
+  const producer = kafka.producer();
+  await producer.connect();
+  return producer;
 }
 
-async function getProducer(host: string): Promise<Producer> {
+export async function getProducer(host: string): Promise<Producer> {
   const config = getConfig();
   if (connections[host] == null) {
     const producer = await createProducer(host);
@@ -88,10 +72,9 @@ async function getProducer(host: string): Promise<Producer> {
     clearTimeout(connection.timeout);
   }
   connection.timeout = setTimeout(() => {
-    connection.producer.removeAllListeners();
-    connection.producer.close();
+    connection.producer.disconnect();
     delete connections[host];
-  }, config.producer?.connectionTTL ?? DEFAULT.connectionTTL);
+  }, config.producer?.connectionTTL ?? DEFAULT_CONFIG.connectionTTL);
   return connection.producer;
 }
 
@@ -99,17 +82,13 @@ export function closeAll(): void {
   for (const host in connections) {
     if (connections[host] != null) {
       clearTimeout(connections[host].timeout);
-      connections[host].producer.removeAllListeners();
-      connections[host].producer.close();
+      connections[host].producer.disconnect();
       delete connections[host];
     }
   }
 }
 
-export async function emit(
-  output: Output | Output[],
-  overwriteHosts?: string | string[]
-): Promise<EmitResponse[]> {
+export async function emit(output: Output | Output[], overwriteHosts?: string | string[]): Promise<EmitResponse[]> {
   const config = getConfig();
 
   const payloads = toArray(output);
@@ -128,24 +107,22 @@ export async function emit(
 
   if (config.onlyTesting === true) {
     onlyTestingEmittedEvents.push(...normalizePayloads(payloads));
-    return Promise.resolve([{}]);
+    return Promise.resolve([]);
   } else {
     const hosts = getHosts(config.host, config.producer?.additionalHosts, overwriteHosts);
 
     return Promise.all(
       hosts.map(async (host): Promise<EmitResponse> => {
         const producer = await getProducer(host);
-        return new Promise((resolve, reject) => {
-          producer.send(normalizePayloads(payloads), (error, result: EmitResponse) => {
-            /* istanbul ignore next */
-            if (error != null) {
-              debug(Debug.ERROR, result);
-              reject(error);
-            }
-            debug(Debug.INFO, 'Emitted', result);
-            resolve(result);
+        let result: RecordMetadata[] = [];
+        for (const payload of normalizePayloads(payloads)) {
+          result = await producer.send({
+            topic: payload.topic,
+            messages: payload.messages
           });
-        });
+        }
+        debug(Debug.INFO, 'Emitted', result);
+        return result;
       })
     );
   }

@@ -1,29 +1,24 @@
-import { Producer } from 'kafka-node';
-import { clearEmittedEvents, closeAll, emit, getEmittedEvents } from '..';
+import { clearEmittedEvents, closeAll, emit, getEmittedEvents, getProducer } from '..';
 import { setConfig } from '../../config';
-import { ProducerPartitionerType } from '../../interfaces';
-import { sleep } from '../../test/helpers';
+import { handlerToCall } from '../../test/helpers';
 
-const defaultHeaderData = {
-  attributes: 0,
-  partition: 0,
-  topic: 'topic-a'
-};
+const defaultTopic = 'topic-a';
 
 const defaultBodyData = {
   firstName: 'John',
   lastName: 'Doe'
 };
 
+const KAFKA_HOST_9092 = 'kafka:9092';
+
 const CONNECTION_TTL = 2000;
-const AFTER_CONNECTION_TTL = 5000;
-const TEST_TIMEOUT = 30000;
+const TEST_TIMEOUT = 120000;
 
 describe('producer', () => {
   describe('emit success', () => {
     beforeEach(() => {
       setConfig({
-        host: 'kafka:9092',
+        host: KAFKA_HOST_9092,
         producer: {
           connectionTTL: CONNECTION_TTL
         }
@@ -33,43 +28,40 @@ describe('producer', () => {
       'Should emit a single event with different topic and code',
       async () => {
         // arrange
-        const sendSpy = jest.spyOn(Producer.prototype, 'send');
-        const closeSpy = jest.spyOn(Producer.prototype, 'close');
+        const producer = await getProducer(KAFKA_HOST_9092);
+        const sendSpy = jest.spyOn(producer, 'send');
+        const disconnectSpy = jest.spyOn(producer, 'disconnect');
 
         const eventName = 'EventCode';
 
         // act
         const response = await emit({
-          topic: defaultHeaderData.topic,
+          topic: defaultTopic,
           data: defaultBodyData,
           eventName
         });
 
         // assert
         expect(sendSpy).toHaveBeenCalled();
-        expect(sendSpy).toHaveBeenCalledWith(
-          [
+        expect(sendSpy).toHaveBeenCalledWith({
+          topic: defaultTopic,
+          messages: [
             {
-              ...defaultHeaderData,
-              messages: [
-                JSON.stringify({
-                  ...defaultBodyData,
-                  code: eventName
-                })
-              ]
+              value: JSON.stringify({
+                ...defaultBodyData,
+                code: eventName
+              })
             }
-          ],
-          expect.any(Function)
-        );
-        expect(closeSpy).not.toHaveBeenCalled();
+          ]
+        });
+        expect(disconnectSpy).not.toHaveBeenCalled();
 
-        const topicsOffset = response.find((messages) => messages[defaultHeaderData.topic] != null);
+        const topicsOffset = response[0];
         expect(topicsOffset).toBeDefined();
 
         if (topicsOffset != null) {
-          const topicOffset = topicsOffset[defaultHeaderData.topic];
+          const topicOffset = topicsOffset.find((item) => item.topicName === defaultTopic);
           expect(topicOffset).toBeDefined();
-          expect(typeof topicOffset[String(defaultHeaderData.partition)]).toBe('number');
         }
         sendSpy.mockClear();
       },
@@ -80,33 +72,31 @@ describe('producer', () => {
       'Should emit a single event with same topic and code in upper camel case',
       async () => {
         // arrange
-        const sendSpy = jest.spyOn(Producer.prototype, 'send');
-        const closeSpy = jest.spyOn(Producer.prototype, 'close');
+        const producer = await getProducer(KAFKA_HOST_9092);
+        const sendSpy = jest.spyOn(producer, 'send');
+        const disconnectSpy = jest.spyOn(producer, 'disconnect');
 
         const eventName = 'TopicA';
 
         // act
         await emit({
-          topic: defaultHeaderData.topic,
+          topic: defaultTopic,
           data: defaultBodyData
         });
 
         // assert
-        expect(sendSpy).toHaveBeenCalledWith(
-          [
+        expect(sendSpy).toHaveBeenCalledWith({
+          topic: defaultTopic,
+          messages: [
             {
-              ...defaultHeaderData,
-              messages: [
-                JSON.stringify({
-                  ...defaultBodyData,
-                  code: eventName
-                })
-              ]
+              value: JSON.stringify({
+                ...defaultBodyData,
+                code: eventName
+              })
             }
-          ],
-          expect.any(Function)
-        );
-        expect(closeSpy).not.toHaveBeenCalled();
+          ]
+        });
+        expect(disconnectSpy).not.toHaveBeenCalled();
         sendSpy.mockClear();
       },
       TEST_TIMEOUT
@@ -116,14 +106,15 @@ describe('producer', () => {
       'Should emit a two events in the same topic and event',
       async () => {
         // arrange
-        const sendSpy = jest.spyOn(Producer.prototype, 'send');
-        const closeSpy = jest.spyOn(Producer.prototype, 'close');
+        const producer = await getProducer(KAFKA_HOST_9092);
+        const sendSpy = jest.spyOn(producer, 'send');
+        const disconnectSpy = jest.spyOn(producer, 'disconnect');
 
         const eventName = 'EventCode';
 
         // act
         await emit({
-          topic: defaultHeaderData.topic,
+          topic: defaultTopic,
           eventName,
           data: [
             {
@@ -138,27 +129,26 @@ describe('producer', () => {
         });
 
         // assert
-        expect(sendSpy).toHaveBeenCalledWith(
-          [
+        expect(sendSpy).toHaveBeenCalledWith({
+          topic: defaultTopic,
+          messages: [
             {
-              ...defaultHeaderData,
-              messages: [
-                JSON.stringify({
-                  ...defaultBodyData,
-                  id: 1,
-                  code: eventName
-                }),
-                JSON.stringify({
-                  ...defaultBodyData,
-                  id: 2,
-                  code: eventName
-                })
-              ]
+              value: JSON.stringify({
+                ...defaultBodyData,
+                id: 1,
+                code: eventName
+              })
+            },
+            {
+              value: JSON.stringify({
+                ...defaultBodyData,
+                id: 2,
+                code: eventName
+              })
             }
-          ],
-          expect.any(Function)
-        );
-        expect(closeSpy).not.toHaveBeenCalled();
+          ]
+        });
+        expect(disconnectSpy).not.toHaveBeenCalled();
         sendSpy.mockClear();
       },
       TEST_TIMEOUT
@@ -168,8 +158,9 @@ describe('producer', () => {
       'Should emit a two events in different topics',
       async () => {
         // arrange
-        const sendSpy = jest.spyOn(Producer.prototype, 'send');
-        const closeSpy = jest.spyOn(Producer.prototype, 'close');
+        const producer = await getProducer(KAFKA_HOST_9092);
+        const sendSpy = jest.spyOn(producer, 'send');
+        const disconnectSpy = jest.spyOn(producer, 'disconnect');
 
         // act
         await emit([
@@ -190,35 +181,31 @@ describe('producer', () => {
         ]);
 
         // assert
-        expect(sendSpy).toHaveBeenCalledWith(
-          [
+        expect(sendSpy).toHaveBeenNthCalledWith(1, {
+          topic: 'topic-a',
+          messages: [
             {
-              partition: defaultHeaderData.partition,
-              attributes: defaultHeaderData.attributes,
-              topic: 'topic-a',
-              messages: [
-                JSON.stringify({
-                  id: 'topic-a-1',
-                  code: 'EventNameA'
-                })
-              ]
-            },
-            {
-              partition: defaultHeaderData.partition,
-              attributes: defaultHeaderData.attributes,
-              topic: 'topic-b',
-              messages: [
-                JSON.stringify({
-                  id: 'topic-b-1',
-                  code: 'EventNameB'
-                })
-              ]
+              value: JSON.stringify({
+                id: 'topic-a-1',
+                code: 'EventNameA'
+              })
             }
-          ],
-          expect.any(Function)
-        );
-        await sleep(AFTER_CONNECTION_TTL);
-        expect(closeSpy).toHaveBeenCalled();
+          ]
+        });
+
+        expect(sendSpy).toHaveBeenNthCalledWith(2, {
+          topic: 'topic-b',
+          messages: [
+            {
+              value: JSON.stringify({
+                id: 'topic-b-1',
+                code: 'EventNameB'
+              })
+            }
+          ]
+        });
+
+        await handlerToCall(disconnectSpy);
         sendSpy.mockClear();
       },
       TEST_TIMEOUT
@@ -228,8 +215,9 @@ describe('producer', () => {
       'Should create and close a producer',
       async () => {
         // arrange
-        const sendSpy = jest.spyOn(Producer.prototype, 'send');
-        const closeSpy = jest.spyOn(Producer.prototype, 'close');
+        const producer = await getProducer(KAFKA_HOST_9092);
+        const sendSpy = jest.spyOn(producer, 'send');
+        const disconnectSpy = jest.spyOn(producer, 'disconnect');
 
         // act
         await emit({
@@ -241,24 +229,19 @@ describe('producer', () => {
         });
 
         // assert
-        expect(sendSpy).toHaveBeenCalledWith(
-          [
+        expect(sendSpy).toHaveBeenCalledWith({
+          topic: 'topic-a',
+          messages: [
             {
-              partition: defaultHeaderData.partition,
-              attributes: defaultHeaderData.attributes,
-              topic: 'topic-a',
-              messages: [
-                JSON.stringify({
-                  id: 'topic-a-1',
-                  code: 'EventNameA'
-                })
-              ]
+              value: JSON.stringify({
+                id: 'topic-a-1',
+                code: 'EventNameA'
+              })
             }
-          ],
-          expect.any(Function)
-        );
+          ]
+        });
         await closeAll();
-        expect(closeSpy).toHaveBeenCalled();
+        expect(disconnectSpy).toHaveBeenCalled();
         sendSpy.mockClear();
       },
       TEST_TIMEOUT
@@ -272,27 +255,20 @@ describe('producer', () => {
         producer: {
           retryOptions: {
             retries: 0
-          },
-          partitionerType: ProducerPartitionerType.DEFAULT
+          }
         }
       });
     });
     it('Should throw an exception because data must be and object - string sended', async () => {
-      await expect(emit({ data: 'my-data', topic: 'topic' })).rejects.toThrowError(
-        'Data must be an object'
-      );
+      await expect(emit({ data: 'my-data', topic: 'topic' })).rejects.toThrowError('Data must be an object');
     });
 
     it('Should throw an exception because data must be and object - null sended', async () => {
-      await expect(emit({ data: null as any, topic: 'topic' })).rejects.toThrowError(
-        'Data must be an object'
-      );
+      await expect(emit({ data: null as any, topic: 'topic' })).rejects.toThrowError('Data must be an object');
     });
 
     it('Should throw an exception because event code - empty', async () => {
-      await expect(emit({ data: {}, topic: 'topic', eventName: '' })).rejects.toThrowError(
-        'Invalid message code'
-      );
+      await expect(emit({ data: {}, topic: 'topic', eventName: '' })).rejects.toThrowError('Invalid message code');
     });
 
     it('Should throw an exception because event code - inside data', async () => {
@@ -312,9 +288,7 @@ describe('producer', () => {
           data: {},
           topic: 'any-topic'
         })
-      ).rejects.toThrow(
-        /getaddrinfo ENOTFOUND my-invalid-host|getaddrinfo EAI_AGAIN my-invalid-host/gim
-      );
+      ).rejects.toThrow(/getaddrinfo ENOTFOUND my-invalid-host|getaddrinfo EAI_AGAIN my-invalid-host|connection timeout/gim);
     }, 12000);
 
     it('should fail connection by overwrite', async () => {
@@ -326,14 +300,14 @@ describe('producer', () => {
           },
           ['another-host:9092']
         )
-      ).rejects.toThrow(/getaddrinfo ENOTFOUND another-host|getaddrinfo EAI_AGAIN another-host/gim);
+      ).rejects.toThrow(/getaddrinfo ENOTFOUND another-host|getaddrinfo EAI_AGAIN another-host|connection timeout/gim);
     }, 12000);
   });
 
   describe('emit testing mode - success', () => {
     beforeEach(() => {
       setConfig({
-        host: 'anyhost:9092',
+        host: 'any-host:9092',
         onlyTesting: true
       });
     });
@@ -356,10 +330,12 @@ describe('producer', () => {
       expect(emittedEvents[0]).toMatchObject({
         topic: myEvent.topic,
         messages: [
-          JSON.stringify({
-            ...myEvent.data,
-            code: myEvent.eventName
-          })
+          {
+            value: JSON.stringify({
+              ...myEvent.data,
+              code: myEvent.eventName
+            })
+          }
         ]
       });
       clearEmittedEvents();
@@ -371,7 +347,7 @@ describe('producer', () => {
   describe('emit testing mode - fail', () => {
     beforeEach(() => {
       setConfig({
-        host: 'anyhost:9092',
+        host: 'any-host:9092',
         onlyTesting: false
       });
     });
