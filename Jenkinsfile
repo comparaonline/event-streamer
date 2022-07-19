@@ -1,5 +1,5 @@
 pipeline {
-  agent any
+  agent { node { label "jenkins-gcp-c2" } }
   options {
     timeout(time: 30, unit: 'MINUTES')
   }
