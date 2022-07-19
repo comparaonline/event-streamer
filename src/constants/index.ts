@@ -10,7 +10,7 @@ interface Default {
 }
 
 export const DEFAULT_CONFIG: Default = {
-  maxMessagesPerTopic: 10,
+  maxMessagesPerTopic: 20,
   onlyTesting: false,
   connectionTTL: 5000,
   strategy: 'topic',
