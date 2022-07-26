@@ -1,4 +1,4 @@
-import { logLevel, RetryOptions } from 'kafkajs';
+import { CompressionTypes, logLevel, RetryOptions, DefaultPartitioner, LegacyPartitioner } from 'kafkajs';
 
 export enum Debug {
   NONE = 6,
@@ -21,6 +21,11 @@ export interface Config {
     connectionTTL?: number;
     additionalHosts?: string[];
     retryOptions?: RetryOptions;
+    /** Default will be none, GZIP doesn't need further config  */
+    compressionType?: CompressionTypes;
+    /** EXPERIMENTAL: default false */
+    idempotent?: boolean;
+    partitioners?: DefaultPartitioner | LegacyPartitioner;
   };
   /** This is required if you want to create a consumer */
   consumer?: {

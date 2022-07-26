@@ -54,7 +54,10 @@ export async function createProducer(host: string): Promise<Producer> {
     logLevel: config.kafkaJSLogs
   });
 
-  const producer = kafka.producer();
+  const producer = kafka.producer({
+    idempotent: config.producer?.idempotent ?? DEFAULT_CONFIG.producerIdempotent,
+    createPartitioner: config.producer?.partitioners ?? DEFAULT_CONFIG.partitioners
+  });
   await producer.connect();
   return producer;
 }
@@ -88,14 +91,39 @@ export function closeAll(): void {
   }
 }
 
-export async function emit(output: Output | Output[], overwriteHosts?: string | string[]): Promise<EmitResponse[]> {
+export async function emit(topic: string, data: Object | Object[]): Promise<EmitResponse[]>;
+export async function emit(topic: string, eventName: string, data: Object | Object[]): Promise<EmitResponse[]>;
+export async function emit(output: Output | Output[], overwriteHosts?: string | string[]): Promise<EmitResponse[]>;
+export async function emit(param1: string | Output | Output[], param2?: any, param3?: any): Promise<EmitResponse[]> {
   const config = getConfig();
+
+  function getParameters(): { output: Output | Output[]; overwriteHosts?: string | string[] } {
+    if (typeof param1 === 'object') {
+      return {
+        output: param1,
+        overwriteHosts: param2
+      };
+    } else {
+      return {
+        output: {
+          topic: param1,
+          eventName: typeof param2 === 'string' ? param2 : undefined,
+          data: typeof param2 === 'string' ? param3 : param2
+        }
+      };
+    }
+  }
+
+  const { output, overwriteHosts } = getParameters();
 
   const payloads = toArray(output);
 
   for (const { data, eventName } of payloads) {
     if (typeof data !== 'object' || data == null) {
-      throw new Error('Data must be an object');
+      throw new Error('Data must be an object or non empty array');
+    }
+    if (Array.isArray(data) && data.length === 0) {
+      throw new Error("Data array can't be empty");
     }
     if (data.hasOwnProperty('code')) {
       throw new Error('Reserved object keyword "code" inside data');
@@ -118,7 +146,8 @@ export async function emit(output: Output | Output[], overwriteHosts?: string | 
         for (const payload of normalizePayloads(payloads)) {
           result = await producer.send({
             topic: payload.topic,
-            messages: payload.messages
+            messages: payload.messages,
+            compression: config.producer?.compressionType ?? DEFAULT_CONFIG.compressionType
           });
         }
         debug(Debug.INFO, 'Emitted', result);

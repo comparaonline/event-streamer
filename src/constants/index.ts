@@ -1,4 +1,4 @@
-import { logLevel } from 'kafkajs';
+import { CompressionTypes, LegacyPartitioner, logLevel, DefaultPartitioner, Partitioners } from 'kafkajs';
 import { Strategy } from '../interfaces';
 
 interface Default {
@@ -7,6 +7,9 @@ interface Default {
   connectionTTL: number;
   strategy: Strategy;
   kafkaJSLogs: logLevel;
+  compressionType: CompressionTypes;
+  producerIdempotent: boolean;
+  partitioners: DefaultPartitioner | LegacyPartitioner;
 }
 
 export const DEFAULT_CONFIG: Default = {
@@ -14,5 +17,8 @@ export const DEFAULT_CONFIG: Default = {
   onlyTesting: false,
   connectionTTL: 5000,
   strategy: 'topic',
-  kafkaJSLogs: logLevel.NOTHING
+  kafkaJSLogs: logLevel.NOTHING,
+  compressionType: CompressionTypes.None,
+  producerIdempotent: false,
+  partitioners: Partitioners.LegacyPartitioner
 };

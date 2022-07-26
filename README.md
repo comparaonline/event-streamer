@@ -55,6 +55,9 @@ setConfig({
 | producer.additionalHosts | string[] | Additional hosts to send a message. This is useful if you need to send information to two or more different clusters | *optional* |
 | producer.connectionTTL | number | Time in ms that the connection will be keep open after last message was sent | *optional* <br/> default: 5000 |
 | producer.retryOptions | RetryOptions (Object) | kafka-node retry options: retries, factor, minTimeout, maxTimeout and randomize | *optional* |
+| producer.compressionType | CompressionTypes (KafkaJS) | Set compression type. Only None and GZIP are available without any additional implementation | *optional* <br/> default: CompressionTypes.NONE |
+| producer.idempotent | boolean | Set message to only be sent once. **EXPERIMENTAL** | *optional*  <br/> default: false |
+| producer.partitioners | DefaultPartitioner/LegacyPartitioner | Set how message will be sended to each partition | *optional* <br/> default: LegacyPartitioner |
 | consumer | Object | Object | *required to start consumer* |
 | consumer.groupId | string | Kafka group id | **required** |
 | consumer.strategy | Strategy ('topic'/'one-by-one') | Chose if you want to create topic queues or process all the messages in a single queue. <br/> *topic*: each topic will have an exclusive queue and fetch messages from kafka based on queue size. When queue is full it will stop fetching for this specific topic and resume it when some handler ends. **Lag can be caused if queue size is too small** <br/>  *one-by-one*: all the message will be handle in a single queue and it will need to wait previous message handler to finish before start to process a new message | *optional* <br/> default: 'topic'
@@ -104,6 +107,20 @@ async function main () {
   
   // Topic: my-topic Message: { "firstName": "John", "code": "MyEventName" }
 
+}
+```
+
+#### Single event with alternative syntax
+
+```ts
+import { emit } from '@comparaonline/event-streamer'
+
+async function main () {
+  await emit('my-topic', 'my-event-name', { firstName: 'John' })
+  // Topic: my-topic Message: { "firstName": "John", "code": "MyEventName" }
+
+  await emit('my-topic', { firstName: 'John' })
+  // Topic: my-topic Message: { "firstName": "John", "code": "MyTopic" }
 }
 ```
 
@@ -255,6 +272,14 @@ async function main () {
   // This handler will be executed with messages from 'topic-g' and 'topic-h' with property 'code' equal to 'MyEventName1' or 'MyEventName2'
   consumer.add(['topic-g', 'topic-h'], ['my-event-name-1', 'my-event-name-2'], (data, emit) => { console.log(6) })
 
+  // Alternative syntax 
+
+  consumer.add({
+    topic: 'topic-i',
+    eventName: 'my-event-name-i', // this is optional
+    callback: (data, emit) => { console.log(6) }
+  })
+  
   await consumer.start()
 }
 ```

@@ -23,16 +23,21 @@ export class ConsumerRouter {
   public add(topic: string, eventNames: string[], handler: Callback<any>): void;
   public add(topics: string[], eventNames: string[], handler: Callback<any>): void;
   public add(topics: string[], eventNames: string, handler: Callback<any>): void;
-  public add(param1: string | string[], param2: string | string[] | Callback<any>, handler?: Callback<any>): void {
-    const topics = Array.isArray(param1) ? param1 : [param1];
-    const eventNames =
-      typeof param2 === 'string'
-        ? [stringToUpperCamelCase(param2)]
-        : Array.isArray(param2)
-        ? param2.map((name) => stringToUpperCamelCase(name))
-        : new Array(topics.length).fill(undefined);
+  public add(route: Route): void;
+  public add(param1: string | string[] | Route, param2?: string | string[] | Callback<any>, handler?: Callback<any>): void {
+    const isRoute = typeof param1 === 'object' && !Array.isArray(param1);
+    const topics = isRoute ? [param1.topic] : Array.isArray(param1) ? param1 : [param1];
+    const eventNames = isRoute
+      ? param1.eventName != null
+        ? [stringToUpperCamelCase(param1.eventName)]
+        : [undefined]
+      : typeof param2 === 'string'
+      ? [stringToUpperCamelCase(param2)]
+      : Array.isArray(param2)
+      ? param2.map((name) => stringToUpperCamelCase(name))
+      : [undefined];
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const callback = typeof param2 === 'function' ? param2 : handler!;
+    const callback = isRoute ? param1.callback : typeof param2 === 'function' ? param2 : handler!;
     for (const topic of topics) {
       for (const eventName of eventNames) {
         const route = {
