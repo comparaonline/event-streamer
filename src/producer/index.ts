@@ -56,7 +56,8 @@ export async function createProducer(host: string): Promise<Producer> {
 
   const producer = kafka.producer({
     idempotent: config.producer?.idempotent ?? DEFAULT_CONFIG.producerIdempotent,
-    createPartitioner: config.producer?.partitioners ?? DEFAULT_CONFIG.partitioners
+    createPartitioner: config.producer?.partitioners ?? DEFAULT_CONFIG.partitioners,
+    allowAutoTopicCreation: true
   });
   await producer.connect();
   return producer;
