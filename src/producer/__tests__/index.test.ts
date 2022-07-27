@@ -1,3 +1,4 @@
+import { CompressionTypes, Partitioners } from 'kafkajs';
 import { clearEmittedEvents, closeAll, emit, getEmittedEvents, getProducer } from '..';
 import { setConfig } from '../../config';
 import { handlerToCall } from '../../test/helpers';
@@ -45,6 +46,7 @@ describe('producer', () => {
         expect(sendSpy).toHaveBeenCalled();
         expect(sendSpy).toHaveBeenCalledWith({
           topic: defaultTopic,
+          compression: 0,
           messages: [
             {
               value: JSON.stringify({
@@ -87,6 +89,7 @@ describe('producer', () => {
         // assert
         expect(sendSpy).toHaveBeenCalledWith({
           topic: defaultTopic,
+          compression: 0,
           messages: [
             {
               value: JSON.stringify({
@@ -131,6 +134,7 @@ describe('producer', () => {
         // assert
         expect(sendSpy).toHaveBeenCalledWith({
           topic: defaultTopic,
+          compression: 0,
           messages: [
             {
               value: JSON.stringify({
@@ -183,6 +187,7 @@ describe('producer', () => {
         // assert
         expect(sendSpy).toHaveBeenNthCalledWith(1, {
           topic: 'topic-a',
+          compression: 0,
           messages: [
             {
               value: JSON.stringify({
@@ -195,6 +200,7 @@ describe('producer', () => {
 
         expect(sendSpy).toHaveBeenNthCalledWith(2, {
           topic: 'topic-b',
+          compression: 0,
           messages: [
             {
               value: JSON.stringify({
@@ -206,6 +212,167 @@ describe('producer', () => {
         });
 
         await handlerToCall(disconnectSpy);
+        sendSpy.mockClear();
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Should emit a event using topic/data overload',
+      async () => {
+        // arrange
+        const producer = await getProducer(KAFKA_HOST_9092);
+        const sendSpy = jest.spyOn(producer, 'send');
+        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+
+        // act
+        await emit('topic-a', {
+          id: 'topic-a-1'
+        });
+
+        // assert
+        expect(sendSpy).toHaveBeenCalledWith({
+          topic: 'topic-a',
+          compression: 0,
+          messages: [
+            {
+              value: JSON.stringify({
+                id: 'topic-a-1',
+                code: 'TopicA'
+              })
+            }
+          ]
+        });
+
+        expect(disconnectSpy).not.toHaveBeenCalled();
+        sendSpy.mockClear();
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Should emit a event using topic/data array overload',
+      async () => {
+        // arrange
+        const producer = await getProducer(KAFKA_HOST_9092);
+        const sendSpy = jest.spyOn(producer, 'send');
+        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+
+        // act
+        await emit('topic-a', [
+          {
+            id: 'topic-a-1'
+          },
+          {
+            id: 'topic-a-2'
+          }
+        ]);
+
+        // assert
+        expect(sendSpy).toHaveBeenCalledWith({
+          topic: 'topic-a',
+          compression: 0,
+          messages: [
+            {
+              value: JSON.stringify({
+                id: 'topic-a-1',
+                code: 'TopicA'
+              })
+            },
+            {
+              value: JSON.stringify({
+                id: 'topic-a-2',
+                code: 'TopicA'
+              })
+            }
+          ]
+        });
+
+        expect(disconnectSpy).not.toHaveBeenCalled();
+        sendSpy.mockClear();
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Should emit a event using topic/event-name/data overload',
+      async () => {
+        // arrange
+        const producer = await getProducer(KAFKA_HOST_9092);
+        const sendSpy = jest.spyOn(producer, 'send');
+        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+
+        // act
+        await emit('topic-a', 'event-name-a', {
+          id: 'topic-a-1'
+        });
+
+        // assert
+        expect(sendSpy).toHaveBeenCalledWith({
+          topic: 'topic-a',
+          compression: 0,
+          messages: [
+            {
+              value: JSON.stringify({
+                id: 'topic-a-1',
+                code: 'EventNameA'
+              })
+            }
+          ]
+        });
+
+        expect(disconnectSpy).not.toHaveBeenCalled();
+        sendSpy.mockClear();
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Should emit a event using topic/event-name/data array overload',
+      async () => {
+        // arrange
+        setConfig({
+          host: KAFKA_HOST_9092,
+          producer: {
+            connectionTTL: CONNECTION_TTL,
+            compressionType: CompressionTypes.GZIP
+          }
+        });
+        const producer = await getProducer(KAFKA_HOST_9092);
+        const sendSpy = jest.spyOn(producer, 'send');
+        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+
+        // act
+        await emit('topic-a', 'event-name-a', [
+          {
+            id: 'topic-a-1'
+          },
+          {
+            id: 'topic-a-2'
+          }
+        ]);
+
+        // assert
+        expect(sendSpy).toHaveBeenCalledWith({
+          topic: 'topic-a',
+          compression: 1,
+          messages: [
+            {
+              value: JSON.stringify({
+                id: 'topic-a-1',
+                code: 'EventNameA'
+              })
+            },
+            {
+              value: JSON.stringify({
+                id: 'topic-a-2',
+                code: 'EventNameA'
+              })
+            }
+          ]
+        });
+
+        expect(disconnectSpy).not.toHaveBeenCalled();
         sendSpy.mockClear();
       },
       TEST_TIMEOUT
@@ -231,6 +398,7 @@ describe('producer', () => {
         // assert
         expect(sendSpy).toHaveBeenCalledWith({
           topic: 'topic-a',
+          compression: 0,
           messages: [
             {
               value: JSON.stringify({
@@ -255,7 +423,10 @@ describe('producer', () => {
         producer: {
           retryOptions: {
             retries: 0
-          }
+          },
+          compressionType: CompressionTypes.None,
+          idempotent: false,
+          partitioners: Partitioners.LegacyPartitioner
         }
       });
     });
@@ -265,6 +436,18 @@ describe('producer', () => {
 
     it('Should throw an exception because data must be and object - null sended', async () => {
       await expect(emit({ data: null as any, topic: 'topic' })).rejects.toThrowError('Data must be an object');
+    });
+
+    it('Should throw an exception because data array is empty', async () => {
+      await expect(emit({ data: [], topic: 'topic' })).rejects.toThrowError("Data array can't be empty");
+    });
+
+    it('Should throw an exception because data array is empty overload', async () => {
+      await expect(emit('topic', [])).rejects.toThrowError("Data array can't be empty");
+    });
+
+    it('Should throw an exception because data array is empty overload 2', async () => {
+      await expect(emit('topic', 'event-name', [])).rejects.toThrowError("Data array can't be empty");
     });
 
     it('Should throw an exception because event code - empty', async () => {
