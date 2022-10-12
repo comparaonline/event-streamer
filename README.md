@@ -397,3 +397,49 @@ describe('Testing some handlers', () => {
 })
 
 ```
+
+## Migration to version +8.0.0
+
+### Node version
+
+You need node version greater than or equal to v14.17.0. A good choice for Dockerfile is `node:14.17.0-alpine3.13` at least than you already want to go with `node:16.13-alpine3.15`
+
+#### Known issues after update node
+
+* `pg`: if you are using a previous version from node v13 with pg v7.X.X then it will not run anymore. The easiest way to fix it is with `yarn add pg@8.0.3`
+* `python`: in your docker file change `python` to `python3`
+
+### Topics and subjects
+
+#### Listeners
+
+Previous versions read all the topics and performs actions from every event not mattering the topic. Now you need to link topic/event/handler
+
+```ts
+// Option A: you know where the event came from
+consumer.add('topic-a', 'my-event-name', myHandler)
+
+// Option B: you don't know where the event came from
+consumer.add(['topic-a', 'topic-b'], 'my-event-name', myHandler)
+
+// Option C: you know where the event came from but there are two input events with the same action
+consumer.add('topic-a', ['my-event-name-a', 'my-event-name-b'], myHandler)
+
+// Option D: you don't know where the event came from but there are two input events with the same action
+consumer.add(['topic-a', 'topic-b'], ['my-event-name-a', 'my-event-name-b'], myHandler)
+```
+
+#### Events subjects
+
+Previous event-streamer version uses class name as event subject. Now you need to specify them, no matter what the event subject will be automatically converted to upper camel case 
+
+#### Tips
+
+* You can transform your events folder into simple TS interfaces
+* Create a kafka service folder with all the emits events
+
+### Migration PRs
+
+[Flux comparador sync](https://github.com/comparaonline/flux-comparador-sync/pull/53/files)
+[Results connector](https://github.com/comparaonline/results-connector/pull/67/files)
+[Quoteapp CICL](https://github.com/comparaonline/quoteapp-cicl/pull/127/files)
