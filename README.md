@@ -4,7 +4,7 @@
 
 Event Streamer is a library for connect micro services based on kafka event communication.
 
-This is a wrap of [kafka-node](https://www.npmjs.com/package/kafka-node) simplifying connection, errors and topic with subject (event name, event code).
+This is a wrap of [kafka-js](https://github.com/tulios/kafkajs) simplifying connection, errors and topic with subject (event name, event code).
 
 This library is not intended to consume two different clusters at the same time, but you can produce in two or more clusters at the same time.
 
