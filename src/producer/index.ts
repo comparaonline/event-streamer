@@ -42,14 +42,16 @@ export function getParsedEmittedEvents(): ParsedPayload[] {
   validateTestingConfig();
   return onlyTestingEmittedEvents
     .map((events) =>
-      events.messages.map((event) => {
-        const data = JSON.parse(event.value);
-        return {
-          topic: events.topic,
-          eventName: data.code,
-          data
-        };
-      })
+      events.messages
+        .map((event) => {
+          const data = JSON.parse(event.value);
+          return {
+            topic: events.topic,
+            eventName: data.code,
+            data
+          };
+        })
+        .reverse()
     )
     .flat();
 }
