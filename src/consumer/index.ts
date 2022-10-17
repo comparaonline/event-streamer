@@ -73,7 +73,11 @@ export class ConsumerRouter {
         .filter((route) => topic === route.topic && (route.eventName == null || route.eventName === content.code))
         .map((route) => {
           debug(Debug.TRACE, 'Message received on route', route);
-          return route.callback(content, emit);
+          try {
+            return route.callback(content, emit);
+          } catch (e) {
+            debug(Debug.ERROR, e);
+          }
         })
     ).then((results) => {
       if (results.length === 0) {
