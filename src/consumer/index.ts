@@ -76,6 +76,7 @@ export class ConsumerRouter {
           try {
             return route.callback(content, emit);
           } catch (e) {
+            /* istanbul ignore next */
             debug(Debug.ERROR, e);
           }
         })

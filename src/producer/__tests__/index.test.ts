@@ -1,5 +1,5 @@
 import { CompressionTypes, Partitioners } from 'kafkajs';
-import { clearEmittedEvents, closeAll, emit, getEmittedEvents, getProducer } from '..';
+import { clearEmittedEvents, closeAll, emit, getEmittedEvents, getParsedEmittedEvents, getProducer } from '..';
 import { setConfig } from '../../config';
 import { handlerToCall } from '../../test/helpers';
 
@@ -523,6 +523,34 @@ describe('producer', () => {
       });
       clearEmittedEvents();
       emittedEvents = getEmittedEvents();
+      expect(emittedEvents.length).toBe(0);
+    });
+
+    it('should get each emitted message parsed and separated', async () => {
+      // arrange
+      const myEvent = {
+        topic: 'test',
+        data: {
+          a: 'a'
+        },
+        eventName: 'MyEvent'
+      };
+      // act
+      await emit(myEvent);
+
+      // assert
+      let emittedEvents = getParsedEmittedEvents();
+      expect(emittedEvents.length).toBe(1);
+      expect(emittedEvents[0]).toMatchObject({
+        topic: myEvent.topic,
+        eventName: 'MyEvent',
+        data: {
+          ...myEvent.data,
+          code: myEvent.eventName
+        }
+      });
+      clearEmittedEvents();
+      emittedEvents = getParsedEmittedEvents();
       expect(emittedEvents.length).toBe(0);
     });
   });

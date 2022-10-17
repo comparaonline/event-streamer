@@ -13,6 +13,12 @@ interface Payload {
   }>;
 }
 
+interface ParsedPayload {
+  topic: string;
+  eventName: string;
+  data: Object;
+}
+
 function normalizePayloads(payloads: Output[]): Payload[] {
   return payloads.map(({ topic, data, eventName }: Output) => ({
     topic,
@@ -30,6 +36,22 @@ let onlyTestingEmittedEvents: Payload[] = [];
 export function getEmittedEvents(): Payload[] {
   validateTestingConfig();
   return onlyTestingEmittedEvents;
+}
+
+export function getParsedEmittedEvents(): ParsedPayload[] {
+  validateTestingConfig();
+  return onlyTestingEmittedEvents
+    .map((events) =>
+      events.messages.map((event) => {
+        const data = JSON.parse(event.value);
+        return {
+          topic: events.topic,
+          eventName: data.code,
+          data
+        };
+      })
+    )
+    .flat();
 }
 
 export function clearEmittedEvents(): void {

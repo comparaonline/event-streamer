@@ -366,7 +366,7 @@ application.onStart(async () => {
 ```ts
 // src/services/my-service/__tests__/index.test.ts
 import { consumer } from '../../../event-server'
-import { getEmittedEvents, clearEmittedEvents } from '@comparaonline/event-server'
+import { getEmittedEvents, clearEmittedEvents, getParsedEmittedEvents } from '@comparaonline/event-server'
 
 describe('Testing some handlers', () => {
   beforeEach(() => {
@@ -391,6 +391,25 @@ describe('Testing some handlers', () => {
             code: 'TopicB'
           })
         ]
+      })
+    })
+
+    it('Should emit event into topic c with parsed event', async () => {
+      await consumer.input({
+        data: { someData: true },
+        topic: 'a',
+        eventName: 'event-name-a'
+      })
+
+      const events = getEmittedEvents()
+
+      expect(events[0]).toMatchObject({
+        topic: 'topic-b',
+        eventName: 'TopicB',
+        data: {
+          message: 'Event received',
+          code: 'TopicB'
+        }
       })
     })
   })
