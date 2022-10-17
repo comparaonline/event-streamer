@@ -460,5 +460,7 @@ Previous event-streamer version uses class name as event subject. Now you need t
 ### Migration PRs
 
 [Flux comparador sync](https://github.com/comparaonline/flux-comparador-sync/pull/53/files)
+
 [Results connector](https://github.com/comparaonline/results-connector/pull/67/files)
+
 [Quoteapp CICL](https://github.com/comparaonline/quoteapp-cicl/pull/127/files)
