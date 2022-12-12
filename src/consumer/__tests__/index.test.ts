@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { ConsumerRouter } from '..';
 import { setConfig } from '../../config';
-import { v4 as uuid } from 'uuid';
 import { emit } from '../../producer';
 import { createTopic, handlerToCall, sendRawMessage, sleep } from '../../test/helpers';
 import { stringToUpperCamelCase } from '../../helpers';
 import { Config, Strategy, Unlimited } from '../../interfaces';
+import MockDate from 'mockdate';
 
 const TEST_TIMEOUT = 240000;
 
@@ -25,10 +25,17 @@ function generateConfig(params: Params): Config {
   };
 }
 
+let topicCounter = 0;
+
+function getIncrementalId(): number {
+  return topicCounter++;
+}
+
 describe('consumer', () => {
   describe('Consume online mode', () => {
     beforeEach(() => {
       jest.clearAllMocks();
+      MockDate.set('2022-12-08T00:00:00.000Z');
     });
 
     it(
@@ -36,7 +43,7 @@ describe('consumer', () => {
       async () => {
         // arrange
         const handler = jest.fn();
-        const id = uuid();
+        const id = getIncrementalId();
         const topic = `my-random-topic-${id}`;
         setConfig(generateConfig({ strategy: 'one-by-one' }));
 
@@ -62,6 +69,7 @@ describe('consumer', () => {
         expect(handler).toHaveBeenCalledWith(
           {
             ...someData,
+            createdAt: '2022-12-08 00:00:00Z',
             code: stringToUpperCamelCase(topic)
           },
           emit
@@ -79,7 +87,7 @@ describe('consumer', () => {
         const handlerA = jest.fn();
         const handlerB = jest.fn();
         const handlerC = jest.fn();
-        const id = uuid();
+        const id = getIncrementalId();
         const topic = `my-random-topic-${id}`;
         setConfig(generateConfig({ strategy: 'topic', maxMessagesPerTopic: 10 }));
 
@@ -130,8 +138,8 @@ describe('consumer', () => {
         const handlerB = jest.fn();
         const handlerC = jest.fn();
 
-        const topicA = `my-random-topic-${uuid()}`;
-        const topicB = `my-random-topic-${uuid()}`;
+        const topicA = `my-random-topic-${getIncrementalId()}`;
+        const topicB = `my-random-topic-${getIncrementalId()}`;
 
         setConfig(
           generateConfig({
@@ -208,7 +216,7 @@ describe('consumer', () => {
       async () => {
         // arrange
         const handler = jest.fn();
-        const id = uuid();
+        const id = getIncrementalId();
         const topic = `my-random-topic-${id}`;
         setConfig(
           generateConfig({
@@ -243,7 +251,7 @@ describe('consumer', () => {
         setConfig(generateConfig({ maxMessagesPerTopic: 1 }));
         const consumer = new ConsumerRouter();
         const handler = jest.fn();
-        const id = uuid();
+        const id = getIncrementalId();
         const topic = `my-random-topic-${id}`;
         await createTopic(topic);
 
@@ -279,7 +287,7 @@ describe('consumer', () => {
         // arrange
         setConfig(generateConfig({}));
         const handler = jest.fn();
-        const id = uuid();
+        const id = getIncrementalId();
         const topic = `my-random-topic-${id}`;
 
         await createTopic(topic);

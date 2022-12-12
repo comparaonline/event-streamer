@@ -43,11 +43,16 @@ export interface Config {
   onlyTesting?: boolean;
 }
 
+interface OutputData {
+  createdAt?: string;
+  [keys: string]: any;
+}
+
 export interface Output {
   topic: string;
   /** This should be UpperCamelCase, but if it is kebab case it will be converted */
   eventName?: string;
-  data: Object | Object[];
+  data: OutputData | OutputData[];
 }
 
 export interface Input {

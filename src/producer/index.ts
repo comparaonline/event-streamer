@@ -25,6 +25,7 @@ function normalizePayloads(payloads: Output[]): Payload[] {
     messages: toArray(data).map((message) => ({
       value: JSON.stringify({
         ...message,
+        createdAt: message.createdAt ?? new Date().toISOString().replace('T', ' ').slice(0, 19) + 'Z',
         code: stringToUpperCamelCase(eventName ?? topic)
       })
     }))

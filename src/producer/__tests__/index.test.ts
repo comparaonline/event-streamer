@@ -2,6 +2,7 @@ import { CompressionTypes, Partitioners } from 'kafkajs';
 import { clearEmittedEvents, closeAll, emit, getEmittedEvents, getParsedEmittedEvents, getProducer } from '..';
 import { setConfig } from '../../config';
 import { handlerToCall } from '../../test/helpers';
+import MockDate from 'mockdate';
 
 const defaultTopic = 'topic-a';
 
@@ -24,6 +25,7 @@ describe('producer', () => {
           connectionTTL: CONNECTION_TTL
         }
       });
+      MockDate.set('2022-12-08T00:00:00.000Z');
     });
     it(
       'Should emit a single event with different topic and code',
@@ -38,7 +40,10 @@ describe('producer', () => {
         // act
         const response = await emit({
           topic: defaultTopic,
-          data: defaultBodyData,
+          data: {
+            ...defaultBodyData,
+            createdAt: '2022-12-09 00:00:00Z'
+          },
           eventName
         });
 
@@ -51,6 +56,7 @@ describe('producer', () => {
             {
               value: JSON.stringify({
                 ...defaultBodyData,
+                createdAt: '2022-12-09 00:00:00Z',
                 code: eventName
               })
             }
@@ -94,6 +100,7 @@ describe('producer', () => {
             {
               value: JSON.stringify({
                 ...defaultBodyData,
+                createdAt: '2022-12-08 00:00:00Z',
                 code: eventName
               })
             }
@@ -140,6 +147,7 @@ describe('producer', () => {
               value: JSON.stringify({
                 ...defaultBodyData,
                 id: 1,
+                createdAt: '2022-12-08 00:00:00Z',
                 code: eventName
               })
             },
@@ -147,6 +155,7 @@ describe('producer', () => {
               value: JSON.stringify({
                 ...defaultBodyData,
                 id: 2,
+                createdAt: '2022-12-08 00:00:00Z',
                 code: eventName
               })
             }
@@ -192,6 +201,7 @@ describe('producer', () => {
             {
               value: JSON.stringify({
                 id: 'topic-a-1',
+                createdAt: '2022-12-08 00:00:00Z',
                 code: 'EventNameA'
               })
             }
@@ -205,6 +215,7 @@ describe('producer', () => {
             {
               value: JSON.stringify({
                 id: 'topic-b-1',
+                createdAt: '2022-12-08 00:00:00Z',
                 code: 'EventNameB'
               })
             }
@@ -238,6 +249,7 @@ describe('producer', () => {
             {
               value: JSON.stringify({
                 id: 'topic-a-1',
+                createdAt: '2022-12-08 00:00:00Z',
                 code: 'TopicA'
               })
             }
@@ -276,12 +288,14 @@ describe('producer', () => {
             {
               value: JSON.stringify({
                 id: 'topic-a-1',
+                createdAt: '2022-12-08 00:00:00Z',
                 code: 'TopicA'
               })
             },
             {
               value: JSON.stringify({
                 id: 'topic-a-2',
+                createdAt: '2022-12-08 00:00:00Z',
                 code: 'TopicA'
               })
             }
@@ -315,6 +329,7 @@ describe('producer', () => {
             {
               value: JSON.stringify({
                 id: 'topic-a-1',
+                createdAt: '2022-12-08 00:00:00Z',
                 code: 'EventNameA'
               })
             }
@@ -360,12 +375,14 @@ describe('producer', () => {
             {
               value: JSON.stringify({
                 id: 'topic-a-1',
+                createdAt: '2022-12-08 00:00:00Z',
                 code: 'EventNameA'
               })
             },
             {
               value: JSON.stringify({
                 id: 'topic-a-2',
+                createdAt: '2022-12-08 00:00:00Z',
                 code: 'EventNameA'
               })
             }
@@ -403,6 +420,7 @@ describe('producer', () => {
             {
               value: JSON.stringify({
                 id: 'topic-a-1',
+                createdAt: '2022-12-08 00:00:00Z',
                 code: 'EventNameA'
               })
             }
@@ -431,7 +449,7 @@ describe('producer', () => {
       });
     });
     it('Should throw an exception because data must be and object - string sended', async () => {
-      await expect(emit({ data: 'my-data', topic: 'topic' })).rejects.toThrowError('Data must be an object');
+      await expect(emit({ data: 'my-data' as unknown as any, topic: 'topic' })).rejects.toThrowError('Data must be an object');
     });
 
     it('Should throw an exception because data must be and object - null sended', async () => {
@@ -516,6 +534,7 @@ describe('producer', () => {
           {
             value: JSON.stringify({
               ...myEvent.data,
+              createdAt: '2022-12-08 00:00:00Z',
               code: myEvent.eventName
             })
           }
@@ -546,6 +565,7 @@ describe('producer', () => {
         eventName: 'MyEvent',
         data: {
           ...myEvent.data,
+          createdAt: '2022-12-08 00:00:00Z',
           code: myEvent.eventName
         }
       });
