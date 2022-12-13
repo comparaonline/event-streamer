@@ -1,5 +1,6 @@
 pipeline {
-  agent { node { label "jenkins-gcp-c2" } }
+  // agent { node { label "jenkins-gcp-c2" } }
+  agent any
   options {
     timeout(time: 30, unit: 'MINUTES')
   }
@@ -27,13 +28,12 @@ pipeline {
         }
       }
     }
-    stage('Test') {
-      steps {
-          sh 'docker-compose build --force --no-cache'
-//          sh 'docker-compose start kafkas'
-          sh 'docker-compose -f docker-compose.yml run --rm app'
-      }
-    }
+//    stage('Test') {
+//      steps {
+//          sh 'docker-compose build --force --no-cache'
+//          sh 'docker-compose -f docker-compose.yml run --rm app'
+//      }
+//    }
     stage('Publish') {
       when {
         allOf {
