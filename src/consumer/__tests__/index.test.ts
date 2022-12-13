@@ -6,6 +6,7 @@ import { createTopic, handlerToCall, sendRawMessage, sleep } from '../../test/he
 import { stringToUpperCamelCase } from '../../helpers';
 import { Config, Strategy, Unlimited } from '../../interfaces';
 import MockDate from 'mockdate';
+import { KAFKA_HOST_9092 } from '../../test/constants';
 
 const TEST_TIMEOUT = 240000;
 
@@ -17,7 +18,7 @@ interface Params {
 
 function generateConfig(params: Params): Config {
   return {
-    host: 'kafka:9092',
+    host: KAFKA_HOST_9092,
     consumer: {
       groupId: 'my-group-id',
       ...params

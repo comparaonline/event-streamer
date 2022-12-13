@@ -3,6 +3,7 @@ import { clearEmittedEvents, closeAll, emit, getEmittedEvents, getParsedEmittedE
 import { setConfig } from '../../config';
 import { handlerToCall } from '../../test/helpers';
 import MockDate from 'mockdate';
+import { KAFKA_HOST_9092 } from '../../test/constants';
 
 const defaultTopic = 'topic-a';
 
@@ -10,8 +11,6 @@ const defaultBodyData = {
   firstName: 'John',
   lastName: 'Doe'
 };
-
-const KAFKA_HOST_9092 = 'kafka:9092';
 
 const CONNECTION_TTL = 2000;
 const TEST_TIMEOUT = 120000;
