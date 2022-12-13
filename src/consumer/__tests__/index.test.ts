@@ -70,6 +70,7 @@ describe('consumer', () => {
         expect(handler).toHaveBeenCalledWith(
           {
             ...someData,
+            appName: 'my-group-id',
             createdAt: '2022-12-08 00:00:00Z',
             code: stringToUpperCamelCase(topic)
           },

@@ -15,6 +15,7 @@ export type Strategy = 'topic' | 'one-by-one';
 
 export interface Config {
   host: string;
+  appName?: string;
   /** Only set this if you need change producer configuration */
   producer?: {
     /** Connection keep alive after send messages to reuse it. Default 5000 ms */
