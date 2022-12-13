@@ -29,6 +29,8 @@ pipeline {
     }
     stage('Test') {
       steps {
+          sh 'docker-compose build --force --no-cache'
+          sh 'docker-compose start kafkas'
           sh 'docker-compose -f docker-compose.yml run --rm app'
       }
     }
