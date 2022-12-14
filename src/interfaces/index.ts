@@ -15,6 +15,7 @@ export type Strategy = 'topic' | 'one-by-one';
 
 export interface Config {
   host: string;
+  appName?: string;
   /** Only set this if you need change producer configuration */
   producer?: {
     /** Connection keep alive after send messages to reuse it. Default 5000 ms */
@@ -43,11 +44,16 @@ export interface Config {
   onlyTesting?: boolean;
 }
 
+interface OutputData {
+  createdAt?: string;
+  [keys: string]: any;
+}
+
 export interface Output {
   topic: string;
   /** This should be UpperCamelCase, but if it is kebab case it will be converted */
   eventName?: string;
-  data: Object | Object[];
+  data: OutputData | OutputData[];
 }
 
 export interface Input {

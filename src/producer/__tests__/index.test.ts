@@ -2,15 +2,17 @@ import { CompressionTypes, Partitioners } from 'kafkajs';
 import { clearEmittedEvents, closeAll, emit, getEmittedEvents, getParsedEmittedEvents, getProducer } from '..';
 import { setConfig } from '../../config';
 import { handlerToCall } from '../../test/helpers';
+import MockDate from 'mockdate';
+import { KAFKA_HOST_9092 } from '../../test/constants';
 
 const defaultTopic = 'topic-a';
+const appName = 'event-streamer';
+const defaultDate = '2022-12-08 00:00:00Z';
 
 const defaultBodyData = {
   firstName: 'John',
   lastName: 'Doe'
 };
-
-const KAFKA_HOST_9092 = 'kafka:9092';
 
 const CONNECTION_TTL = 2000;
 const TEST_TIMEOUT = 120000;
@@ -20,10 +22,12 @@ describe('producer', () => {
     beforeEach(() => {
       setConfig({
         host: KAFKA_HOST_9092,
+        appName,
         producer: {
           connectionTTL: CONNECTION_TTL
         }
       });
+      MockDate.set('2022-12-08T00:00:00.000Z');
     });
     it(
       'Should emit a single event with different topic and code',
@@ -34,11 +38,17 @@ describe('producer', () => {
         const disconnectSpy = jest.spyOn(producer, 'disconnect');
 
         const eventName = 'EventCode';
+        const testDate = '2022-12-09 00:00:00Z';
+        const testAppName = 'tests';
 
         // act
         const response = await emit({
           topic: defaultTopic,
-          data: defaultBodyData,
+          data: {
+            ...defaultBodyData,
+            createdAt: testDate,
+            appName: testAppName
+          },
           eventName
         });
 
@@ -51,6 +61,8 @@ describe('producer', () => {
             {
               value: JSON.stringify({
                 ...defaultBodyData,
+                createdAt: testDate,
+                appName: testAppName,
                 code: eventName
               })
             }
@@ -94,6 +106,8 @@ describe('producer', () => {
             {
               value: JSON.stringify({
                 ...defaultBodyData,
+                createdAt: defaultDate,
+                appName,
                 code: eventName
               })
             }
@@ -140,6 +154,8 @@ describe('producer', () => {
               value: JSON.stringify({
                 ...defaultBodyData,
                 id: 1,
+                createdAt: defaultDate,
+                appName,
                 code: eventName
               })
             },
@@ -147,6 +163,8 @@ describe('producer', () => {
               value: JSON.stringify({
                 ...defaultBodyData,
                 id: 2,
+                createdAt: defaultDate,
+                appName,
                 code: eventName
               })
             }
@@ -192,6 +210,8 @@ describe('producer', () => {
             {
               value: JSON.stringify({
                 id: 'topic-a-1',
+                createdAt: defaultDate,
+                appName,
                 code: 'EventNameA'
               })
             }
@@ -205,6 +225,8 @@ describe('producer', () => {
             {
               value: JSON.stringify({
                 id: 'topic-b-1',
+                createdAt: defaultDate,
+                appName,
                 code: 'EventNameB'
               })
             }
@@ -238,6 +260,8 @@ describe('producer', () => {
             {
               value: JSON.stringify({
                 id: 'topic-a-1',
+                createdAt: defaultDate,
+                appName,
                 code: 'TopicA'
               })
             }
@@ -276,12 +300,16 @@ describe('producer', () => {
             {
               value: JSON.stringify({
                 id: 'topic-a-1',
+                createdAt: defaultDate,
+                appName,
                 code: 'TopicA'
               })
             },
             {
               value: JSON.stringify({
                 id: 'topic-a-2',
+                createdAt: defaultDate,
+                appName,
                 code: 'TopicA'
               })
             }
@@ -315,6 +343,8 @@ describe('producer', () => {
             {
               value: JSON.stringify({
                 id: 'topic-a-1',
+                createdAt: defaultDate,
+                appName,
                 code: 'EventNameA'
               })
             }
@@ -360,12 +390,16 @@ describe('producer', () => {
             {
               value: JSON.stringify({
                 id: 'topic-a-1',
+                createdAt: defaultDate,
+                appName: 'unknown',
                 code: 'EventNameA'
               })
             },
             {
               value: JSON.stringify({
                 id: 'topic-a-2',
+                createdAt: defaultDate,
+                appName: 'unknown',
                 code: 'EventNameA'
               })
             }
@@ -403,6 +437,8 @@ describe('producer', () => {
             {
               value: JSON.stringify({
                 id: 'topic-a-1',
+                createdAt: defaultDate,
+                appName,
                 code: 'EventNameA'
               })
             }
@@ -431,7 +467,7 @@ describe('producer', () => {
       });
     });
     it('Should throw an exception because data must be and object - string sended', async () => {
-      await expect(emit({ data: 'my-data', topic: 'topic' })).rejects.toThrowError('Data must be an object');
+      await expect(emit({ data: 'my-data' as unknown as any, topic: 'topic' })).rejects.toThrowError('Data must be an object');
     });
 
     it('Should throw an exception because data must be and object - null sended', async () => {
@@ -516,6 +552,8 @@ describe('producer', () => {
           {
             value: JSON.stringify({
               ...myEvent.data,
+              createdAt: defaultDate,
+              appName: 'unknown',
               code: myEvent.eventName
             })
           }
@@ -528,6 +566,7 @@ describe('producer', () => {
 
     it('should get each emitted message parsed and separated', async () => {
       // arrange
+      clearEmittedEvents();
       const myEvent = {
         topic: 'test',
         data: {
@@ -546,6 +585,8 @@ describe('producer', () => {
         eventName: 'MyEvent',
         data: {
           ...myEvent.data,
+          createdAt: defaultDate,
+          appName: 'unknown',
           code: myEvent.eventName
         }
       });

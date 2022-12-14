@@ -19,12 +19,14 @@ interface ParsedPayload {
   data: Object;
 }
 
-function normalizePayloads(payloads: Output[]): Payload[] {
+function normalizePayloads(payloads: Output[], appName: string): Payload[] {
   return payloads.map(({ topic, data, eventName }: Output) => ({
     topic,
     messages: toArray(data).map((message) => ({
       value: JSON.stringify({
         ...message,
+        createdAt: message.createdAt ?? new Date().toISOString().replace('T', ' ').slice(0, 19) + 'Z',
+        appName: message.appName ?? appName,
         code: stringToUpperCamelCase(eventName ?? topic)
       })
     }))
@@ -122,6 +124,8 @@ export async function emit(output: Output | Output[], overwriteHosts?: string | 
 export async function emit(param1: string | Output | Output[], param2?: any, param3?: any): Promise<EmitResponse[]> {
   const config = getConfig();
 
+  const appName = config.appName ?? config.consumer?.groupId ?? 'unknown';
+
   function getParameters(): { output: Output | Output[]; overwriteHosts?: string | string[] } {
     if (typeof param1 === 'object') {
       return {
@@ -159,7 +163,7 @@ export async function emit(param1: string | Output | Output[], param2?: any, par
   }
 
   if (config.onlyTesting === true) {
-    onlyTestingEmittedEvents.push(...normalizePayloads(payloads));
+    onlyTestingEmittedEvents.push(...normalizePayloads(payloads, appName));
     return Promise.resolve([]);
   } else {
     const hosts = getHosts(config.host, config.producer?.additionalHosts, overwriteHosts);
@@ -168,7 +172,7 @@ export async function emit(param1: string | Output | Output[], param2?: any, par
       hosts.map(async (host): Promise<EmitResponse> => {
         const producer = await getProducer(host);
         let result: RecordMetadata[] = [];
-        for (const payload of normalizePayloads(payloads)) {
+        for (const payload of normalizePayloads(payloads, appName)) {
           result = await producer.send({
             topic: payload.topic,
             messages: payload.messages,
