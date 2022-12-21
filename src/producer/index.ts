@@ -33,6 +33,13 @@ function normalizePayloads(payloads: Output[], appName: string): Payload[] {
   }));
 }
 
+function getProcessHostname(): string | void {
+  if (process.env.HOSTNAME != null && process.env.HOSTNAME.trim() !== '') {
+    const hostname = process.env.HOSTNAME.split('-');
+    return hostname.length <= 2 ? hostname.join('-') : hostname.splice(0, hostname.length - 2).join('-');
+  }
+}
+
 let onlyTestingEmittedEvents: Payload[] = [];
 
 export function getEmittedEvents(): Payload[] {
@@ -124,7 +131,7 @@ export async function emit(output: Output | Output[], overwriteHosts?: string | 
 export async function emit(param1: string | Output | Output[], param2?: any, param3?: any): Promise<EmitResponse[]> {
   const config = getConfig();
 
-  const appName = config.appName ?? config.consumer?.groupId ?? 'unknown';
+  const appName = config.appName ?? config.consumer?.groupId ?? getProcessHostname() ?? 'unknown';
 
   function getParameters(): { output: Output | Output[]; overwriteHosts?: string | string[] } {
     if (typeof param1 === 'object') {
