@@ -391,7 +391,7 @@ describe('producer', () => {
               value: JSON.stringify({
                 id: 'topic-a-1',
                 createdAt: defaultDate,
-                appName: 'unknown',
+                appName,
                 code: 'EventNameA'
               })
             },
@@ -399,7 +399,7 @@ describe('producer', () => {
               value: JSON.stringify({
                 id: 'topic-a-2',
                 createdAt: defaultDate,
-                appName: 'unknown',
+                appName,
                 code: 'EventNameA'
               })
             }
@@ -540,6 +540,8 @@ describe('producer', () => {
         },
         eventName: 'MyEvent'
       };
+      const previousHostname = process.env.HOSTNAME;
+      process.env.HOSTNAME = 'my-service-name-abcd-1234';
       // act
       await emit(myEvent);
 
@@ -553,7 +555,7 @@ describe('producer', () => {
             value: JSON.stringify({
               ...myEvent.data,
               createdAt: defaultDate,
-              appName: 'unknown',
+              appName: 'my-service-name',
               code: myEvent.eventName
             })
           }
@@ -562,6 +564,7 @@ describe('producer', () => {
       clearEmittedEvents();
       emittedEvents = getEmittedEvents();
       expect(emittedEvents.length).toBe(0);
+      process.env.HOSTNAME = previousHostname;
     });
 
     it('should get each emitted message parsed and separated', async () => {
@@ -574,6 +577,8 @@ describe('producer', () => {
         },
         eventName: 'MyEvent'
       };
+      const previousHostname = process.env.HOSTNAME;
+      delete process.env.HOSTNAME;
       // act
       await emit(myEvent);
 
@@ -593,6 +598,7 @@ describe('producer', () => {
       clearEmittedEvents();
       emittedEvents = getParsedEmittedEvents();
       expect(emittedEvents.length).toBe(0);
+      process.env.HOSTNAME = previousHostname;
     });
   });
 
