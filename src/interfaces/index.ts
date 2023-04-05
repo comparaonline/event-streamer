@@ -60,7 +60,7 @@ export interface Input {
   code?: string;
 }
 
-export type Callback<T extends Input> = (input: T, emit: (message: Output) => Promise<any>) => void;
+export type Callback<T extends Input> = (input: T, emit: (message: Output) => Promise<any>) => Promise<void> | void;
 
 export interface Route {
   topic: string;
