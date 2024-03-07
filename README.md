@@ -89,7 +89,20 @@ If a subject is not provided then the topic will be transformed to UpperCamelCas
 ### Producing
 
 Event streamer will create and close kafka client on demand to avoid keeping open connections, this connection will be reused until TTL is reached (TTL is renewed after each execution).
-Produced events will be delivered the `data` object into a single topic as JSON string with the corresponding subject.
+Produced events will be delivered the `data` object into a single topic as JSON string with the corresponding subject. It will also add `appName` and `createdAt` properties
+
+#### App name
+
+`appName` is a first-level property with sender name. `event-streamer` has this options to set appName
+1. Sending `appName` property on messages
+2. Perform `event-streamer` initialization with `appName` property
+3. Read `consumerGroupId` from `event-streamer` initialization and use it as `appName`
+4. Read `process.env.HOSTNAME`. This is automatically setup on K8S deployment
+5. Set `unknown` string
+
+#### Message date
+
+every message should have a property `createdAt`, it is message creation date on ISO UTC format. `event-streamer` add this property automatically
 
 #### Single event
 
@@ -105,7 +118,7 @@ async function main () {
     data: { firstName: 'John' }
   })
   
-  // Topic: my-topic Message: { "firstName": "John", "code": "MyEventName" }
+  // Topic: my-topic Message: { "firstName": "John", "code": "MyEventName", "createdAt": "2024-03-07 18:41:54Z", "appName": "test" }
 
 }
 ```
@@ -117,10 +130,10 @@ import { emit } from '@comparaonline/event-streamer'
 
 async function main () {
   await emit('my-topic', 'my-event-name', { firstName: 'John' })
-  // Topic: my-topic Message: { "firstName": "John", "code": "MyEventName" }
+  // Topic: my-topic Message: { "firstName": "John", "code": "MyEventName", "createdAt": "2024-03-07 18:41:54Z", "appName": "test" }
 
   await emit('my-topic', { firstName: 'John' })
-  // Topic: my-topic Message: { "firstName": "John", "code": "MyTopic" }
+  // Topic: my-topic Message: { "firstName": "John", "code": "MyTopic", "createdAt": "2024-03-07 18:41:54Z", "appName": "test" }
 }
 ```
 
@@ -136,8 +149,8 @@ async function main () {
     data: [{ firstName: 'John' }, { firstName: 'Jane' }]
   })
   
-  // Topic: my-topic Message: { "firstName": "John", "code": "MyEventName" }
-  // Topic: my-topic Message: { "firstName": "Jane", "code": "MyEventName" }
+  // Topic: my-topic Message: { "firstName": "John", "code": "MyEventName", "createdAt": "2024-03-07 18:41:54Z", "appName": "test" }
+  // Topic: my-topic Message: { "firstName": "Jane", "code": "MyEventName", "createdAt": "2024-03-07 18:41:54Z", "appName": "test" }
 
 }
 ```
@@ -163,8 +176,8 @@ async function main () {
     ]
   )
   
-  // Topic: my-topic-a Message: { "firstName": "John", "code": "MyEventName" }
-  // Topic: my-topic-b Message: { "firstName": "Jane", "code": "MyEventName" }
+  // Topic: my-topic-a Message: { "firstName": "John", "code": "MyEventName", "createdAt": "2024-03-07 18:41:54Z", "appName": "test" }
+  // Topic: my-topic-b Message: { "firstName": "Jane", "code": "MyEventName", "createdAt": "2024-03-07 18:41:54Z", "appName": "test" }
 }
 ```
 
@@ -179,7 +192,7 @@ async function main () {
     data: { firstName: 'John' }
   })
   
-  // Topic: my-topic Message: { "firstName": "John", "code": "MyTopic" }
+  // Topic: my-topic Message: { "firstName": "John", "code": "MyTopic", "createdAt": "2024-03-07 18:41:54Z", "appName": "test" }
 }
 ```
 
