@@ -74,7 +74,13 @@ export class ConsumerRouter {
         .map((route) => {
           debug(Debug.TRACE, 'Message received on route', route);
           try {
-            return route.callback(content, emit);
+            return Promise.resolve(route.callback(content, emit))
+              .then((value) => {
+                return value;
+              })
+              .catch((e) => {
+                debug(Debug.ERROR, e);
+              });
           } catch (e) {
             /* istanbul ignore next */
             debug(Debug.ERROR, e);

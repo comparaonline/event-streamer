@@ -1,6 +1,6 @@
 {
   "name": "@comparaonline/event-streamer",
-  "version": "8.2.5",
+  "version": "8.2.6",
   "description": "Simple event-streaming framework",
   "repository": "comparaonline/event-streamer",
   "author": {
@@ -53,6 +53,7 @@
     "jest": "^27.3.1",
     "mockdate": "^3.0.5",
     "nock-utils": "^0.2.1",
+    "nodemon": "^3.0.2",
     "prettier": "^2.4.1",
     "ts-jest": "^27.0.7",
     "ts-node": "^10.4.0",
