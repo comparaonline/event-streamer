@@ -27,6 +27,8 @@ export interface Config {
     /** EXPERIMENTAL: default false */
     idempotent?: boolean;
     partitioners?: DefaultPartitioner | LegacyPartitioner;
+    /** Enable Schema Registry for new events. Default: false */
+    useSchemaRegistry?: boolean;
   };
   /** This is required if you want to create a consumer */
   consumer?: {
@@ -37,6 +39,14 @@ export interface Config {
     maxMessagesPerTopic?: number | Unlimited;
     /** Object with topic-name as key and number of messages to be processed as value */
     maxMessagesPerSpecificTopic?: Record<string, number | Unlimited>;
+  };
+  /** Schema Registry configuration - services provide credentials */
+  schemaRegistry?: {
+    url: string;
+    auth?: {
+      username: string;
+      password: string;
+    };
   };
   debug?: false | Debug;
   kafkaJSLogs?: logLevel;

@@ -1,1 +1,1 @@
-export const KAFKA_HOST_9092 = 'kafka:9092';
+export const KAFKA_HOST_9092 = 'localhost:9092';

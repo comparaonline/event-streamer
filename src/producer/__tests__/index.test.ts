@@ -363,6 +363,7 @@ describe('producer', () => {
         // arrange
         setConfig({
           host: KAFKA_HOST_9092,
+          appName,
           producer: {
             connectionTTL: CONNECTION_TTL,
             compressionType: CompressionTypes.GZIP
