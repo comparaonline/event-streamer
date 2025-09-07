@@ -16,13 +16,20 @@
   "keywords": [
     "comparaonline",
     "microservice",
-    "kafka"
+    "kafka",
+    "schema-registry",
+    "confluent",
+    "zod",
+    "events"
   ],
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "files": [
     "build"
   ],
+  "bin": {
+    "event-streamer-cli": "build/cli/index.js"
+  },
   "private": false,
   "publishConfig": {
     "access": "public"
@@ -31,12 +38,26 @@
     "build": "tsc",
     "lint": "eslint src --fix",
     "test": "jest --runInBand --forceExit",
+    "test:unit": "jest src --testPathPattern='(__tests__|test)' --testNamePattern='unit|Unit' --runInBand --forceExit",
+    "test:integration": "jest src --testPathPattern='(__tests__|test)' --testNamePattern='integration|Integration' --runInBand --forceExit",
+    "test:schema-registry": "jest src/test/schema-registry --runInBand --forceExit",
     "pretest": "yarn lint",
     "test-consumer": "ts-node src/local-tests/consumer.ts",
-    "test-producer": "ts-node src/local-tests/producer.ts"
+    "test-producer": "ts-node src/local-tests/producer.ts",
+    "docker:up": "docker-compose up -d --wait",
+    "docker:down": "docker-compose down",
+    "docker:test": "docker-compose up -d --wait && npm run test && docker-compose down",
+    "cli:publish": "node build/cli/index.js publish",
+    "cli:validate": "node build/cli/index.js validate",
+    "cli:init": "node build/cli/index.js init"
   },
   "dependencies": {
-    "kafkajs": "^2.1.0"
+    "kafkajs": "^2.1.0",
+    "@kafkajs/confluent-schema-registry": "^3.3.0",
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.23.2",
+    "commander": "^11.1.0",
+    "ajv": "^7.2.1"
   },
   "devDependencies": {
     "@comparaonline/test-helpers": "^1.1.0",

@@ -19,5 +19,13 @@
     "inlineSourceMap": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
-  }
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "build",
+    "node_modules",
+    "examples"
+  ]
 }
