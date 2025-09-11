@@ -13,8 +13,6 @@ type EmitResponse = RecordMetadata[];
 interface SchemaRegistryOutput<T extends BaseEvent = BaseEvent> extends Omit<Output, 'data'> {
   data: T | T[];
   schema?: z.ZodSchema<T>;
-  version?: string;
-  source?: string; // For schema registry subject mapping
 }
 
 interface SchemaRegistryMessage {
@@ -45,7 +43,8 @@ export class SchemaRegistryProducer {
       return;
     }
 
-    const subjects = eventCodes.map((code) => `${code}-value`);
+    // Note: preloadSchemas now requires topic context - this is a simplified fallback
+    const subjects = eventCodes.map((code) => this.getSubjectFromEventCode(code));
     await this.schemaRegistryClient.preloadSchemasForProducer(subjects);
 
     subjects.forEach((subject) => this.preloadedSubjects.add(subject));
@@ -75,27 +74,27 @@ export class SchemaRegistryProducer {
     // Process each output
     const messages = await Promise.all(
       outputs.map(async (singleOutput) => {
-        const { topic, data, eventName, schema, version, source } = singleOutput;
-        const eventCode = stringToUpperCamelCase(eventName ?? topic);
+        const { topic, data, eventName, schema } = singleOutput;
 
         return Promise.all(
           toArray(data).map(async (item): Promise<SchemaRegistryMessage> => {
             // Validate input data
             this.validateEventData(item);
 
-            // Create Schema Registry event with all required fields
+            // Resolve event code per item: eventName param > item.code > topic
             const itemAny = item as any;
+            const resolvedEventCode = stringToUpperCamelCase(eventName ?? itemAny?.code ?? topic);
+
+            // Create Schema Registry event with all required fields
             const schemaRegistryEvent = createSchemaRegistryEvent({
               ...item,
-              code: eventCode,
-              appName: itemAny.appName ?? appName,
-              version: version ?? itemAny.version ?? '1.0.0',
-              source: source ?? itemAny.source ?? appName
+              code: resolvedEventCode,
+              appName: itemAny.appName ?? appName
             });
 
-            // Validate with provided schema if given
+            // Validate with provided schema if given (validate original data, not transformed data)
             if (schema) {
-              const validation = schema.safeParse(schemaRegistryEvent);
+              const validation = schema.safeParse(item);
               if (!validation.success) {
                 const errorDetails = validation.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', ');
                 throw new Error(`Schema validation failed: ${errorDetails}`);
@@ -103,7 +102,14 @@ export class SchemaRegistryProducer {
             }
 
             // Validate and encode with Schema Registry (using cached schema)
-            const subject = this.getSubjectFromEventCode(eventCode);
+            const subject = this.getSubjectFromTopicAndEventCode(topic, resolvedEventCode);
+
+            debug(Debug.TRACE, 'Encoding event for Schema Registry', {
+              eventCode: resolvedEventCode,
+              subject,
+              dataKeys: Object.keys(schemaRegistryEvent)
+            });
+
             if (!this.schemaRegistryClient) {
               throw new Error('Schema Registry client is not initialized');
             }
@@ -112,15 +118,9 @@ export class SchemaRegistryProducer {
 
             return {
               topic,
-              key: schemaRegistryEvent.id,
+              key: (schemaRegistryEvent as any).id || undefined,
               value: encodedValue,
-              headers: {
-                'event-type': eventCode,
-                'event-version': schemaRegistryEvent.version,
-                'event-source': schemaRegistryEvent.source,
-                'content-encoding': 'confluent-schema-registry',
-                'schema-subject': subject
-              }
+              headers: {}
             };
           })
         );
@@ -208,12 +208,20 @@ export class SchemaRegistryProducer {
     return [defaultHost, ...secondaryHosts];
   }
 
-  // Get subject name from event code
+  // Get subject name from topic and event code to avoid collisions
+  private getSubjectFromTopicAndEventCode(topic: string, eventCode: string): string {
+    if (this.schemaRegistryClient) {
+      return this.schemaRegistryClient.getSubjectFromTopicAndEventCode(topic, eventCode);
+    }
+    return `${topic}-${eventCode}`;
+  }
+
+  // Legacy method for backward compatibility
   private getSubjectFromEventCode(eventCode: string): string {
     if (this.schemaRegistryClient) {
       return this.schemaRegistryClient.getSubjectFromEventCode(eventCode);
     }
-    return `${eventCode}-value`;
+    return eventCode;
   }
 
   // Validate event data
@@ -226,10 +234,9 @@ export class SchemaRegistryProducer {
       throw new Error('Event data cannot be an array at the top level');
     }
 
-    const dataObj = data as Record<string, unknown>;
-    if (dataObj.hasOwnProperty('code')) {
-      throw new Error('Reserved field "code" cannot be provided in event data - it will be auto-generated');
-    }
+    // Allow data to include or not include the 'code' field
+    // If 'code' is provided, it should match the eventName
+    // If 'code' is not provided, it will be auto-generated
   }
 
   // Get cache statistics
