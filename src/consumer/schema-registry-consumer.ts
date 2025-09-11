@@ -3,9 +3,12 @@ import { Consumer, Kafka } from 'kafkajs';
 import { SchemaRegistryClient } from '../schema-registry/client';
 import { getConfig } from '../config';
 import { debug, getParsedJson } from '../helpers';
-import { Debug } from '../interfaces';
+import { Debug, Strategy } from '../interfaces';
 import { BaseEvent, EventHandler, EventMetadata } from '../schemas';
 import { Input, Config } from '../interfaces';
+import { QueueManager, QueueConfig } from '../shared/queue-manager';
+import { ErrorHandler, ErrorStrategy, ErrorHandlerConfig } from '../shared/error-handler';
+import { getProducer } from '../producer/legacy-producer';
 
 interface SchemaRegistryRoute<T extends BaseEvent = BaseEvent> {
   topic: string | string[];
@@ -15,17 +18,44 @@ interface SchemaRegistryRoute<T extends BaseEvent = BaseEvent> {
   validateWithRegistry?: boolean; // Whether to validate against Schema Registry schemas
 }
 
+export interface SchemaRegistryConsumerConfig {
+  errorStrategy?: ErrorStrategy;
+  deadLetterTopic?: string;
+  maxRetries?: number;
+  strategy?: Strategy;
+  maxMessagesPerTopic?: number | 'unlimited';
+  maxMessagesPerSpecificTopic?: Record<string, number | 'unlimited'>;
+}
+
 export class SchemaRegistryConsumerRouter {
   private schemaRegistryClient?: SchemaRegistryClient;
   private schemaRoutes: SchemaRegistryRoute<any>[] = [];
   private consumer: Consumer | null = null;
+  private queueManager?: QueueManager;
+  private errorHandler?: ErrorHandler;
+  private consumerConfig: SchemaRegistryConsumerConfig;
 
-  constructor() {
+  constructor(consumerConfig: SchemaRegistryConsumerConfig = {}) {
     const config = getConfig() as Config;
+    this.consumerConfig = consumerConfig;
 
     if (config.schemaRegistry) {
       this.schemaRegistryClient = new SchemaRegistryClient(config.schemaRegistry);
       debug(Debug.INFO, 'Schema Registry consumer initialized with validation caching');
+    }
+
+    // Initialize error handler if strategy is provided
+    if (consumerConfig.errorStrategy) {
+      const errorConfig: ErrorHandlerConfig = {
+        strategy: consumerConfig.errorStrategy,
+        deadLetterTopic: consumerConfig.deadLetterTopic,
+        maxRetries: consumerConfig.maxRetries || 3,
+        appName: config.appName || config.consumer?.groupId || 'unknown',
+        consumerGroupId: config.consumer?.groupId || 'unknown'
+      };
+
+      this.errorHandler = new ErrorHandler(errorConfig);
+      debug(Debug.INFO, 'Error handler initialized', errorConfig);
     }
   }
 
@@ -122,6 +152,19 @@ export class SchemaRegistryConsumerRouter {
 
     const topics = Array.from(allTopics);
 
+    // Initialize queue manager for parallel processing (topic strategy)
+    const strategy = this.consumerConfig.strategy || config.consumer?.strategy || 'topic';
+    if (strategy === 'topic') {
+      const queueConfig: QueueConfig = {
+        maxMessagesPerTopic: this.consumerConfig.maxMessagesPerTopic || config.consumer?.maxMessagesPerTopic || 10,
+        maxMessagesPerSpecificTopic: this.consumerConfig.maxMessagesPerSpecificTopic || config.consumer?.maxMessagesPerSpecificTopic
+      };
+
+      this.queueManager = new QueueManager(queueConfig);
+      this.queueManager.initializeQueues(topics);
+      debug(Debug.INFO, 'Queue manager initialized for parallel processing', queueConfig);
+    }
+
     // Initialize Kafka consumer
     const kafka = new Kafka({
       brokers: kafkaHost.split(','),
@@ -132,19 +175,42 @@ export class SchemaRegistryConsumerRouter {
     await this.consumer.connect();
     debug(Debug.INFO, 'Schema Registry consumer connected');
 
+    // Set consumer in queue manager for pause/resume functionality
+    if (this.queueManager) {
+      this.queueManager.setConsumer(this.consumer);
+    }
+
     await this.consumer.subscribe({ topics });
+
+    const processingStrategy = this.consumerConfig.strategy || config.consumer?.strategy || 'topic';
 
     await this.consumer.run({
       eachMessage: async ({ topic, message, partition }) => {
-        try {
-          await this.processSchemaRegistryMessage(topic, message, partition);
-        } catch (error) {
-          debug(Debug.ERROR, 'Error processing message', { topic, partition, error });
+        if (processingStrategy === 'one-by-one') {
+          try {
+            await this.processSchemaRegistryMessage(topic, message, partition);
+          } catch (error) {
+            await this.handleProcessingError(error as Error, topic, message, partition);
+          }
+        } else {
+          // Topic-based parallel processing with queue management
+          const processingPromise = this.processSchemaRegistryMessage(topic, message, partition).catch((error) =>
+            this.handleProcessingError(error as Error, topic, message, partition)
+          );
+
+          if (this.queueManager) {
+            this.queueManager.addToQueue(topic, processingPromise);
+          }
         }
       }
     });
 
-    debug(Debug.INFO, 'Schema Registry consumer started with enhanced validation', { topics });
+    debug(Debug.INFO, 'Schema Registry consumer started with enhanced validation', {
+      topics,
+      strategy: processingStrategy,
+      errorStrategy: this.consumerConfig.errorStrategy || 'none',
+      hasQueueManager: !!this.queueManager
+    });
   }
 
   private async processSchemaRegistryMessage(topic: string, message: any, partition: number): Promise<void> {
@@ -227,32 +293,106 @@ export class SchemaRegistryConsumerRouter {
 
     // Process each matching route
     for (const route of matchingRoutes) {
-      try {
-        // Additional Zod validation if schema provided
-        if (route.schema) {
-          const validation = route.schema.safeParse(parsedEvent);
-          if (!validation.success) {
-            debug(Debug.ERROR, 'Route schema validation failed', {
-              topic,
-              eventName: parsedEvent.code,
-              errors: validation.error.issues
-            });
-            continue;
-          }
+      // Additional Zod validation if schema provided
+      if (route.schema) {
+        const validation = route.schema.safeParse(parsedEvent);
+        if (!validation.success) {
+          const validationError = new Error(
+            `Route schema validation failed: ${validation.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ')}`
+          );
+          throw validationError;
         }
+      }
 
-        await route.callback(parsedEvent as any, metadata);
-      } catch (error) {
-        debug(Debug.ERROR, 'Route handler error', {
-          topic,
-          eventName: parsedEvent.code,
-          error
+      await route.callback(parsedEvent as any, metadata);
+    }
+  }
+
+  /**
+   * Handle processing errors using configured error strategy
+   */
+  private async handleProcessingError(error: Error, topic: string, message: any, partition: number): Promise<void> {
+    if (!this.errorHandler) {
+      // No error handler configured, use legacy behavior (log and continue)
+      debug(Debug.ERROR, 'Message processing error (no error handler)', {
+        topic,
+        partition,
+        offset: message.offset,
+        error: error.message
+      });
+      return;
+    }
+
+    // Extract event code if possible
+    let originalCode = 'UnknownEvent';
+    let originalPayload = message.value;
+
+    try {
+      if (SchemaRegistryClient.isSchemaRegistryEncoded(message.value)) {
+        // For Schema Registry messages, we can't easily extract the code without decoding
+        // Use topic name as fallback
+        originalCode = topic;
+      } else {
+        // For JSON messages, try to extract the code
+        const parsed = getParsedJson<Input>(message.value);
+        if (parsed?.code) {
+          originalCode = parsed.code;
+        }
+        originalPayload = parsed;
+      }
+    } catch {
+      // If we can't parse, use topic name
+      originalCode = topic;
+    }
+
+    const context = {
+      topic,
+      partition,
+      offset: message.offset,
+      timestamp: message.timestamp,
+      originalCode,
+      originalPayload,
+      retryCount: 0 // TODO: Implement retry tracking if needed
+    };
+
+    const result = this.errorHandler.handleError(error, context);
+
+    // If we have a DLQ event, send it to the dead letter topic
+    if (result.deadLetterEvent && this.consumerConfig.deadLetterTopic) {
+      try {
+        const config = getConfig();
+        const producer = await getProducer(config.host);
+        await producer.send({
+          topic: this.consumerConfig.deadLetterTopic,
+          messages: [
+            {
+              value: JSON.stringify(result.deadLetterEvent)
+            }
+          ]
+        });
+
+        debug(Debug.INFO, 'Sent message to dead letter queue', {
+          originalTopic: topic,
+          originalOffset: message.offset,
+          deadLetterTopic: this.consumerConfig.deadLetterTopic
+        });
+      } catch (dlqError) {
+        debug(Debug.ERROR, 'Failed to send message to dead letter queue', {
+          originalTopic: topic,
+          originalOffset: message.offset,
+          dlqError
         });
       }
     }
   }
 
   async stop(): Promise<void> {
+    // Wait for all queued messages to complete if using parallel processing
+    if (this.queueManager) {
+      debug(Debug.INFO, 'Waiting for message queues to complete...');
+      await this.queueManager.waitForAllQueues();
+    }
+
     if (this.consumer != null) {
       await this.consumer.disconnect();
     }
@@ -264,5 +404,13 @@ export class SchemaRegistryConsumerRouter {
 
   clearCaches(): void {
     this.schemaRegistryClient?.clearCaches();
+  }
+
+  getQueueStats(): any {
+    return this.queueManager?.getQueueStats() || {};
+  }
+
+  getErrorHandlerConfig(): any {
+    return this.errorHandler?.getConfig();
   }
 }

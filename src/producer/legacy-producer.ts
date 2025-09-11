@@ -4,6 +4,13 @@ import { Debug, Output } from '../interfaces';
 import { debug, stringToUpperCamelCase, toArray, validateTestingConfig } from '../helpers';
 import { DEFAULT_CONFIG } from '../constants';
 
+function warnDeprecation(message: string): void {
+  const config = getConfig();
+  if (config.showDeprecationWarnings) {
+    console.warn(`[DEPRECATION WARNING] ${message}`);
+  }
+}
+
 type EmitResponse = RecordMetadata[];
 
 interface Payload {
@@ -125,10 +132,40 @@ export function closeAll(): void {
   }
 }
 
+/**
+ * @deprecated Use SchemaRegistryProducer.emitWithSchema() instead for type safety and Schema Registry support.
+ *
+ * Legacy emit function that sends JSON messages without schema validation.
+ * This function will be removed in a future major version.
+ *
+ * Migration guide:
+ * ```typescript
+ * // Old way
+ * import { emit } from '@comparaonline/event-streamer';
+ * await emit('my-topic', 'MyEvent', data);
+ *
+ * // New way
+ * import { SchemaRegistryProducer } from '@comparaonline/event-streamer';
+ * const producer = new SchemaRegistryProducer();
+ * await producer.emitWithSchema({
+ *   topic: 'my-topic',
+ *   eventName: 'MyEvent',
+ *   data,
+ *   schema: MyEventSchema
+ * });
+ * ```
+ */
 export async function emit(topic: string, data: Object | Object[]): Promise<EmitResponse[]>;
+/**
+ * @deprecated Use SchemaRegistryProducer.emitWithSchema() instead for type safety and Schema Registry support.
+ */
 export async function emit(topic: string, eventName: string, data: Object | Object[]): Promise<EmitResponse[]>;
+/**
+ * @deprecated Use SchemaRegistryProducer.emitWithSchema() instead for type safety and Schema Registry support.
+ */
 export async function emit(output: Output | Output[], overwriteHosts?: string | string[]): Promise<EmitResponse[]>;
 export async function emit(param1: string | Output | Output[], param2?: any, param3?: any): Promise<EmitResponse[]> {
+  warnDeprecation('emit() is deprecated. Use SchemaRegistryProducer.emitWithSchema() for type safety and Schema Registry support.');
   const config = getConfig();
 
   const appName = config.appName ?? config.consumer?.groupId ?? getProcessHostname() ?? 'unknown';

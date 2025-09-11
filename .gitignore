@@ -5,3 +5,6 @@ build
 .vscode
 .editorconfig
 .idea/*
+.claude
+CLAUDE.md
+examples
