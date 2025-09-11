@@ -105,34 +105,34 @@ describe('Schema Validation', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should require source field', () => {
+    it('should not require source field (removed redundant field)', () => {
       const event = {
         id: randomUUID(),
         createdAt: '2023-01-01 12:00:00Z',
         appName: 'test-service',
         code: 'TestEvent'
-        // missing source
+        // source field no longer exists
       };
 
       const result = SchemaRegistryEventSchema.safeParse(event);
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
     });
 
-    it('should provide default version', () => {
+    it('should validate schema registry events properly', () => {
       const event = {
         id: randomUUID(),
         createdAt: '2023-01-01 12:00:00Z',
         appName: 'test-service',
-        code: 'TestEvent',
-        source: 'test-service'
-        // no version specified
+        code: 'TestEvent'
+        // no source field needed anymore
       };
 
       const result = SchemaRegistryEventSchema.safeParse(event);
       expect(result.success).toBe(true);
 
       if (result.success) {
-        expect(result.data.version).toBe('1.0.0');
+        expect(result.data.code).toBe('TestEvent');
+        expect(result.data.appName).toBe('test-service');
       }
     });
   });
@@ -223,31 +223,27 @@ describe('Schema Validation', () => {
       it('should create valid Schema Registry event with auto-generated fields', () => {
         const event = createSchemaRegistryEvent({
           code: 'TestEvent',
-          appName: 'test-service',
-          source: 'test-service',
-          version: '1.0.0'
+          appName: 'test-service'
         });
 
-        expect(event.id).toBeDefined();
         expect(event.createdAt).toBeDefined();
         expect(event.code).toBe('TestEvent');
         expect(event.appName).toBe('test-service');
-        expect(event.source).toBe('test-service');
-        expect(event.version).toBe('1.0.0'); // Default version
 
         const validation = SchemaRegistryEventSchema.safeParse(event);
         expect(validation.success).toBe(true);
       });
 
-      it('should override default version when provided', () => {
+      it('should preserve user-provided fields when present', () => {
         const event = createSchemaRegistryEvent({
           code: 'TestEvent',
           appName: 'test-service',
-          source: 'test-service',
-          version: '2.1.0'
-        });
+          customField: 'custom-value'
+        } as any);
 
-        expect(event.version).toBe('2.1.0');
+        expect(event.code).toBe('TestEvent');
+        expect(event.appName).toBe('test-service');
+        expect((event as any).customField).toBe('custom-value');
       });
     });
   });

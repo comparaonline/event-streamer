@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { randomUUID } from 'crypto';
 
 // Base event schema matching legacy producer/consumer exactly
 export const BaseEventSchema = z.object({
@@ -24,19 +23,10 @@ export const LegacyEventSchema = BaseEventSchema.passthrough();
 
 export type LegacyEvent = z.infer<typeof LegacyEventSchema>;
 
-// Schema Registry events extend base with additional metadata for registry
-export const SchemaRegistryEventSchema = BaseEventSchema.extend({
-  // Add unique identifier for Schema Registry events
-  id: z.string().uuid().describe('Unique event identifier'),
+// Schema Registry events are identical to base events (no additional fields needed)
+export const SchemaRegistryEventSchema = BaseEventSchema;
 
-  // Add version for schema evolution
-  version: z.string().default('1.0.0').describe('Event schema version'),
-
-  // Source service metadata (can be same as appName or different)
-  source: z.string().min(1).describe('Service name for schema registry subject mapping')
-});
-
-export type SchemaRegistryEvent = z.infer<typeof SchemaRegistryEventSchema>;
+export type SchemaRegistryEvent = BaseEvent;
 
 export interface EventMetadata {
   topic: string;
@@ -81,13 +71,10 @@ export function createBaseEvent(data: Omit<BaseEvent, 'createdAt'> & Partial<Pic
   };
 }
 
-// Factory function to create Schema Registry events
-export function createSchemaRegistryEvent(
-  data: Omit<SchemaRegistryEvent, 'id' | 'createdAt'> & Partial<Pick<SchemaRegistryEvent, 'id' | 'createdAt'>>
-): SchemaRegistryEvent {
-  return {
-    id: data.id || randomUUID(),
-    createdAt: data.createdAt || new Date().toISOString().replace('T', ' ').slice(0, 19) + 'Z',
-    ...data
-  };
+// Factory function to create Schema Registry events (now identical to createBaseEvent)
+export function createSchemaRegistryEvent(data: Omit<BaseEvent, 'createdAt'> & Partial<Pick<BaseEvent, 'createdAt'>>): BaseEvent {
+  return createBaseEvent(data);
 }
+
+// Dead Letter Queue exports
+export { DeadLetterQueueSchema, DeadLetterQueueEvent, createDeadLetterQueueEvent } from './dead-letter-queue';
