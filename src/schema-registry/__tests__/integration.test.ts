@@ -1,0 +1,335 @@
+// Import removed - z not used directly in this test file
+import { randomUUID } from 'crypto';
+import { SchemaRegistryClient } from '../client';
+import { SchemaRegistryProducer } from '../../producer/schema-registry-producer';
+import { SchemaRegistryConsumerRouter } from '../../consumer/schema-registry-consumer';
+import { setConfig } from '../../config';
+import { createBaseEvent } from '../../schemas';
+import { UserRegisteredSchema, type UserRegistered } from '../../__fixtures__/schemas/user-registered.schema';
+
+// Mock debug function to avoid config initialization issues while preserving other functions
+jest.mock('../../helpers', () => ({
+  ...jest.requireActual('../../helpers'),
+  debug: jest.fn()
+}));
+
+// Real integration tests - requires Docker containers to be running
+// Run with: docker-compose up -d && npm run test:integration:sr
+describe('Schema Registry Integration Tests', () => {
+  const SCHEMA_REGISTRY_URL = process.env.SCHEMA_REGISTRY_URL || 'http://localhost:8081';
+  const KAFKA_BROKERS = process.env.KAFKA_BROKERS || 'localhost:9092';
+
+  let client: SchemaRegistryClient;
+  let producer: SchemaRegistryProducer;
+  let consumer: SchemaRegistryConsumerRouter;
+  let uniqueEventName: string;
+
+  // Test schemas are imported from fixtures
+
+  beforeAll(async () => {
+    // Configure for integration testing
+    setConfig({
+      host: KAFKA_BROKERS,
+      consumer: { groupId: `integration-test-${Date.now()}` },
+      schemaRegistry: {
+        url: SCHEMA_REGISTRY_URL
+      },
+      producer: {
+        useSchemaRegistry: true
+      },
+      onlyTesting: false // Use real Kafka
+    });
+
+    client = new SchemaRegistryClient({ url: SCHEMA_REGISTRY_URL });
+    producer = new SchemaRegistryProducer();
+    consumer = new SchemaRegistryConsumerRouter();
+
+    // Register schemas used in tests with topic-based subjects to match new naming
+    const timestamp = Date.now();
+    uniqueEventName = `UserRegistered-${timestamp}`;
+    try {
+      const { zodToJsonSchema } = await import('zod-to-json-schema');
+      const registry = (client as any).registry;
+
+      // Register schema with topic-based subject
+      const userRegisteredSubject = client.getSubjectFromTopicAndEventCode('users', uniqueEventName);
+      const userRegisteredJsonSchema = zodToJsonSchema(UserRegisteredSchema, { target: 'jsonSchema7' });
+      await registry.register({ type: 'JSON', schema: JSON.stringify(userRegisteredJsonSchema) }, { subject: userRegisteredSubject });
+
+      console.log('✅ Registered UserRegisteredSchema with topic-based subject');
+    } catch (error) {
+      console.log('⚠️ Schema registration:', (error as Error).message);
+    }
+  }, 30000);
+
+  afterAll(async () => {
+    if (consumer) {
+      await consumer.stop();
+    }
+  });
+
+  describe('Schema Publishing and Retrieval', () => {
+    it('should publish and retrieve schemas from Schema Registry', async () => {
+      // const testSubject = `test-user-registered-${Date.now()}-value`;
+
+      // Create a test event with Schema Registry envelope
+      const userEvent = {
+        ...createBaseEvent({
+          code: uniqueEventName,
+          appName: 'integration-test'
+        }),
+        userId: randomUUID(),
+        email: 'test@example.com',
+        registrationSource: 'web',
+        metadata: {
+          ipAddress: '192.168.1.1',
+          userAgent: 'Mozilla/5.0 Test Browser'
+        }
+      };
+
+      // Validate and encode the event
+      const subject = client.getSubjectFromTopicAndEventCode('users', uniqueEventName);
+      const encoded = await client.validateAndEncode(subject, userEvent);
+      expect(encoded).toBeInstanceOf(Buffer);
+      expect(encoded.length).toBeGreaterThan(5); // Has magic byte + schema ID + data
+
+      // Decode the event
+      const decoded = await client.decodeAndValidate(encoded, true);
+      expect(decoded.value).toEqual(userEvent);
+      expect(decoded.schemaId).toBeGreaterThan(0);
+      expect(decoded.valid).toBe(true);
+    }, 15000);
+
+    it('should handle schema evolution correctly', async () => {
+      // const baseSubject = `test-schema-evolution-${Date.now()}-value`;
+
+      // Version 1: UserRegistered event (matches the registered schema)
+      const eventV1 = {
+        ...createBaseEvent({ code: 'UserRegistered', appName: 'integration-test' }),
+        userId: randomUUID(),
+        email: 'john.doe@example.com',
+        registrationSource: 'web' as const
+      };
+
+      const subject = client.getSubjectFromTopicAndEventCode('users', uniqueEventName);
+      const encodedV1 = await client.validateAndEncode(subject, eventV1);
+      const decodedV1 = await client.decodeAndValidate(encodedV1);
+
+      expect(decodedV1.value).toMatchObject({
+        userId: eventV1.userId,
+        email: 'john.doe@example.com',
+        registrationSource: 'web'
+      });
+
+      // Version 2: Add optional metadata (backward compatible)
+      const eventV2 = {
+        ...createBaseEvent({ code: 'UserRegistered', appName: 'integration-test' }),
+        userId: randomUUID(),
+        email: 'jane.smith@example.com',
+        registrationSource: 'api' as const,
+        metadata: {
+          ipAddress: '10.0.0.1',
+          userAgent: 'Test Agent'
+        }
+      };
+
+      const encodedV2 = await client.validateAndEncode(subject, eventV2);
+      const decodedV2 = await client.decodeAndValidate(encodedV2);
+
+      expect(decodedV2.value).toMatchObject({
+        userId: eventV2.userId,
+        email: 'jane.smith@example.com',
+        registrationSource: 'api',
+        metadata: {
+          ipAddress: '10.0.0.1',
+          userAgent: 'Test Agent'
+        }
+      });
+
+      // Both should use the same schema (UserRegistered) so same schema ID
+      expect(decodedV1.schemaId).toEqual(decodedV2.schemaId);
+    }, 20000);
+  });
+
+  describe('Producer-Consumer Integration', () => {
+    it('should produce and consume Schema Registry events end-to-end', async () => {
+      const testTopic = `test-topic-${Date.now()}`;
+      const receivedEvents: UserRegistered[] = [];
+
+      // Set up consumer
+      consumer.addWithSchema(
+        testTopic,
+        uniqueEventName,
+        async (event: UserRegistered) => {
+          receivedEvents.push(event);
+        },
+        { schema: UserRegisteredSchema, validateWithRegistry: true }
+      );
+
+      // Start consumer (in a real environment, this would be long-running)
+      await consumer.start();
+
+      // Wait a moment for consumer to initialize
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Produce events
+      const testUser: UserRegistered = {
+        ...createBaseEvent({
+          code: uniqueEventName,
+          appName: 'integration-test'
+        }),
+        userId: randomUUID(),
+        email: 'integration-test@example.com',
+        registrationSource: 'api',
+        metadata: {
+          ipAddress: '10.0.0.1'
+        }
+      };
+
+      await producer.emitWithSchema({
+        topic: testTopic,
+        eventName: uniqueEventName,
+        data: testUser,
+        schema: UserRegisteredSchema
+      });
+
+      // Wait for message to be consumed
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
+      // Verify event was received and validated
+      expect(receivedEvents).toHaveLength(1);
+      expect(receivedEvents[0]).toMatchObject({
+        userId: testUser.userId,
+        email: testUser.email,
+        registrationSource: testUser.registrationSource
+      });
+
+      await consumer.stop();
+    }, 30000);
+
+    it('should handle mixed JSON and Schema Registry messages', async () => {
+      const testTopic = `test-mixed-${Date.now()}`;
+      const receivedEvents: any[] = [];
+
+      // Consumer that handles both formats
+      consumer.addWithSchema(testTopic, async (event: any, metadata: any) => {
+        receivedEvents.push({ event, isSchemaRegistry: metadata.isSchemaRegistryMessage });
+      });
+
+      await consumer.start();
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Send Schema Registry message
+      const srEvent: UserRegistered = {
+        ...createBaseEvent({
+          code: uniqueEventName,
+          appName: 'integration-test'
+        }),
+        userId: randomUUID(),
+        email: 'sr-test@example.com',
+        registrationSource: 'web'
+      };
+
+      await producer.emitWithSchema({
+        topic: testTopic,
+        data: srEvent,
+        schema: UserRegisteredSchema
+      });
+
+      // Send legacy JSON message (fallback)
+      const jsonEvent = {
+        ...createBaseEvent({
+          code: uniqueEventName,
+          appName: 'integration-test'
+        }),
+        userId: randomUUID(),
+        email: 'json-test@example.com',
+        registrationSource: 'mobile'
+      };
+
+      // Force JSON fallback by temporarily disabling SR
+      setConfig({
+        host: KAFKA_BROKERS,
+        consumer: { groupId: `integration-test-${Date.now()}` },
+        producer: { useSchemaRegistry: false },
+        onlyTesting: false
+      });
+
+      const jsonProducer = new SchemaRegistryProducer();
+      await jsonProducer.emitWithSchema({
+        topic: testTopic,
+        data: jsonEvent,
+        schema: UserRegisteredSchema
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+
+      // Should have received both messages
+      expect(receivedEvents).toHaveLength(2);
+
+      const srMessage = receivedEvents.find((e) => e.isSchemaRegistry);
+      const jsonMessage = receivedEvents.find((e) => !e.isSchemaRegistry);
+
+      expect(srMessage).toBeDefined();
+      expect(jsonMessage).toBeDefined();
+
+      expect(srMessage.event.email).toBe('sr-test@example.com');
+      expect(jsonMessage.event.email).toBe('json-test@example.com');
+
+      await consumer.stop();
+    }, 45000);
+  });
+
+  describe('Error Handling', () => {
+    it('should handle Schema Registry unavailable gracefully', async () => {
+      // Create client with invalid URL
+      const invalidClient = new SchemaRegistryClient({
+        url: 'http://invalid-host:8081'
+      });
+
+      const testEvent = {
+        ...createBaseEvent({ code: 'TestEvent', appName: 'test' }),
+        field: 'value'
+      };
+
+      await expect(invalidClient.validateAndEncode('test-subject-value', testEvent)).rejects.toThrow();
+    });
+
+    it('should validate schema compliance and reject invalid data', async () => {
+      const invalidEvent = {
+        ...createBaseEvent({ code: 'UserRegistered', appName: 'test' }),
+        userId: 'not-a-uuid', // Invalid UUID
+        email: 'not-an-email', // Invalid email
+        registrationSource: 'invalid-source' as any // Invalid enum
+      };
+
+      // Register a test schema first with topic-based naming
+      try {
+        const { zodToJsonSchema } = await import('zod-to-json-schema');
+        const registry = (client as any).registry;
+        const testValidationSubject = client.getSubjectFromTopicAndEventCode('test', 'TestValidation');
+        const testValidationJsonSchema = zodToJsonSchema(UserRegisteredSchema, { target: 'jsonSchema7' });
+        await registry.register({ type: 'JSON', schema: JSON.stringify(testValidationJsonSchema) }, { subject: testValidationSubject });
+      } catch (error) {
+        // Ignore registration errors for this test
+      }
+
+      const testSubject = client.getSubjectFromTopicAndEventCode('test', 'TestValidation');
+      await expect(client.validateAndEncode(testSubject, invalidEvent)).rejects.toThrow('Schema validation failed');
+    });
+  });
+});
+
+// Helper to check if integration tests should run
+export function shouldRunIntegrationTests(): boolean {
+  return process.env.RUN_INTEGRATION_TESTS === 'true' || process.env.CI === 'true';
+}
+
+// Skip these tests if not in integration mode
+if (!shouldRunIntegrationTests()) {
+  describe.skip('Schema Registry Integration Tests', () => {
+    it('should be skipped - set RUN_INTEGRATION_TESTS=true to enable', () => {
+      // Test is skipped when RUN_INTEGRATION_TESTS is not set to 'true'
+    });
+  });
+}
