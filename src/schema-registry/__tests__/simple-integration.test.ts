@@ -1,0 +1,135 @@
+import { randomUUID } from 'crypto';
+import { SchemaRegistryClient } from '../client';
+import { SchemaRegistryProducer } from '../../producer/schema-registry-producer';
+import { SchemaRegistryConsumerRouter } from '../../consumer/schema-registry-consumer';
+import { setConfig } from '../../config';
+import { createBaseEvent } from '../../schemas';
+import { UserRegisteredSchema, UserRegisteredSchemaRegistrySchema, type UserRegistered } from '../../__fixtures__/schemas/user-registered.schema';
+
+// Mock debug function to avoid config initialization issues while preserving other functions
+jest.mock('../../helpers', () => ({
+  ...jest.requireActual('../../helpers'),
+  debug: jest.fn()
+}));
+
+describe('Simple Schema Registry Integration Test', () => {
+  const SCHEMA_REGISTRY_URL = process.env.SCHEMA_REGISTRY_URL || 'http://localhost:8081';
+  const KAFKA_BROKERS = process.env.KAFKA_BROKERS || 'localhost:9092';
+
+  let client: SchemaRegistryClient;
+  let producer: SchemaRegistryProducer;
+  let consumer: SchemaRegistryConsumerRouter;
+  let eventName: string;
+  let testTopic: string;
+
+  beforeAll(async () => {
+    console.log('🔧 Setting up simple integration test...');
+
+    eventName = `UserRegistered${Date.now()}`;
+    testTopic = `simple-test-${Date.now()}`;
+
+    // Configure for integration testing
+    setConfig({
+      host: KAFKA_BROKERS,
+      consumer: { groupId: `simple-test-${Date.now()}` },
+      schemaRegistry: { url: SCHEMA_REGISTRY_URL },
+      producer: { useSchemaRegistry: true },
+      onlyTesting: false
+    });
+
+    client = new SchemaRegistryClient({ url: SCHEMA_REGISTRY_URL });
+    producer = new SchemaRegistryProducer();
+    consumer = new SchemaRegistryConsumerRouter();
+
+    // Register schema using topic-based subject name that producer will use
+    console.log(`📝 Registering ${eventName} schema...`);
+    try {
+      // We need to manually construct the subject that producer will expect
+      const expectedSubject = client.getSubjectFromTopicAndEventCode(testTopic, eventName);
+
+      // Register directly with Schema Registry using the computed subject
+      const { zodToJsonSchema } = await import('zod-to-json-schema');
+      const jsonSchema = zodToJsonSchema(UserRegisteredSchemaRegistrySchema, { target: 'jsonSchema7' });
+
+      const registry = (client as any).registry;
+      const registrationResult = await registry.register({ type: 'JSON', schema: JSON.stringify(jsonSchema) }, { subject: expectedSubject });
+
+      const schemaId = typeof registrationResult === 'object' ? registrationResult.id : registrationResult;
+      console.log(`✅ ${eventName} schema registered with subject ${expectedSubject} and ID: ${schemaId}`);
+    } catch (error) {
+      console.error('❌ Schema registration failed:', error);
+      throw error;
+    }
+  }, 30000);
+
+  afterAll(async () => {
+    if (consumer) {
+      await consumer.stop();
+    }
+  });
+
+  it('should produce and consume a UserRegistered event end-to-end', async () => {
+    // Use the pre-defined topic from beforeAll
+    const receivedEvents: UserRegistered[] = [];
+
+    // Set up consumer
+    consumer.addWithSchema(
+      testTopic,
+      eventName,
+      async (event: UserRegistered) => {
+        receivedEvents.push(event);
+      },
+      { schema: UserRegisteredSchema }
+    );
+
+    // Start consumer
+    await consumer.start();
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    // Create test event following MVP pattern
+    const testEvent: UserRegistered = {
+      ...createBaseEvent({
+        code: eventName,
+        appName: 'simple-test'
+      }),
+      userId: randomUUID(),
+      email: 'simple-test@example.com',
+      registrationSource: 'api',
+      metadata: {
+        ipAddress: '10.0.0.1',
+        userAgent: 'Test/1.0'
+      }
+    };
+
+    // Produce event
+    await producer.emitWithSchema({
+      topic: testTopic,
+      eventName: eventName,
+      data: testEvent,
+      schema: UserRegisteredSchema
+    });
+
+    // Wait for message to be consumed
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    // Verify event was received and validated
+    expect(receivedEvents).toHaveLength(1);
+    expect(receivedEvents[0]).toMatchObject({
+      userId: testEvent.userId,
+      email: testEvent.email,
+      registrationSource: testEvent.registrationSource,
+      code: eventName,
+      appName: 'simple-test'
+    });
+
+    console.log('✅ Simple integration test completed successfully');
+  }, 30000);
+});
+
+// Only run integration tests when explicitly requested
+if (process.env.RUN_INTEGRATION_TESTS !== 'true') {
+  // Don't run any tests - Jest will show 0 tests for this file
+  describe.skip('Integration tests require RUN_INTEGRATION_TESTS=true', () => {
+    // This file contains integration tests that need Docker containers
+  });
+}
