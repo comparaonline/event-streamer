@@ -50,8 +50,9 @@ export async function validateSchema(schemaFilePath: string, options: ValidateOp
 
     try {
       // 1. Test schema compilation to JSON Schema
+      // Use draft-07 for compatibility with Schema Registry AJV setup
       const jsonSchema = zodToJsonSchema(schema, {
-        target: 'jsonSchema2019-09',
+        target: 'jsonSchema7',
         $refStrategy: 'relative'
       });
 

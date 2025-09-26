@@ -66,6 +66,9 @@ describe('Schema Registry Integration Tests', () => {
     if (consumer) {
       await consumer.stop();
     }
+    if (client) {
+      client.disconnect();
+    }
   });
 
   describe('Schema Publishing and Retrieval', () => {
@@ -89,7 +92,7 @@ describe('Schema Registry Integration Tests', () => {
 
       // Validate and encode the event
       const subject = client.getSubjectFromTopicAndEventCode('users', uniqueEventName);
-      const encoded = await client.validateAndEncode(subject, userEvent);
+      const encoded = await client.encode(subject, UserRegisteredSchema, userEvent);
       expect(encoded).toBeInstanceOf(Buffer);
       expect(encoded.length).toBeGreaterThan(5); // Has magic byte + schema ID + data
 
@@ -112,7 +115,7 @@ describe('Schema Registry Integration Tests', () => {
       };
 
       const subject = client.getSubjectFromTopicAndEventCode('users', uniqueEventName);
-      const encodedV1 = await client.validateAndEncode(subject, eventV1);
+      const encodedV1 = await client.encode(subject, UserRegisteredSchema, eventV1);
       const decodedV1 = await client.decodeAndValidate(encodedV1);
 
       expect(decodedV1.value).toMatchObject({
@@ -133,7 +136,7 @@ describe('Schema Registry Integration Tests', () => {
         }
       };
 
-      const encodedV2 = await client.validateAndEncode(subject, eventV2);
+      const encodedV2 = await client.encode(subject, UserRegisteredSchema, eventV2);
       const decodedV2 = await client.decodeAndValidate(encodedV2);
 
       expect(decodedV2.value).toMatchObject({
@@ -171,6 +174,17 @@ describe('Schema Registry Integration Tests', () => {
 
       // Wait a moment for consumer to initialize
       await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Ensure schema is registered for this topic/event subject
+      try {
+        const { zodToJsonSchema } = await import('zod-to-json-schema');
+        const registry = (client as any).registry;
+        const subject = client.getSubjectFromTopicAndEventCode(testTopic, uniqueEventName);
+        const jsonSchema = zodToJsonSchema(UserRegisteredSchema, { target: 'jsonSchema7' });
+        await registry.register({ type: 'JSON', schema: JSON.stringify(jsonSchema) }, { subject });
+      } catch (e) {
+        // ignore if already exists
+      }
 
       // Produce events
       const testUser: UserRegistered = {
@@ -218,6 +232,17 @@ describe('Schema Registry Integration Tests', () => {
 
       await consumer.start();
       await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Ensure schema is registered for this topic/event subject
+      try {
+        const { zodToJsonSchema } = await import('zod-to-json-schema');
+        const registry = (client as any).registry;
+        const subject = client.getSubjectFromTopicAndEventCode(testTopic, uniqueEventName);
+        const jsonSchema = zodToJsonSchema(UserRegisteredSchema, { target: 'jsonSchema7' });
+        await registry.register({ type: 'JSON', schema: JSON.stringify(jsonSchema) }, { subject });
+      } catch (e) {
+        // ignore if already exists
+      }
 
       // Send Schema Registry message
       const srEvent: UserRegistered = {
@@ -275,8 +300,6 @@ describe('Schema Registry Integration Tests', () => {
 
       expect(srMessage.event.email).toBe('sr-test@example.com');
       expect(jsonMessage.event.email).toBe('json-test@example.com');
-
-      await consumer.stop();
     }, 45000);
   });
 
@@ -292,7 +315,7 @@ describe('Schema Registry Integration Tests', () => {
         field: 'value'
       };
 
-      await expect(invalidClient.validateAndEncode('test-subject-value', testEvent)).rejects.toThrow();
+      await expect(invalidClient.encode('test-subject-value', UserRegisteredSchema, testEvent)).rejects.toThrow();
     });
 
     it('should validate schema compliance and reject invalid data', async () => {
@@ -315,7 +338,7 @@ describe('Schema Registry Integration Tests', () => {
       }
 
       const testSubject = client.getSubjectFromTopicAndEventCode('test', 'TestValidation');
-      await expect(client.validateAndEncode(testSubject, invalidEvent)).rejects.toThrow('Schema validation failed');
+      await expect(client.encode(testSubject, UserRegisteredSchema, invalidEvent)).rejects.toThrow('invalid payload');
     });
   });
 });

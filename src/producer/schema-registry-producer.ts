@@ -36,24 +36,7 @@ export class SchemaRegistryProducer {
     }
   }
 
-  // Pre-load schemas for known event types (startup optimization)
-  async preloadSchemas(topicEventPairs: Array<{ topic: string; eventCode: string }>): Promise<void> {
-    if (!this.schemaRegistryClient) {
-      debug(Debug.WARN, 'Cannot preload schemas: Schema Registry client not initialized');
-      return;
-    }
-
-    const subjects = topicEventPairs.map(({ topic, eventCode }) => this.getSubjectFromTopicAndEventCode(topic, eventCode));
-    await this.schemaRegistryClient.preloadSchemasForProducer(subjects);
-
-    subjects.forEach((subject) => this.preloadedSubjects.add(subject));
-
-    debug(Debug.INFO, 'Preloaded schemas for topic-event pairs', {
-      topicEventPairs,
-      subjects,
-      cacheStats: this.schemaRegistryClient.getCacheStats()
-    });
-  }
+  
 
   async emitWithSchema<T extends BaseEvent>(
     output: SchemaRegistryOutput<T> | SchemaRegistryOutput<T>[],
@@ -62,7 +45,6 @@ export class SchemaRegistryProducer {
     const config = getConfig() as Config;
     const outputs = toArray(output);
 
-    // If Schema Registry is not configured, fall back to legacy emit
     if (!this.schemaRegistryClient || !config.producer?.useSchemaRegistry) {
       debug(Debug.INFO, 'Schema Registry not configured, falling back to JSON');
       return this.emitAsJson(outputs, overwriteHosts);
@@ -70,54 +52,56 @@ export class SchemaRegistryProducer {
 
     const appName = config.appName ?? config.consumer?.groupId ?? process.env.HOSTNAME?.split('-')[0] ?? 'unknown';
 
-    // Process each output
     const messages = await Promise.all(
       outputs.map(async (singleOutput) => {
         const { topic, data, eventName, schema } = singleOutput;
 
+        // The Zod schema is now required for encoding.
+        if (!schema) {
+          throw new Error('A Zod schema must be provided when using Schema Registry producer.');
+        }
+
         return Promise.all(
           toArray(data).map(async (item): Promise<SchemaRegistryMessage> => {
-            // Validate input data
             this.validateEventData(item);
 
-            // Resolve event code per item: eventName param > item.code > topic
             const itemAny = item as any;
-            const resolvedEventCode = stringToUpperCamelCase(eventName ?? itemAny?.code ?? topic);
+            const rawEventCode = (eventName ?? itemAny?.code ?? topic) as string;
+            const resolvedEventCode = stringToUpperCamelCase(rawEventCode);
 
-            // Create Schema Registry event with all required fields
-            const schemaRegistryEvent = createSchemaRegistryEvent({
+            // Create the full event object with all required fields.
+            const eventData = createSchemaRegistryEvent({
               ...item,
               code: resolvedEventCode,
               appName: itemAny.appName ?? appName
             });
 
-            // Validate with provided schema if given (validate original data, not transformed data)
-            if (schema) {
-              const validation = schema.safeParse(item);
-              if (!validation.success) {
-                const errorDetails = validation.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', ');
-                throw new Error(`Schema validation failed: ${errorDetails}`);
-              }
+            // Perform local validation with the provided Zod schema.
+            const validation = schema.safeParse(eventData);
+            if (!validation.success) {
+              const errorDetails = validation.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', ');
+              throw new Error(`Local Zod schema validation failed: ${errorDetails}`);
             }
 
-            // Validate and encode with Schema Registry (using cached schema)
-            const subject = this.getSubjectFromTopicAndEventCode(topic, resolvedEventCode);
+            // Get the subject for the schema registry.
+            const subject = this.getSubjectFromTopicAndEventCode(topic, rawEventCode);
 
             debug(Debug.TRACE, 'Encoding event for Schema Registry', {
               eventCode: resolvedEventCode,
               subject,
-              dataKeys: Object.keys(schemaRegistryEvent)
+              dataKeys: Object.keys(eventData)
             });
 
             if (!this.schemaRegistryClient) {
               throw new Error('Schema Registry client is not initialized');
             }
 
-            const encodedValue = await this.schemaRegistryClient.validateAndEncode(subject, schemaRegistryEvent);
+            // Encode the event using the new client method, which handles registration and encoding.
+            const encodedValue = await this.schemaRegistryClient.encode(subject, schema, eventData);
 
             return {
               topic,
-              key: (schemaRegistryEvent as any).id || undefined,
+              key: (eventData as any).id || undefined,
               value: encodedValue,
               headers: {}
             };

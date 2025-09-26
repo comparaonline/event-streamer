@@ -133,8 +133,9 @@ function getSubjectName(topic: string, schemaName: string): string {
 async function publishSchema(client: SchemaRegistryClient, subject: string, schema: any, options: PublishOptions): Promise<void> {
   try {
     // Convert Zod schema to JSON Schema
+    // Use draft-07 for compatibility with Schema Registry AJV setup
     const jsonSchema = zodToJsonSchema(schema, {
-      target: 'jsonSchema2019-09',
+      target: 'jsonSchema7',
       $refStrategy: 'relative'
     });
 
@@ -146,29 +147,20 @@ async function publishSchema(client: SchemaRegistryClient, subject: string, sche
       return;
     }
 
-    // Check if schema already exists
-    let shouldPublish = true;
+    // Check if an identical schema already exists.
     try {
-      const existingSchema = await client.getLatestSchemaForProducer(subject);
-      if (existingSchema.schema === schemaString) {
-        console.log(`⏭️  Schema for ${subject} is already up to date`);
-        return;
-      }
-
-      if (!options.force) {
-        console.log(`⚠️  Schema for ${subject} exists but differs. Use --force to update.`);
-        return;
-      }
+      const existingId = await client.getRegistryIdBySchema(subject, schemaString);
+      console.log(`⏭️  Schema for ${subject} is already up to date (ID: ${existingId})`);
+      return;
     } catch (error) {
-      // Schema doesn't exist, which is fine
-      shouldPublish = true;
+      // If it fails, it means the schema doesn't exist, so we can proceed to publish.
+      // We assume a 404 error here. Other errors will be caught by the register call.
+      debug(Debug.INFO, `Schema for ${subject} not found. Proceeding with publishing.`);
     }
 
-    if (shouldPublish) {
-      // Register the schema
-      await registerSchemaToRegistry(client, subject, schemaString);
-      console.log(`✅ Published schema for subject: ${subject}`);
-    }
+    // Register the new schema.
+    await registerSchemaToRegistry(client, subject, schemaString);
+    console.log(`✅ Published schema for subject: ${subject}`);
   } catch (error) {
     debug(Debug.ERROR, 'Failed to publish schema', { subject, error });
     throw new Error(`Failed to publish schema for ${subject}: ${error}`);

@@ -57,9 +57,9 @@ describe('Schema Publishing Logic', () => {
         return `${topicKebab}-${eventCodeKebab}`;
       };
 
-      expect(getSubjectName('users', 'UserCreatedSchema')).toBe('users-userCreated');
-      expect(getSubjectName('orders', 'OrderProcessedSchema')).toBe('orders-orderProcessed');
-      expect(getSubjectName('notifications', 'NotificationEventSchema')).toBe('notifications-notificationEvent');
+      expect(getSubjectName('users', 'UserCreatedSchema')).toBe('users-user-created');
+      expect(getSubjectName('orders', 'OrderProcessedSchema')).toBe('orders-order-processed');
+      expect(getSubjectName('notifications', 'NotificationEventSchema')).toBe('notifications-notification-event');
     });
   });
 

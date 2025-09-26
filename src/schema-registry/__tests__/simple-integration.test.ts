@@ -66,6 +66,9 @@ describe('Simple Schema Registry Integration Test', () => {
     if (consumer) {
       await consumer.stop();
     }
+    if (client) {
+      client.disconnect();
+    }
   });
 
   it('should produce and consume a UserRegistered event end-to-end', async () => {

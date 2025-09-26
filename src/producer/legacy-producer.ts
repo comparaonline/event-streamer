@@ -122,13 +122,18 @@ export async function getProducer(host: string): Promise<Producer> {
   return connection.producer;
 }
 
-export function closeAll(): void {
-  for (const host in connections) {
-    if (connections[host] != null) {
-      clearTimeout(connections[host].timeout);
-      connections[host].producer.disconnect();
-      delete connections[host];
+export async function closeAll(): Promise<void> {
+  const disconnections = Object.values(connections).map((connection) => {
+    if (connection.timeout) {
+      clearTimeout(connection.timeout);
     }
+    return connection.producer.disconnect();
+  });
+
+  await Promise.all(disconnections);
+
+  for (const host in connections) {
+    delete connections[host];
   }
 }
 

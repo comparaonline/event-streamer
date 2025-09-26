@@ -1,20 +1,17 @@
 import { z } from 'zod';
 
 // Base event schema matching legacy producer/consumer exactly
-export const BaseEventSchema = z.object({
-  // Event classification - always required (legacy auto-generates this)
-  code: z.string().min(1).describe('Event type code in UpperCamelCase'),
-
-  // Timing information - optional (legacy auto-generates if not provided)
-  createdAt: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z$/, 'Must be in YYYY-MM-DD HH:mm:ssZ format')
-    .optional()
-    .describe('Timestamp when event was created (YYYY-MM-DD HH:mm:ssZ format)'),
-
-  // Source identification - optional (legacy auto-detects from config/hostname)
-  appName: z.string().min(1).optional().describe('Service that produced the event')
-});
+export const BaseEventSchema = z
+  .object({
+    code: z.string().min(1).describe('Event type code in UpperCamelCase'),
+    createdAt: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z$/, 'Must be in YYYY-MM-DD HH:mm:ssZ format')
+      .optional()
+      .describe('Timestamp when event was created (YYYY-MM-DD HH:mm:ssZ format)'),
+    appName: z.string().min(1).optional().describe('Service that produced the event')
+  })
+  .passthrough();
 
 export type BaseEvent = z.infer<typeof BaseEventSchema>;
 
@@ -64,15 +61,15 @@ export function validateEvent<T>(schema: z.ZodSchema<T>, event: unknown): Schema
 }
 
 // Factory function to create base events with legacy-compatible defaults
-export function createBaseEvent(data: Omit<BaseEvent, 'createdAt'> & Partial<Pick<BaseEvent, 'createdAt'>>): BaseEvent {
+export function createBaseEvent(data: { code: string } & Partial<BaseEvent>): BaseEvent {
   return {
-    createdAt: data.createdAt || new Date().toISOString().replace('T', ' ').slice(0, 19) + 'Z',
-    ...data
+    ...data,
+    createdAt: data.createdAt || new Date().toISOString().replace('T', ' ').slice(0, 19) + 'Z'
   };
 }
 
 // Factory function to create Schema Registry events (now identical to createBaseEvent)
-export function createSchemaRegistryEvent(data: Omit<BaseEvent, 'createdAt'> & Partial<Pick<BaseEvent, 'createdAt'>>): BaseEvent {
+export function createSchemaRegistryEvent(data: { code: string } & Partial<BaseEvent>): BaseEvent {
   return createBaseEvent(data);
 }
 

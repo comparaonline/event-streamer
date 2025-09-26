@@ -1,4 +1,5 @@
 import { SchemaRegistry, SchemaType } from '@kafkajs/confluent-schema-registry';
+import { z } from 'zod';
 import { SchemaRegistryConfig } from '../schemas';
 import { debug } from '../helpers';
 import { Debug } from '../interfaces';
@@ -53,50 +54,43 @@ export class SchemaRegistryClient {
     debug(Debug.INFO, 'Schema Registry client initialized with dual caching strategy', { url: config.url });
   }
 
-  // Producer method: Get latest schema by subject (startup caching)
-  async getLatestSchemaForProducer(subject: string): Promise<CachedSchema> {
-    if (this.subjectCache.has(subject)) {
-      const cached = this.subjectCache.get(subject);
-      if (cached) {
-        debug(Debug.TRACE, 'Retrieved schema from subject cache', { subject, schemaId: cached.id });
-        return cached;
-      }
-    }
+  public disconnect(): void {
+    // Placeholder for future implementation if the underlying library supports it.
+  }
 
+  
+
+  // Producer method: Look up schema ID and encode data.
+  async encode(subject: string, schema: z.ZodSchema<any>, data: unknown): Promise<Buffer> {
     try {
-      const latestId = await this.registry.getLatestSchemaId(subject);
-      const schema = await this.registry.getSchema(latestId);
+      // 1. Convert Zod schema to a canonical JSON schema string.
+      const { zodToJsonSchema } = await import('zod-to-json-schema');
+      const jsonSchema = zodToJsonSchema(schema, { target: 'jsonSchema7' });
+      const canonicalSchemaString = JSON.stringify(jsonSchema);
 
-      const cachedSchema: CachedSchema = {
-        id: latestId,
-        version: -1, // Version not directly available from latest API
-        subject: subject,
-        schema: schema,
-        jsonSchema: typeof schema === 'object' ? schema : JSON.parse(schema as string),
-        validator: undefined // Will be compiled on demand
-      };
+      // 2. Look up the schema ID using the method you pointed out.
+      // This will throw an error if the schema is not found.
+      const id = await this.getRegistryIdBySchema(subject, canonicalSchemaString);
 
-      // Compile JSON Schema validator if it's a JSON Schema
-      if (cachedSchema.jsonSchema) {
-        try {
-          cachedSchema.validator = this.ajv.compile(cachedSchema.jsonSchema);
-        } catch (compileError) {
-          debug(Debug.WARN, 'Failed to compile JSON schema validator', { subject, error: compileError });
-        }
+      // 3. Encode the data using the specific ID.
+      return this.registry.encode(id, data);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      debug(Debug.ERROR, 'Failed to encode data', {
+        subject,
+        errorMessage: message
+      });
+
+      // Re-throw a more specific error for validation failures.
+      if (/invalid payload/i.test(message)) {
+        throw new Error(`Schema validation failed for subject ${subject}: ${message}`);
       }
 
-      this.subjectCache.set(subject, cachedSchema);
-      debug(Debug.DEBUG, 'Cached latest schema for producer', { subject, schemaId: latestId });
-
-      return cachedSchema;
-    } catch (error) {
-      debug(Debug.ERROR, 'Failed to fetch latest schema for producer', { subject, error });
-      throw new Error(`Failed to fetch schema for subject ${subject}: ${error}`);
+      throw new Error(`Failed to encode data for subject ${subject}: ${message}`);
     }
   }
 
-  // Consumer method: Get schema by ID (immutable caching)
-  async getSchemaForConsumer(schemaId: number): Promise<CachedSchema> {
+  private async getSchemaForConsumer(schemaId: number): Promise<CachedSchema> {
     if (this.schemaIdCache.has(schemaId)) {
       const cached = this.schemaIdCache.get(schemaId);
       if (cached) {
@@ -136,57 +130,11 @@ export class SchemaRegistryClient {
     }
   }
 
-  // Validation method using cached validators
-  validateDataAgainstSchema(data: unknown, cachedSchema: CachedSchema): { valid: boolean; errors?: any[] } {
-    if (!cachedSchema.validator) {
-      debug(Debug.WARN, 'No validator available for schema', { schemaId: cachedSchema.id });
-      return { valid: true }; // Skip validation if no validator
-    }
-
-    const valid = cachedSchema.validator(data);
-    if (valid) {
-      return { valid: true };
-    } else {
-      return {
-        valid: false,
-        errors: cachedSchema.validator.errors || []
-      };
-    }
-  }
-
-  // Producer method: Validate and encode with cached schema
-  async validateAndEncode(subject: string, data: unknown): Promise<Buffer> {
-    let cachedSchema: CachedSchema | undefined;
-
-    try {
-      // Get cached schema for validation
-      cachedSchema = await this.getLatestSchemaForProducer(subject);
-
-      // Skip local validation for now - let Schema Registry handle it
-      debug(Debug.TRACE, 'Skipping local validation, letting Schema Registry validate', { subject });
-
-      // Encode with Schema Registry
-      debug(Debug.INFO, 'Attempting to encode data', {
-        subject,
-        schemaId: cachedSchema.id,
-        dataKeys: data && typeof data === 'object' ? Object.keys(data as object) : 'not-object',
-        dataPreview: JSON.stringify(data, null, 2).substring(0, 500)
-      });
-
-      const encoded = await this.registry.encode(cachedSchema.id, data);
-
-      debug(Debug.TRACE, 'Validated and encoded data with Schema Registry', { subject, schemaId: cachedSchema.id });
-      return encoded;
-    } catch (error) {
-      debug(Debug.ERROR, 'Failed to validate and encode data', {
-        subject,
-        schemaId: cachedSchema?.id || 'unknown',
-        errorMessage: error instanceof Error ? error.message : String(error),
-        schemaExists: cachedSchema ? 'yes' : 'no'
-      });
-
-      throw new Error(`Failed to validate and encode data for subject ${subject}: ${error instanceof Error ? error.message : String(error)}`);
-    }
+  async getRegistryIdBySchema(subject: string, schemaString: string): Promise<number> {
+    return this.registry.getRegistryIdBySchema(subject, {
+      type: SchemaType.JSON,
+      schema: schemaString,
+    });
   }
 
   // Consumer method: Decode and optionally validate with cached schema
@@ -210,17 +158,22 @@ export class SchemaRegistryClient {
 
       debug(Debug.TRACE, 'Decoded Schema Registry data', { schemaId });
 
-      let validationResult;
       if (validateAgainstSchema) {
-        // Get cached schema for validation
         const cachedSchema = await this.getSchemaForConsumer(schemaId);
-        validationResult = this.validateDataAgainstSchema(decodedValue, cachedSchema);
+        
+        if (!cachedSchema.validator) {
+            debug(Debug.WARN, 'No validator available for schema', { schemaId: cachedSchema.id });
+            return { value: decodedValue, schemaId, valid: true }; // Skip validation
+        }
+
+        const valid = cachedSchema.validator(decodedValue);
+        const errors = !valid ? cachedSchema.validator.errors || [] : [];
 
         return {
           value: decodedValue,
           schemaId,
-          valid: validationResult.valid,
-          validationErrors: validationResult.errors
+          valid,
+          validationErrors: errors,
         };
       }
 
@@ -258,21 +211,10 @@ export class SchemaRegistryClient {
     debug(Debug.DEBUG, 'All schema caches cleared');
   }
 
-  // Pre-load schemas for known subjects (startup optimization)
-  async preloadSchemasForProducer(subjects: string[]): Promise<void> {
-    const promises = subjects.map((subject) =>
-      this.getLatestSchemaForProducer(subject).catch((error) => {
-        debug(Debug.WARN, 'Failed to preload schema', { subject, error });
-      })
-    );
-
-    await Promise.all(promises);
-    debug(Debug.INFO, 'Preloaded schemas for producer', { subjects, cacheSize: this.subjectCache.size });
-  }
-
   // Get subject name from topic and event code to avoid collisions
   getSubjectFromTopicAndEventCode(topic: string, eventCode: string): string {
-    // Format: {topic}-{event-code} to avoid cross-topic collisions (no confusing -value suffix)
+    // Format: {topic}-{event-code} to avoid cross-topic collisions (no -value suffix)
+    // Use same kebab-case logic as CLI and preserve existing hyphenation in eventCode
     return `${this.toKebabCase(topic)}-${this.toKebabCase(eventCode)}`;
   }
 
@@ -296,7 +238,7 @@ export class SchemaRegistryClient {
       // Register with Schema Registry
       const registrationResult = await this.registry.register(
         {
-          type: 'JSON' as any,
+          type: SchemaType.JSON,
           schema: JSON.stringify(jsonSchema)
         },
         { subject }

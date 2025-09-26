@@ -18,9 +18,14 @@ beforeAll(() => {
   }
 });
 
-afterAll(() => {
+afterAll(async () => {
   // Restore console methods
   if (console.log.mockRestore) console.log.mockRestore();
   if (console.warn.mockRestore) console.warn.mockRestore();
   if (console.error.mockRestore) console.error.mockRestore();
+
+  // Close all lingering producer connections
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { closeAll } = require('./src/producer');
+  await closeAll();
 });

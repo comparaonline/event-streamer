@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { Consumer, Kafka } from 'kafkajs';
 import { SchemaRegistryClient } from '../schema-registry/client';
 import { getConfig } from '../config';
-import { debug, getParsedJson } from '../helpers';
+import { debug, getParsedJson, stringToUpperCamelCase } from '../helpers';
 import { Debug, Strategy } from '../interfaces';
 import { BaseEvent, EventHandler, EventMetadata } from '../schemas';
 import { Input, Config } from '../interfaces';
@@ -97,10 +97,11 @@ export class SchemaRegistryConsumerRouter {
         };
       } else {
         // EventName provided
-        const eventNames = Array.isArray(param2) ? param2 : [param2];
+        const rawEventNames = Array.isArray(param2) ? param2 : [param2];
+        const normalizedEventNames = rawEventNames.filter((name): name is string => name !== undefined).map((name) => stringToUpperCamelCase(name));
         route = {
           topic: topics,
-          eventName: eventNames.filter((name): name is string => name !== undefined),
+          eventName: normalizedEventNames,
           callback: param3 as EventHandler<T>,
           schema: (param4 as any)?.schema,
           validateWithRegistry: (param4 as any)?.validateWithRegistry ?? true
@@ -126,7 +127,8 @@ export class SchemaRegistryConsumerRouter {
     }
 
     if (!this.schemaRegistryClient) {
-      throw new Error('Schema Registry client not initialized. Check schemaRegistry config.');
+      debug(Debug.WARN, 'Schema Registry client not initialized, consumer will handle only JSON messages');
+      // Continue with JSON-only behavior; routes without SR messages will still work
     }
 
     const config = getConfig() as Config;
@@ -223,13 +225,10 @@ export class SchemaRegistryConsumerRouter {
     let metadata: EventMetadata;
 
     // Check if message is Schema Registry encoded
-    if (SchemaRegistryClient.isSchemaRegistryEncoded(message.value)) {
+    if (this.schemaRegistryClient && SchemaRegistryClient.isSchemaRegistryEncoded(message.value)) {
       // Schema Registry message
 
-      if (!this.schemaRegistryClient) {
-        debug(Debug.ERROR, 'Schema Registry message received but client not initialized');
-        return;
-      }
+      // this.schemaRegistryClient is checked above
 
       try {
         const decoded = await this.schemaRegistryClient.decodeAndValidate(message.value, true);
@@ -293,8 +292,11 @@ export class SchemaRegistryConsumerRouter {
 
     // Process each matching route
     for (const route of matchingRoutes) {
+      // Respect route-level registry validation preference for SR messages
+      const shouldValidate = route.validateWithRegistry !== undefined ? route.validateWithRegistry : true;
+
       // Additional Zod validation if schema provided
-      if (route.schema) {
+      if (route.schema && shouldValidate) {
         const validation = route.schema.safeParse(parsedEvent);
         if (!validation.success) {
           const validationError = new Error(

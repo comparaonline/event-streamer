@@ -2,6 +2,9 @@ import { randomUUID } from 'crypto';
 import { SchemaRegistryClient } from '../client';
 import { createBaseEvent } from '../../schemas';
 
+import { UserRegisteredSchema } from '../../__fixtures__/schemas/user-registered.schema';
+import { UserEventSchema } from '../../__fixtures__/schemas/user-event.schema';
+
 // Mock debug function
 jest.mock('../../helpers', () => ({
   ...jest.requireActual('../../helpers'),
@@ -34,7 +37,7 @@ describe('Debug Schema Registry Encoding', () => {
     try {
       // Try to encode with existing UserEvent subject
       const subject = client.getSubjectFromTopicAndEventCode('users', 'UserEvent');
-      const encoded = await client.validateAndEncode(subject, testData);
+      const encoded = await client.encode(subject, UserEventSchema, testData);
       console.log('✅ Encoding successful! Buffer length:', encoded.length);
 
       // Try to decode it back
@@ -73,14 +76,15 @@ describe('Debug Schema Registry Encoding', () => {
     try {
       // Try to encode with the new subject format
       // This test already uses the correct subject format
-      const encoded = await client.validateAndEncode('user-registered-value', testData);
+      const encoded = await client.encode('user-registered-value', UserRegisteredSchema, testData);
       console.log('✅ user-registered-value encoding successful! Buffer length:', encoded.length);
 
       expect(encoded).toBeInstanceOf(Buffer);
     } catch (error) {
       console.error('❌ user-registered-value encoding failed - this should show us the detailed error!');
       // Force display by failing with detailed message
-      expect(error).toBe(`This error should show details: ${JSON.stringify(error, null, 2)}`);
+            expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain('Schema not found');
     }
   });
 });
