@@ -43,21 +43,23 @@ describe('Schema Publishing Logic', () => {
   });
 
   describe('subject name generation', () => {
-    it('should convert schema names to subject names', () => {
-      // Test core business logic without file I/O
-      const getSubjectName = (schemaName: string): string => {
-        const baseName = schemaName.replace(/Schema$/, '');
-        return (
-          baseName
-            .replace(/([A-Z])/g, '-$1')
-            .toLowerCase()
-            .replace(/^-/, '') + '-value'
-        );
+    it('should convert topic and schema names to subject names', () => {
+      // Helper function to convert to kebab-case (matching Schema Registry client)
+      const toKebabCase = (str: string): string => {
+        return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
       };
 
-      expect(getSubjectName('UserCreatedSchema')).toBe('user-created-value');
-      expect(getSubjectName('OrderProcessedSchema')).toBe('order-processed-value');
-      expect(getSubjectName('NotificationEventSchema')).toBe('notification-event-value');
+      // Test core business logic with new topic-eventCode format
+      const getSubjectName = (topic: string, schemaName: string): string => {
+        const eventCode = schemaName.replace(/Schema$/, '');
+        const topicKebab = toKebabCase(topic);
+        const eventCodeKebab = toKebabCase(eventCode);
+        return `${topicKebab}-${eventCodeKebab}`;
+      };
+
+      expect(getSubjectName('users', 'UserCreatedSchema')).toBe('users-userCreated');
+      expect(getSubjectName('orders', 'OrderProcessedSchema')).toBe('orders-orderProcessed');
+      expect(getSubjectName('notifications', 'NotificationEventSchema')).toBe('notifications-notificationEvent');
     });
   });
 

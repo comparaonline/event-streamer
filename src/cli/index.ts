@@ -12,6 +12,7 @@ program
   .command('publish')
   .description('Publish event schemas to Confluent Schema Registry')
   .option('--events-dir <path>', 'Directory containing event schema files', './src/events')
+  .option('--topic <name>', 'Topic name for schema subjects (required)')
   .option('--registry-url <url>', 'Schema registry URL (required)')
   .option('--registry-auth <user:password>', 'Registry authentication credentials')
   .option('--dry-run', 'Show what would be published without actually doing it')
@@ -20,6 +21,12 @@ program
     try {
       if (!options.registryUrl) {
         console.error('❌ Registry URL is required. Use --registry-url option.');
+        process.exit(1);
+      }
+
+      if (!options.topic) {
+        console.error('❌ Topic name is required. Use --topic option.');
+        console.error('   Example: --topic orders (will create subjects like "orders-user-event")');
         process.exit(1);
       }
 

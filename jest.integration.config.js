@@ -5,14 +5,16 @@ module.exports = {
   roots: ['src/'],
   testEnvironment: 'node',
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  collectCoverage: false, // Skip coverage for integration tests
+  collectCoverage: true,
+  collectCoverageFrom: ['src/**/*.{ts,js}', '!src/**/*.d.ts', '!src/**/__tests__/**/*.*', '!src/test/**/*.*', '!src/local-tests/**/*.*'],
   // Only run integration tests
   testMatch: [
     '**/src/schema-registry/__tests__/integration.test.ts',
     '**/src/schema-registry/__tests__/mixed-formats.test.ts', 
     '**/src/schema-registry/__tests__/schema-evolution.test.ts',
     '**/src/schema-registry/__tests__/simple-integration.test.ts',
-    '**/src/schema-registry/__tests__/debug-encoding.test.ts'
+    '**/src/schema-registry/__tests__/debug-encoding.test.ts',
+    '**/src/**/*.integration.test.ts'
   ],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testTimeout: 60000 // Longer timeout for integration tests

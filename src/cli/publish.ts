@@ -7,6 +7,7 @@ import { Debug } from '../interfaces';
 
 interface PublishOptions {
   eventsDir: string;
+  topic: string;
   registryUrl: string;
   registryAuth?: string;
   dryRun?: boolean;
@@ -51,7 +52,7 @@ async function findSchemaFiles(eventsDir: string): Promise<string[]> {
         // Recursively search subdirectories
         const subFiles = await findSchemaFiles(fullPath);
         files.push(...subFiles);
-      } else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts')) {
+      } else if ((entry.name.endsWith('.ts') || entry.name.endsWith('.js')) && !entry.name.endsWith('.d.ts')) {
         files.push(fullPath);
       }
     }
@@ -70,18 +71,28 @@ async function loadSchemaFile(filePath: string): Promise<SchemaFile | null> {
     // Use dynamic import to load TypeScript files
     // Note: This requires the files to be compiled first
     const absolutePath = path.resolve(filePath);
-    const moduleExports = await import(absolutePath);
+    console.log(`📂 Loading schema file: ${absolutePath}`);
 
-    const fileName = path.basename(filePath, '.ts');
+    const moduleExports = await import(absolutePath);
+    console.log(`📦 Module exports:`, Object.keys(moduleExports));
+
+    const fileName = path.basename(filePath, path.extname(filePath));
 
     // Find Zod schemas in the module
     const schemas: Record<string, any> = {};
     for (const [key, value] of Object.entries(moduleExports)) {
+      console.log(
+        `🔍 Checking export "${key}":`,
+        typeof value,
+        value && typeof value === 'object' && '_def' in value ? 'IS ZOD SCHEMA' : 'not a zod schema'
+      );
       // Check if it's a Zod schema (has _def property)
       if (value && typeof value === 'object' && '_def' in value) {
         schemas[key] = value;
       }
     }
+
+    console.log(`📋 Found ${Object.keys(schemas).length} Zod schemas:`, Object.keys(schemas));
 
     if (Object.keys(schemas).length === 0) {
       debug(Debug.WARN, 'No Zod schemas found in file', { filePath });
@@ -94,22 +105,29 @@ async function loadSchemaFile(filePath: string): Promise<SchemaFile | null> {
       exports: schemas
     };
   } catch (error) {
+    console.error(`❌ Failed to load schema file ${filePath}:`, error);
     debug(Debug.ERROR, 'Failed to load schema file', { filePath, error });
     throw new Error(`Failed to load schema file ${filePath}: ${error}`);
   }
 }
 
-function getSubjectName(schemaName: string): string {
-  // Remove 'Schema' suffix if present
-  const baseName = schemaName.replace(/Schema$/, '');
+// Helper function to convert to kebab-case (matching Schema Registry client)
+function toKebabCase(str: string): string {
+  return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+}
 
-  // Convert to kebab-case and add -value suffix
-  const kebabName = baseName
-    .replace(/([A-Z])/g, '-$1')
-    .toLowerCase()
-    .replace(/^-/, '');
+function getSubjectName(topic: string, schemaName: string): string {
+  // Remove 'Schema' suffix if present to get event code
+  const eventCode = schemaName.replace(/Schema$/, '');
 
-  return `${kebabName}-value`;
+  // Convert both topic and event code to kebab-case using same logic as producer
+  const topicKebab = toKebabCase(topic);
+  const eventCodeKebab = toKebabCase(eventCode);
+
+  // Use same format as runtime: {topic}-{eventCode}
+  const subject = `${topicKebab}-${eventCodeKebab}`;
+  console.log(`🏷️ Subject name: "${topic}" + "${schemaName}" → "${subject}"`);
+  return subject;
 }
 
 async function publishSchema(client: SchemaRegistryClient, subject: string, schema: any, options: PublishOptions): Promise<void> {
@@ -158,12 +176,17 @@ async function publishSchema(client: SchemaRegistryClient, subject: string, sche
 }
 
 export async function registerSchemaToRegistry(client: SchemaRegistryClient, subject: string, schemaString: string): Promise<void> {
-  // Use the underlying registry client
+  // Use the underlying registry client with correct signature: register(schema, options)
   const registry = (client as any).registry;
-  await registry.register(subject, {
-    type: 'JSON',
-    schema: schemaString
-  });
+  await registry.register(
+    {
+      type: 'JSON',
+      schema: schemaString
+    },
+    {
+      subject: subject
+    }
+  );
 }
 
 export async function publishSchemas(options: PublishOptions): Promise<void> {
@@ -196,7 +219,7 @@ export async function publishSchemas(options: PublishOptions): Promise<void> {
 
       // Process each schema in the file
       for (const [schemaName, schema] of Object.entries(schemaFile.exports)) {
-        const subject = getSubjectName(schemaName);
+        const subject = getSubjectName(options.topic, schemaName);
 
         await publishSchema(client, subject, schema, options);
 

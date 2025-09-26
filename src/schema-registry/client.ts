@@ -276,12 +276,6 @@ export class SchemaRegistryClient {
     return `${this.toKebabCase(topic)}-${this.toKebabCase(eventCode)}`;
   }
 
-  // Backward compatibility method - deprecated, use getSubjectFromTopicAndEventCode
-  getSubjectFromEventCode(eventCode: string): string {
-    // Legacy format without -value suffix for cleaner naming
-    return `${this.toKebabCase(eventCode)}`;
-  }
-
   // Register schema for testing purposes (clean naming)
   async registerSchema(eventName: string, schema: any): Promise<number> {
     try {

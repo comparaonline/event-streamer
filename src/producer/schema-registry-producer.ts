@@ -37,20 +37,19 @@ export class SchemaRegistryProducer {
   }
 
   // Pre-load schemas for known event types (startup optimization)
-  async preloadSchemas(eventCodes: string[]): Promise<void> {
+  async preloadSchemas(topicEventPairs: Array<{ topic: string; eventCode: string }>): Promise<void> {
     if (!this.schemaRegistryClient) {
       debug(Debug.WARN, 'Cannot preload schemas: Schema Registry client not initialized');
       return;
     }
 
-    // Note: preloadSchemas now requires topic context - this is a simplified fallback
-    const subjects = eventCodes.map((code) => this.getSubjectFromEventCode(code));
+    const subjects = topicEventPairs.map(({ topic, eventCode }) => this.getSubjectFromTopicAndEventCode(topic, eventCode));
     await this.schemaRegistryClient.preloadSchemasForProducer(subjects);
 
     subjects.forEach((subject) => this.preloadedSubjects.add(subject));
 
-    debug(Debug.INFO, 'Preloaded schemas for event codes', {
-      eventCodes,
+    debug(Debug.INFO, 'Preloaded schemas for topic-event pairs', {
+      topicEventPairs,
       subjects,
       cacheStats: this.schemaRegistryClient.getCacheStats()
     });
@@ -214,14 +213,6 @@ export class SchemaRegistryProducer {
       return this.schemaRegistryClient.getSubjectFromTopicAndEventCode(topic, eventCode);
     }
     return `${topic}-${eventCode}`;
-  }
-
-  // Legacy method for backward compatibility
-  private getSubjectFromEventCode(eventCode: string): string {
-    if (this.schemaRegistryClient) {
-      return this.schemaRegistryClient.getSubjectFromEventCode(eventCode);
-    }
-    return eventCode;
   }
 
   // Validate event data
