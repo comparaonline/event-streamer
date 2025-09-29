@@ -9,19 +9,36 @@ export function stringToUpperCamelCase(input: string): string {
   return input.charAt(0).toUpperCase() + input.slice(1).replace(/[-_ ]./g, (x) => x[1].toUpperCase());
 }
 
+export function toKebabCase(str: string): string {
+  return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+}
+
+export function getSubjectName(topic: string, schemaName: string): string {
+  // Remove 'Schema' suffix if present to get event code
+  const eventCode = schemaName.replace(/Schema$/, '');
+
+  // Convert both topic and event code to kebab-case using same logic as producer
+  const topicKebab = toKebabCase(topic);
+  const eventCodeKebab = toKebabCase(eventCode);
+
+  // Use same format as runtime: {topic}-{eventCode}
+  const subject = `${topicKebab}-${eventCodeKebab}`;
+  return subject;
+}
+
 export function getParsedJson<T extends Object>(input: string | Buffer | null): T | null {
   try {
     if (input == null) {
       return null;
     }
     return JSON.parse(typeof input === 'string' ? input : input.toString());
-  } catch (e) {
+  } catch (_e) {
     return null;
   }
 }
 
 /* istanbul ignore next */
-export function debug(level: Debug, ...args: any[]): void {
+export function debug(level: Debug, ...args: unknown[]): void {
   const configLevel = getConfig().debug;
   if (configLevel != null && configLevel !== false && configLevel <= level) {
     switch (level) {
