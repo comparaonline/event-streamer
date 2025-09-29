@@ -61,6 +61,12 @@ export function validateEvent<T>(schema: z.ZodSchema<T>, event: unknown): Schema
 }
 
 // Factory function to create base events with legacy-compatible defaults
+// TODO: Refactor to use Zod defaults in BaseEventSchema.
+// This function is a source of confusion because it's used for both legacy
+// and schema registry events, but the producer requires the full event object
+// to be passed in. A better approach would be to define defaults directly
+// in the BaseEventSchema using Zod's `.default()` method for `id`, `timestamp`, etc.
+// This would make the schema the single source of truth and simplify event creation.
 export function createBaseEvent(data: { code: string } & Partial<BaseEvent>): BaseEvent {
   return {
     ...data,
