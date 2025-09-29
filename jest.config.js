@@ -20,6 +20,7 @@ module.exports = {
   },
   // Skip integration tests by default - only run unit tests
   testPathIgnorePatterns: [
+    '.*\\.integration\\.test\\.(ts|js)$',
     'src/schema-registry/__tests__/integration.test.ts',
     'src/schema-registry/__tests__/mixed-formats.test.ts', 
     'src/schema-registry/__tests__/schema-evolution.test.ts',

@@ -1,12 +1,13 @@
+// jest.globalSetup.js
+const { setConfig } = require('./src/config');
 
-import { setConfig } from './src/config';
-
-// This function is executed once before all test suites.
-export default () => {
+module.exports = () => {
+  // This ensures that the entire test suite runs in "offline" mode,
+  // preventing any real Kafka connections during unit tests.
   setConfig({
     host: 'fake-kafka:9092',
     consumer: {
-      groupId: 'global-test-group'
+      groupId: 'global-test-group',
     },
     onlyTesting: true,
     showDeprecationWarnings: false,

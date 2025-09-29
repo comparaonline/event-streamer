@@ -36,10 +36,6 @@ function getIncrementalId(): number {
 let consumer: ConsumerRouter | null;
 
 describe('Consumer Integration Tests', () => {
-  beforeEach(() => {
-    consumer = new ConsumerRouter();
-  });
-
   afterEach(async () => {
     if (consumer) {
       await consumer.stop();
@@ -67,7 +63,7 @@ describe('Consumer Integration Tests', () => {
         };
 
         // act
-        const consumer = new ConsumerRouter();
+        consumer = new ConsumerRouter();
         consumer.add(topic, handler);
 
         await consumer.start();
@@ -89,8 +85,6 @@ describe('Consumer Integration Tests', () => {
           },
           emit
         );
-
-        await consumer.stop();
       },
       TEST_TIMEOUT
     );
@@ -112,7 +106,7 @@ describe('Consumer Integration Tests', () => {
         };
 
         // act
-        const consumer = new ConsumerRouter();
+        consumer = new ConsumerRouter();
 
         consumer.add(topic, handlerA);
         consumer.add(topic, 'EventCodeB', handlerB);
@@ -139,8 +133,6 @@ describe('Consumer Integration Tests', () => {
         expect(handlerA).toHaveBeenCalledTimes(2);
         expect(handlerC).toHaveBeenCalledTimes(1);
         expect(handlerB).toHaveBeenCalledTimes(0);
-
-        await consumer.stop();
       },
       TEST_TIMEOUT
     );
@@ -173,7 +165,7 @@ describe('Consumer Integration Tests', () => {
 
         // act
 
-        const consumer = new ConsumerRouter();
+        consumer = new ConsumerRouter();
 
         consumer.add([topicA, topicB], 'EventCodeA', handlerA);
         consumer.add(topicA, 'EventCodeB', handlerB);
@@ -220,8 +212,6 @@ describe('Consumer Integration Tests', () => {
         expect(handlerA).toHaveBeenCalledTimes(2);
         expect(handlerB).toHaveBeenCalledTimes(1);
         expect(handlerC).toHaveBeenCalledTimes(1);
-
-        await consumer.stop();
       },
       TEST_TIMEOUT
     );
@@ -238,7 +228,7 @@ describe('Consumer Integration Tests', () => {
             maxMessagesPerSpecificTopic: {}
           })
         );
-        const consumer = new ConsumerRouter();
+        consumer = new ConsumerRouter();
         await createTopic(topic);
 
         // act
@@ -253,8 +243,6 @@ describe('Consumer Integration Tests', () => {
 
         // assert
         expect(handler).not.toHaveBeenCalled();
-
-        await consumer.stop();
       },
       TEST_TIMEOUT
     );
@@ -264,7 +252,7 @@ describe('Consumer Integration Tests', () => {
       async () => {
         // arrange
         setConfig(generateConfig({ maxMessagesPerTopic: 1 }));
-        const consumer = new ConsumerRouter();
+        consumer = new ConsumerRouter();
         const handler = jest.fn();
         const id = getIncrementalId();
         const topic = `my-random-topic-${id}`;
@@ -290,8 +278,6 @@ describe('Consumer Integration Tests', () => {
         expect(handler).toHaveBeenCalled();
         expect(pauseSpy).toHaveBeenCalledWith([{ topic }]);
         expect(resumeSpy).toHaveBeenCalledWith([{ topic }]);
-
-        await consumer.stop();
       },
       TEST_TIMEOUT
     );
@@ -308,7 +294,7 @@ describe('Consumer Integration Tests', () => {
         await createTopic(topic);
 
         // act
-        const consumer = new ConsumerRouter();
+        consumer = new ConsumerRouter();
         consumer.add(topic, handler);
         await consumer.start();
 

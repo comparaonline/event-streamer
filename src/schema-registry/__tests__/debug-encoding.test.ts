@@ -19,6 +19,11 @@ describe('Debug Schema Registry Encoding', () => {
     client = new SchemaRegistryClient({ url: SCHEMA_REGISTRY_URL });
   });
 
+  // TODO: This test is skipped because it requires the UserEventSchema to be manually pre-registered.
+  // To fix this, we should:
+  // 1. Programmatically register the schema in a `beforeAll` or `beforeEach` block.
+  // 2. Run the encoding/decoding test.
+  // 3. Programmatically delete the schema in an `afterAll` or `afterEach` block to ensure the test is self-contained and idempotent.
   it.skip('should test encoding with existing UserEvent schema (skipped - schema needs to be pre-registered with new naming)', async () => {
     // Use the existing UserEvent schema (which we know exists)
     const testData = {
@@ -84,7 +89,7 @@ describe('Debug Schema Registry Encoding', () => {
       console.error('❌ user-registered-value encoding failed - this should show us the detailed error!');
       // Force display by failing with detailed message
             expect(error).toBeInstanceOf(Error);
-      expect((error as Error).message).toContain('Schema not found');
+      expect((error as Error).message).toContain("Subject 'user-registered-value' not found");
     }
   });
 });

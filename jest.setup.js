@@ -3,7 +3,9 @@
 
 // Mock process.env for consistent test behavior
 process.env.NODE_ENV = 'test';
-process.env.RUN_INTEGRATION_TESTS = 'false'; // Explicitly disable integration tests for unit tests
+if (!process.env.RUN_INTEGRATION_TESTS) {
+  process.env.RUN_INTEGRATION_TESTS = 'false'; // Explicitly disable integration tests for unit tests
+}
 
 // Set reasonable test timeouts
 jest.setTimeout(15000);
