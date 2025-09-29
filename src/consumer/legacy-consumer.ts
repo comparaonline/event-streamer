@@ -124,7 +124,7 @@ export class ConsumerRouter {
     }
   }
 
-  public getQueueStats(): any {
+  public getQueueStats(): Record<string, unknown> {
     return this.queueManager?.getQueueStats() || {};
   }
 

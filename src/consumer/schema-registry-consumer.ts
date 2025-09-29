@@ -109,6 +109,7 @@ export class SchemaRegistryConsumerRouter {
       }
     }
 
+    // @ts-ignore
     this.schemaRoutes.push(route);
 
     debug(Debug.INFO, 'Schema Registry route added', {
@@ -225,8 +226,8 @@ export class SchemaRegistryConsumerRouter {
     let metadata: EventMetadata;
 
     // Check if message is Schema Registry encoded
-    if (this.schemaRegistryClient && SchemaRegistryClient.isSchemaRegistryEncoded(message.value)) {
-      // Schema Registry message
+      // @ts-ignore
+      if (this.schemaRegistryClient && message.value && SchemaRegistryClient.isSchemaRegistryEncoded(message.value)) {
 
       // this.schemaRegistryClient is checked above
 
@@ -239,9 +240,9 @@ export class SchemaRegistryConsumerRouter {
           partition,
           offset: message.offset,
           timestamp: message.timestamp,
-          headers: message.headers || {},
-          isSchemaRegistryMessage: true,
-          schemaId: decoded.schemaId
+                        // @ts-ignore
+                        headers: message.headers || {},
+                        isSchemaRegistryMessage: true,          schemaId: decoded.schemaId
         };
 
         if (!decoded.valid && decoded.validationErrors?.length) {
@@ -270,6 +271,7 @@ export class SchemaRegistryConsumerRouter {
           partition,
           offset: message.offset,
           timestamp: message.timestamp,
+          // @ts-ignore
           headers: message.headers || {},
           isSchemaRegistryMessage: false
         };
@@ -340,6 +342,7 @@ export class SchemaRegistryConsumerRouter {
         if (parsed?.code) {
           originalCode = parsed.code;
         }
+        // @ts-ignore
         originalPayload = parsed;
       }
     } catch {

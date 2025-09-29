@@ -1,7 +1,7 @@
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+ 
 const draft7Meta = require('ajv/dist/refs/json-schema-draft-07.json');
 
 export function createAjvInstance(): Ajv {

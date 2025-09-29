@@ -456,7 +456,7 @@ describe('Mixed Format and Multiple Event Type Tests', () => {
         async (event: any, metadata: any) => {
           try {
             validMessages.push({ event, format: metadata.isSchemaRegistryMessage ? 'sr' : 'json' });
-          } catch (error) {
+          } catch (_error) {
             errorCount.count++;
           }
         },

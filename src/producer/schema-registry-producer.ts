@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RecordMetadata } from 'kafkajs';
+import { RecordMetadata, Message } from 'kafkajs';
 import { getConfig } from '../config';
 import { SchemaRegistryClient } from '../schema-registry/client';
 import { getProducer } from './legacy-producer';
@@ -65,7 +65,7 @@ export class SchemaRegistryProducer {
           toArray(data).map(async (item): Promise<SchemaRegistryMessage> => {
             this.validateEventData(item);
 
-            const itemAny = item as any;
+            const itemAny = item as { code?: string; appName?: string };
             const rawEventCode = (eventName ?? itemAny?.code ?? topic) as string;
             const resolvedEventCode = stringToUpperCamelCase(rawEventCode);
 
@@ -101,7 +101,7 @@ export class SchemaRegistryProducer {
 
             return {
               topic,
-              key: (eventData as any).id || undefined,
+              key: (eventData as { id?: string }).id || undefined,
               value: encodedValue,
               headers: {}
             };
@@ -148,7 +148,7 @@ export class SchemaRegistryProducer {
         const result: RecordMetadata[] = [];
 
         // Group messages by topic for efficient sending
-        const messagesByTopic = messages.reduce<Record<string, any[]>>((acc, msg) => {
+        const messagesByTopic = messages.reduce<Record<string, unknown[]>>((acc, msg) => {
           if (!acc[msg.topic]) {
             acc[msg.topic] = [];
           }
@@ -165,7 +165,7 @@ export class SchemaRegistryProducer {
         for (const [topic, msgs] of Object.entries(messagesByTopic)) {
           const topicResult = await producer.send({
             topic,
-            messages: msgs,
+            messages: msgs as Message[],
             compression: config.producer?.compressionType
           });
           result.push(...topicResult);
@@ -215,7 +215,7 @@ export class SchemaRegistryProducer {
   }
 
   // Get cache statistics
-  getCacheStats(): any {
+  getCacheStats(): Record<string, unknown> | undefined {
     return this.schemaRegistryClient?.getCacheStats();
   }
 

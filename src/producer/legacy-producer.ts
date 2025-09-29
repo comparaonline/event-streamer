@@ -160,16 +160,11 @@ export async function closeAll(): Promise<void> {
  * });
  * ```
  */
-export async function emit(topic: string, data: Object | Object[]): Promise<EmitResponse[]>;
-/**
- * @deprecated Use SchemaRegistryProducer.emitWithSchema() instead for type safety and Schema Registry support.
- */
-export async function emit(topic: string, eventName: string, data: Object | Object[]): Promise<EmitResponse[]>;
-/**
- * @deprecated Use SchemaRegistryProducer.emitWithSchema() instead for type safety and Schema Registry support.
- */
-export async function emit(output: Output | Output[], overwriteHosts?: string | string[]): Promise<EmitResponse[]>;
-export async function emit(param1: string | Output | Output[], param2?: any, param3?: any): Promise<EmitResponse[]> {
+export async function emit(
+  param1: string | Output | Output[],
+  param2?: string | Object | Object[] | string[],
+  param3?: Object | Object[]
+): Promise<EmitResponse[]> {
   warnDeprecation('emit() is deprecated. Use SchemaRegistryProducer.emitWithSchema() for type safety and Schema Registry support.');
   const config = getConfig();
 
@@ -179,14 +174,14 @@ export async function emit(param1: string | Output | Output[], param2?: any, par
     if (typeof param1 === 'object') {
       return {
         output: param1,
-        overwriteHosts: param2
+        overwriteHosts: param2 as string[]
       };
     } else {
       return {
         output: {
           topic: param1,
           eventName: typeof param2 === 'string' ? param2 : undefined,
-          data: typeof param2 === 'string' ? param3 : param2
+          data: (typeof param2 === 'string' ? param3 : param2) || {},
         }
       };
     }
@@ -203,7 +198,7 @@ export async function emit(param1: string | Output | Output[], param2?: any, par
     if (Array.isArray(data) && data.length === 0) {
       throw new Error("Data array can't be empty");
     }
-    if (data.hasOwnProperty('code')) {
+    if (Object.prototype.hasOwnProperty.call(data, 'code')) {
       throw new Error('Reserved object keyword "code" inside data');
     }
     if (eventName != null && eventName.trim() === '') {

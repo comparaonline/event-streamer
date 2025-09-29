@@ -26,27 +26,27 @@ describe('Producer Unit Tests', () => {
       });
     });
     it('Should throw an exception because data must be and object - string sended', async () => {
-      await expect(emit({ data: 'my-data' as unknown as any, topic: 'topic' })).rejects.toThrowError('Data must be an object');
+      await expect(emit({ data: 'my-data' as any, topic: 'topic' })).rejects.toThrow('Data must be an object');
     });
 
     it('Should throw an exception because data must be and object - null sended', async () => {
-      await expect(emit({ data: null as any, topic: 'topic' })).rejects.toThrowError('Data must be an object');
+      await expect(emit({ data: null as any, topic: 'topic' })).rejects.toThrow('Data must be an object');
     });
 
     it('Should throw an exception because data array is empty', async () => {
-      await expect(emit({ data: [], topic: 'topic' })).rejects.toThrowError("Data array can't be empty");
+      await expect(emit({ data: [], topic: 'topic' })).rejects.toThrow("Data array can't be empty");
     });
 
     it('Should throw an exception because data array is empty overload', async () => {
-      await expect(emit('topic', [])).rejects.toThrowError("Data array can't be empty");
+      await expect(emit('topic', [])).rejects.toThrow("Data array can't be empty");
     });
 
     it('Should throw an exception because data array is empty overload 2', async () => {
-      await expect(emit('topic', 'event-name', [])).rejects.toThrowError("Data array can't be empty");
+      await expect(emit('topic', 'event-name', [])).rejects.toThrow("Data array can't be empty");
     });
 
     it('Should throw an exception because event code - empty', async () => {
-      await expect(emit({ data: {}, topic: 'topic', eventName: '' })).rejects.toThrowError('Invalid message code');
+      await expect(emit({ data: {}, topic: 'topic', eventName: '' })).rejects.toThrow('Invalid message code');
     });
 
     it('Should throw an exception because event code - inside data', async () => {
@@ -57,7 +57,7 @@ describe('Producer Unit Tests', () => {
           },
           topic: 'topic'
         })
-      ).rejects.toThrowError('Reserved object keyword "code" inside data');
+      ).rejects.toThrow('Reserved object keyword "code" inside data');
     });
   });
 

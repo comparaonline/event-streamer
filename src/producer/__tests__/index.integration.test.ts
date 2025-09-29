@@ -19,6 +19,10 @@ const CONNECTION_TTL = 2000;
 const TEST_TIMEOUT = 120000;
 
 describe('Producer Integration Tests', () => {
+  afterAll(async () => {
+    await closeAll();
+  });
+
   describe('emit success', () => {
     beforeEach(() => {
       setConfig({

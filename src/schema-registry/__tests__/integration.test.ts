@@ -182,7 +182,7 @@ describe('Schema Registry Integration Tests', () => {
         const subject = client.getSubjectFromTopicAndEventCode(testTopic, uniqueEventName);
         const jsonSchema = zodToJsonSchema(UserRegisteredSchema, { target: 'jsonSchema7' });
         await registry.register({ type: 'JSON', schema: JSON.stringify(jsonSchema) }, { subject });
-      } catch (e) {
+      } catch (_e) {
         // ignore if already exists
       }
 
@@ -240,7 +240,7 @@ describe('Schema Registry Integration Tests', () => {
         const subject = client.getSubjectFromTopicAndEventCode(testTopic, uniqueEventName);
         const jsonSchema = zodToJsonSchema(UserRegisteredSchema, { target: 'jsonSchema7' });
         await registry.register({ type: 'JSON', schema: JSON.stringify(jsonSchema) }, { subject });
-      } catch (e) {
+      } catch (_e) {
         // ignore if already exists
       }
 
@@ -262,7 +262,7 @@ describe('Schema Registry Integration Tests', () => {
       });
 
       // Send legacy JSON message (fallback)
-      const jsonEvent = {
+      const jsonEvent: UserRegistered = {
         ...createBaseEvent({
           code: uniqueEventName,
           appName: 'integration-test'
@@ -284,6 +284,7 @@ describe('Schema Registry Integration Tests', () => {
       await jsonProducer.emitWithSchema({
         topic: testTopic,
         data: jsonEvent,
+
         schema: UserRegisteredSchema
       });
 
@@ -333,7 +334,7 @@ describe('Schema Registry Integration Tests', () => {
         const testValidationSubject = client.getSubjectFromTopicAndEventCode('test', 'TestValidation');
         const testValidationJsonSchema = zodToJsonSchema(UserRegisteredSchema, { target: 'jsonSchema7' });
         await registry.register({ type: 'JSON', schema: JSON.stringify(testValidationJsonSchema) }, { subject: testValidationSubject });
-      } catch (error) {
+      } catch (_error) {
         // Ignore registration errors for this test
       }
 

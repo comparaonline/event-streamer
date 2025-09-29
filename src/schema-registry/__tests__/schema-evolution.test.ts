@@ -205,7 +205,7 @@ describe('Schema Evolution and Compatibility Tests', () => {
         const EventSchema = BaseEventSchema.extend({});
         const eventJsonSchema = zodToJsonSchema(EventSchema, { target: 'jsonSchema7' });
         await registry.register({ type: 'JSON', schema: JSON.stringify(eventJsonSchema) }, { subject: eventSubject });
-      } catch (error) {
+      } catch (_error) {
         // Ignore registration errors for this test
       }
 
