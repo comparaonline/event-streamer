@@ -13,7 +13,7 @@
     ],
     "types": [
       "node",
-      "jest"
+      "vitest/globals"
     ],
     "esModuleInterop": true,
     "inlineSourceMap": true,

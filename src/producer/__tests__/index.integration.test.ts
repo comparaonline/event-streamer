@@ -54,8 +54,8 @@ describe('Producer Integration Tests', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         const eventName = 'EventCode';
         const testDate = '2022-12-09 00:00:00Z';
@@ -107,8 +107,8 @@ describe('Producer Integration Tests', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         const eventName = 'TopicA';
 
@@ -144,8 +144,8 @@ describe('Producer Integration Tests', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         const eventName = 'EventCode';
 
@@ -201,8 +201,8 @@ describe('Producer Integration Tests', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         // act
         await emit([
@@ -264,8 +264,8 @@ describe('Producer Integration Tests', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         // act
         await emit('topic-a', {
@@ -299,8 +299,8 @@ describe('Producer Integration Tests', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         // act
         await emit('topic-a', [
@@ -347,8 +347,8 @@ describe('Producer Integration Tests', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         // act
         await emit('topic-a', 'event-name-a', {
@@ -390,8 +390,8 @@ describe('Producer Integration Tests', () => {
           }
         });
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         // act
         await emit('topic-a', 'event-name-a', [
@@ -438,8 +438,8 @@ describe('Producer Integration Tests', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         // act
         await emit({

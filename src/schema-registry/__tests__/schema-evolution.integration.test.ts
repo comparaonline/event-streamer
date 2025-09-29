@@ -9,10 +9,13 @@ import { OrderStatusSchema, type OrderStatus } from '../../__fixtures__/schemas/
 import { ProductSchema, type Product } from '../../__fixtures__/schemas/product.schema';
 
 // Mock debug function to avoid config initialization issues while preserving other functions
-jest.mock('../../helpers', () => ({
-  ...jest.requireActual('../../helpers'),
-  debug: jest.fn()
-}));
+vi.mock('../../helpers', async () => {
+  const actual = await vi.importActual<typeof import('../../helpers')>('../../helpers');
+  return {
+    ...actual,
+    debug: vi.fn(),
+  };
+});
 
 describe('Schema Evolution and Compatibility Tests', () => {
   const SCHEMA_REGISTRY_URL = process.env.SCHEMA_REGISTRY_URL || 'http://localhost:8081';
@@ -357,11 +360,4 @@ describe('Schema Evolution and Compatibility Tests', () => {
   });
 });
 
-// Skip these tests if not running integration tests
-if (process.env.RUN_INTEGRATION_TESTS !== 'true') {
-  describe.skip('Schema Evolution and Compatibility Tests', () => {
-    it('should be skipped - set RUN_INTEGRATION_TESTS=true to enable', () => {
-      // Test is skipped when RUN_INTEGRATION_TESTS is not set to 'true'
-    });
-  });
-}
+

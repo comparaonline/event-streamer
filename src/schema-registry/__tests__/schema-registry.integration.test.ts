@@ -8,10 +8,13 @@ import { createBaseEvent } from '../../schemas';
 import { UserRegisteredSchema, type UserRegistered } from '../../__fixtures__/schemas/user-registered.schema';
 
 // Mock debug function to avoid config initialization issues while preserving other functions
-jest.mock('../../helpers', () => ({
-  ...jest.requireActual('../../helpers'),
-  debug: jest.fn()
-}));
+vi.mock('../../helpers', async () => {
+  const actual = await vi.importActual<typeof import('../../helpers')>('../../helpers');
+  return {
+    ...actual,
+    debug: vi.fn(),
+  };
+});
 
 // Real integration tests - requires Docker containers to be running
 // Run with: docker-compose up -d && npm run test:integration:sr
@@ -344,16 +347,4 @@ describe('Schema Registry Integration Tests', () => {
   });
 });
 
-// Helper to check if integration tests should run
-export function shouldRunIntegrationTests(): boolean {
-  return process.env.RUN_INTEGRATION_TESTS === 'true' || process.env.CI === 'true';
-}
 
-// Skip these tests if not in integration mode
-if (!shouldRunIntegrationTests()) {
-  describe.skip('Schema Registry Integration Tests', () => {
-    it('should be skipped - set RUN_INTEGRATION_TESTS=true to enable', () => {
-      // Test is skipped when RUN_INTEGRATION_TESTS is not set to 'true'
-    });
-  });
-}

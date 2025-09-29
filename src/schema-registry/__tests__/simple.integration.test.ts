@@ -7,10 +7,13 @@ import { createBaseEvent } from '../../schemas';
 import { UserRegisteredSchema, UserRegisteredSchemaRegistrySchema, type UserRegistered } from '../../__fixtures__/schemas/user-registered.schema';
 
 // Mock debug function to avoid config initialization issues while preserving other functions
-jest.mock('../../helpers', () => ({
-  ...jest.requireActual('../../helpers'),
-  debug: jest.fn()
-}));
+vi.mock('../../helpers', async () => {
+  const actual = await vi.importActual<typeof import('../../helpers')>('../../helpers');
+  return {
+    ...actual,
+    debug: vi.fn(),
+  };
+});
 
 describe('Simple Schema Registry Integration Test', () => {
   const SCHEMA_REGISTRY_URL = process.env.SCHEMA_REGISTRY_URL || 'http://localhost:8081';
@@ -129,10 +132,4 @@ describe('Simple Schema Registry Integration Test', () => {
   }, 30000);
 });
 
-// Only run integration tests when explicitly requested
-if (process.env.RUN_INTEGRATION_TESTS !== 'true') {
-  // Don't run any tests - Jest will show 0 tests for this file
-  describe.skip('Integration tests require RUN_INTEGRATION_TESTS=true', () => {
-    // This file contains integration tests that need Docker containers
-  });
-}
+

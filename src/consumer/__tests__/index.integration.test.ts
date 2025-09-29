@@ -55,7 +55,7 @@ describe('Consumer Integration Tests', () => {
   });
   describe('Consume online mode', () => {
     beforeEach(() => {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       MockDate.set('2022-12-08T00:00:00.000Z');
     });
 
@@ -63,7 +63,7 @@ describe('Consumer Integration Tests', () => {
       'Receive a single message without event code',
       async () => {
         // arrange
-        const handler = jest.fn();
+        const handler = vi.fn();
         const id = getIncrementalId();
         const topic = `my-random-topic-${id}`;
         setConfig(generateConfig({ strategy: 'one-by-one' }));
@@ -104,9 +104,9 @@ describe('Consumer Integration Tests', () => {
       'Receive two of three message by event code',
       async () => {
         // arrange
-        const handlerA = jest.fn();
-        const handlerB = jest.fn();
-        const handlerC = jest.fn();
+        const handlerA = vi.fn();
+        const handlerB = vi.fn();
+        const handlerC = vi.fn();
         const id = getIncrementalId();
         const topic = `my-random-topic-${id}`;
         setConfig(generateConfig({ strategy: 'topic', maxMessagesPerTopic: 10 }));
@@ -152,9 +152,9 @@ describe('Consumer Integration Tests', () => {
       'Receive a message on multi topics',
       async () => {
         // arrange
-        const handlerA = jest.fn();
-        const handlerB = jest.fn();
-        const handlerC = jest.fn();
+        const handlerA = vi.fn();
+        const handlerB = vi.fn();
+        const handlerC = vi.fn();
 
         const topicA = `my-random-topic-${getIncrementalId()}`;
         const topicB = `my-random-topic-${getIncrementalId()}`;
@@ -230,7 +230,7 @@ describe('Consumer Integration Tests', () => {
       'Receive a single message but wont process it',
       async () => {
         // arrange
-        const handler = jest.fn();
+        const handler = vi.fn();
         const id = getIncrementalId();
         const topic = `my-random-topic-${id}`;
         setConfig(
@@ -263,7 +263,7 @@ describe('Consumer Integration Tests', () => {
         // arrange
         setConfig(generateConfig({ maxMessagesPerTopic: 1 }));
         consumer = new ConsumerRouter();
-        const handler = jest.fn();
+        const handler = vi.fn();
         const id = getIncrementalId();
         const topic = `my-random-topic-${id}`;
         await createTopic(topic);
@@ -272,8 +272,8 @@ describe('Consumer Integration Tests', () => {
         consumer.add(topic, handler);
         await consumer.start();
 
-        const pauseSpy = jest.spyOn(consumer['consumer']!, 'pause');
-        const resumeSpy = jest.spyOn(consumer['consumer']!, 'resume');
+        const pauseSpy = vi.spyOn(consumer['consumer']!, 'pause');
+        const resumeSpy = vi.spyOn(consumer['consumer']!, 'resume');
 
         for (let i = 0; i < 100; i++) {
           await emit({
@@ -296,7 +296,7 @@ describe('Consumer Integration Tests', () => {
       async () => {
         // arrange
         setConfig(generateConfig({}));
-        const handler = jest.fn();
+        const handler = vi.fn();
         const id = getIncrementalId();
         const topic = `my-random-topic-${id}`;
 
@@ -307,7 +307,7 @@ describe('Consumer Integration Tests', () => {
         consumer.add(topic, handler);
         await consumer.start();
 
-        const disconnectSpy = jest.spyOn(consumer['consumer']!, 'disconnect');
+        const disconnectSpy = vi.spyOn(consumer['consumer']!, 'disconnect');
 
         await consumer.stop();
 

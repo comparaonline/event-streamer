@@ -6,7 +6,7 @@ import { BaseEventSchema, createBaseEvent } from '../../schemas';
 import { SchemaRegistryClient } from '../client';
 
 // Mock Kafka dependencies
-jest.mock('kafkajs');
+vi.mock('kafkajs');
 
 // Test event schema
 const TestEventSchema = BaseEventSchema.extend({
@@ -17,7 +17,7 @@ const TestEventSchema = BaseEventSchema.extend({
 
 describe('Schema Registry Backward Compatibility', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Configure event-streamer for testing
     setConfig({

@@ -6,10 +6,13 @@ import { UserRegisteredSchema } from '../../__fixtures__/schemas/user-registered
 import { UserEventSchema } from '../../__fixtures__/schemas/user-event.schema';
 
 // Mock debug function
-jest.mock('../../helpers', () => ({
-  ...jest.requireActual('../../helpers'),
-  debug: jest.fn()
-}));
+vi.mock('../../helpers', async () => {
+  const actual = await vi.importActual<typeof import('../../helpers')>('../../helpers');
+  return {
+    ...actual,
+    debug: vi.fn(),
+  };
+});
 
 describe('Debug Schema Registry Encoding', () => {
   const SCHEMA_REGISTRY_URL = process.env.SCHEMA_REGISTRY_URL || 'http://localhost:8081';
@@ -94,10 +97,4 @@ describe('Debug Schema Registry Encoding', () => {
   });
 });
 
-// Only run integration tests when explicitly requested
-if (process.env.RUN_INTEGRATION_TESTS !== 'true') {
-  // Don't run any tests - Jest will show 0 tests for this file
-  describe.skip('Integration tests require RUN_INTEGRATION_TESTS=true', () => {
-    // This file contains integration tests that need Docker containers
-  });
-}
+

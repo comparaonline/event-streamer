@@ -12,10 +12,13 @@ import { OrderEventSchema, type OrderEvent } from '../../__fixtures__/schemas/or
 import { NotificationEventSchema, type NotificationEvent } from '../../__fixtures__/schemas/notification-event.schema';
 
 // Mock debug function to avoid config initialization issues while preserving other functions
-jest.mock('../../helpers', () => ({
-  ...jest.requireActual('../../helpers'),
-  debug: jest.fn()
-}));
+vi.mock('../../helpers', async () => {
+  const actual = await vi.importActual<typeof import('../../helpers')>('../../helpers');
+  return {
+    ...actual,
+    debug: vi.fn(),
+  };
+});
 
 describe('Mixed Format and Multiple Event Type Tests', () => {
   const SCHEMA_REGISTRY_URL = process.env.SCHEMA_REGISTRY_URL || 'http://localhost:8081';
@@ -493,11 +496,4 @@ describe('Mixed Format and Multiple Event Type Tests', () => {
   });
 });
 
-// Skip if not running integration tests
-if (process.env.RUN_INTEGRATION_TESTS !== 'true') {
-  describe.skip('Mixed Format and Multiple Event Type Tests', () => {
-    it('should be skipped - set RUN_INTEGRATION_TESTS=true to enable', () => {
-      // Test is skipped when RUN_INTEGRATION_TESTS is not set to 'true'
-    });
-  });
-}
+

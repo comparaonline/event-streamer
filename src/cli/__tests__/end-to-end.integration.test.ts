@@ -4,16 +4,15 @@ import { publishSchemas } from '../publish';
 import { E2eTestEventSchema } from '../../__fixtures__/schemas/e2e-test-event.schema';
 
 // Mock debug function
-jest.mock('../../helpers', () => ({
-  ...jest.requireActual('../../helpers'),
-  debug: jest.fn()
-}));
+vi.mock('../../helpers', async () => {
+  const actual = await vi.importActual<typeof import('../../helpers')>('../../helpers');
+  return {
+    ...actual,
+    debug: vi.fn(),
+  };
+});
 
-const shouldRun = process.env.RUN_INTEGRATION_TESTS === 'true';
-
-const describeMaybe = shouldRun ? describe : describe.skip;
-
-describeMaybe('CLI-Runtime Integration (End-to-End)', () => {
+describe('CLI-Runtime Integration (End-to-End)', () => {
   const SCHEMA_REGISTRY_URL = process.env.SCHEMA_REGISTRY_URL || 'http://localhost:8081';
   let client: SchemaRegistryClient;
 
