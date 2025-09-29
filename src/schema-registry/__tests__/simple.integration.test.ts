@@ -22,13 +22,13 @@ describe('Simple Schema Registry Integration Test', () => {
   let client: SchemaRegistryClient;
   let producer: SchemaRegistryProducer;
   let consumer: SchemaRegistryConsumerRouter;
-  let eventName: string;
+  let eventCode: string;
   let testTopic: string;
 
   beforeAll(async () => {
     console.log('🔧 Setting up simple integration test...');
 
-    eventName = `UserRegistered${Date.now()}`;
+    eventCode = `UserRegistered${Date.now()}`;
     testTopic = `simple-test-${Date.now()}`;
 
     // Configure for integration testing
@@ -45,10 +45,10 @@ describe('Simple Schema Registry Integration Test', () => {
     consumer = new SchemaRegistryConsumerRouter();
 
     // Register schema using topic-based subject name that producer will use
-    console.log(`📝 Registering ${eventName} schema...`);
+    console.log(`📝 Registering ${eventCode} schema...`);
     try {
       // We need to manually construct the subject that producer will expect
-      const expectedSubject = client.getSubjectFromTopicAndEventCode(testTopic, eventName);
+      const expectedSubject = client.getSubjectFromTopicAndEventCode(testTopic, eventCode);
 
       // Register directly with Schema Registry using the computed subject
       const { zodToJsonSchema } = await import('zod-to-json-schema');
@@ -58,7 +58,7 @@ describe('Simple Schema Registry Integration Test', () => {
       const registrationResult = await registry.register({ type: 'JSON', schema: JSON.stringify(jsonSchema) }, { subject: expectedSubject });
 
       const schemaId = typeof registrationResult === 'object' ? registrationResult.id : registrationResult;
-      console.log(`✅ ${eventName} schema registered with subject ${expectedSubject} and ID: ${schemaId}`);
+      console.log(`✅ ${eventCode} schema registered with subject ${expectedSubject} and ID: ${schemaId}`);
     } catch (error) {
       console.error('❌ Schema registration failed:', error);
       throw error;
@@ -81,7 +81,7 @@ describe('Simple Schema Registry Integration Test', () => {
     // Set up consumer
     consumer.addWithSchema(
       testTopic,
-      eventName,
+      eventCode,
       async (event: UserRegistered) => {
         receivedEvents.push(event);
       },
@@ -95,7 +95,7 @@ describe('Simple Schema Registry Integration Test', () => {
     // Create test event following MVP pattern
     const testEvent: UserRegistered = {
       ...createBaseEvent({
-        code: eventName,
+        code: eventCode,
         appName: 'simple-test'
       }),
       userId: randomUUID(),
@@ -110,7 +110,7 @@ describe('Simple Schema Registry Integration Test', () => {
     // Produce event
     await producer.emitWithSchema({
       topic: testTopic,
-      eventName: eventName,
+      eventCode: eventCode,
       data: testEvent,
       schema: UserRegisteredSchema
     });
@@ -124,7 +124,7 @@ describe('Simple Schema Registry Integration Test', () => {
       userId: testEvent.userId,
       email: testEvent.email,
       registrationSource: testEvent.registrationSource,
-      code: eventName,
+      code: eventCode,
       appName: 'simple-test'
     });
 

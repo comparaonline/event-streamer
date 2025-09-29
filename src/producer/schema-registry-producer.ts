@@ -10,7 +10,8 @@ import { Output, Config } from '../interfaces';
 
 type EmitResponse = RecordMetadata[];
 
-interface SchemaRegistryOutput<T extends BaseEvent = BaseEvent> extends Omit<Output, 'data'> {
+interface SchemaRegistryOutput<T extends BaseEvent = BaseEvent> extends Omit<Output, 'data' | 'eventName'> {
+  eventCode?: string;
   data: T | T[];
   schema?: z.ZodSchema<T>;
 }
@@ -54,7 +55,7 @@ export class SchemaRegistryProducer {
 
     const messages = await Promise.all(
       outputs.map(async (singleOutput) => {
-        const { topic, data, eventName, schema } = singleOutput;
+        const { topic, data, eventCode, schema } = singleOutput;
 
         // The Zod schema is now required for encoding.
         if (!schema) {
@@ -66,7 +67,7 @@ export class SchemaRegistryProducer {
             this.validateEventData(item);
 
             const itemAny = item as { code?: string; appName?: string };
-            const rawEventCode = (eventName ?? itemAny?.code ?? topic) as string;
+            const rawEventCode = (eventCode ?? itemAny?.code ?? topic) as string;
             const resolvedEventCode = stringToUpperCamelCase(rawEventCode);
 
             // Create the full event object with all required fields.
@@ -118,13 +119,13 @@ export class SchemaRegistryProducer {
     const config = getConfig();
     const appName = config.appName ?? config.consumer?.groupId ?? process.env.HOSTNAME?.split('-')[0] ?? 'unknown';
 
-    const legacyOutputs: Output[] = outputs.map(({ topic, data, eventName }) => ({
+    const legacyOutputs: Output[] = outputs.map(({ topic, data, eventCode }) => ({
       topic,
-      eventName,
+      eventName: eventCode,
       data: toArray(data).map((item) => {
         const baseEvent = createBaseEvent({
           ...item,
-          code: stringToUpperCamelCase(eventName ?? topic),
+          code: stringToUpperCamelCase(eventCode ?? topic),
           appName: item.appName ?? appName
         });
 

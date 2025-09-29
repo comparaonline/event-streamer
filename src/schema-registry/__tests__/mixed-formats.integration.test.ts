@@ -148,19 +148,19 @@ describe('Mixed Format and Multiple Event Type Tests', () => {
       await Promise.all([
         producer.emitWithSchema({
           topic: testTopic,
-          eventName: 'UserEvent',
+          eventCode: 'UserEvent',
           data: userEvent,
           schema: UserEventSchema
         }),
         producer.emitWithSchema({
           topic: testTopic,
-          eventName: 'OrderEvent',
+          eventCode: 'OrderEvent',
           data: orderEvent,
           schema: OrderEventSchema
         }),
         producer.emitWithSchema({
           topic: testTopic,
-          eventName: 'NotificationEvent',
+          eventCode: 'NotificationEvent',
           data: notificationEvent,
           schema: NotificationEventSchema
         })
@@ -259,7 +259,7 @@ describe('Mixed Format and Multiple Event Type Tests', () => {
         events.push(
           producer.emitWithSchema({
             topic: testTopic,
-            eventName: 'UserEvent',
+            eventCode: 'UserEvent',
             data: {
               ...createBaseEvent({ code: 'UserEvent', appName: 'routing-test' }),
               userId: randomUUID(),
@@ -274,7 +274,7 @@ describe('Mixed Format and Multiple Event Type Tests', () => {
         events.push(
           producer.emitWithSchema({
             topic: testTopic,
-            eventName: 'OrderEvent',
+            eventCode: 'OrderEvent',
             data: {
               ...createBaseEvent({ code: 'OrderEvent', appName: 'routing-test' }),
               orderId: randomUUID(),
@@ -365,6 +365,7 @@ describe('Mixed Format and Multiple Event Type Tests', () => {
 
       await srProducer.emitWithSchema({
         topic: testTopic,
+        eventCode: 'UserEvent',
         data: srEvent,
         schema: UserEventSchema
       });

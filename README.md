@@ -30,6 +30,18 @@ setConfig({
 });
 ```
 
+### Configuration Options
+
+| Key              | Type                                              | Description                                                                                             | Default                  |
+| ---------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `host`           | `string`                                          | **Required.** Comma-separated list of Kafka broker hosts.                                               | -                        |
+| `appName`        | `string`                                          | The name of your application, used for logging and metadata.                                            | `unknown`                |
+| `consumer`       | `object`                                          | Consumer-specific settings. `groupId` is required to run a consumer.                                    | -                        |
+| `producer`       | `object`                                          | Producer-specific settings.                                                                             | -                        |
+| `schemaRegistry` | `object`                                          | Schema Registry settings. `url` is required to use the Schema Registry producer/consumer.               | -                        |
+| `onlyTesting`    | `boolean`                                         | Set to `true` in a test environment to disable real Kafka connections and enable mock functionalities. | `false`                  |
+
+
 ---
 
 ## CLI for Schema Management
@@ -66,17 +78,22 @@ export function createUserRegistered(data: Partial<UserRegistered>): UserRegiste
 
 ### 2. CLI Commands
 
-- **`generate-example <event-name>`**: Creates a new example schema file to get you started.
+- **`init`**: Scaffolds a new event schema structure in your project by creating a `./src/events` directory with an example schema and a README.
+  - **Usage**: `pnpm event-streamer-cli init`
+
+- **`generate-example <event-code>`**: Creates a new example schema file to get you started.
   - **Usage**: `pnpm event-streamer-cli generate-example user-created`
 
 - **`validate <schema-file-path>`**: Validates a single Zod schema file to ensure it's correctly structured.
   - **Usage**: `pnpm event-streamer-cli validate ./events/user-registered.schema.ts`
 
 - **`publish`**: Publishes all schemas from a directory to the Schema Registry.
-  - **Usage**: `pnpm event-streamer-cli publish --events-dir ./events --registry-url http://localhost:8081`
+  - **Usage**: `pnpm event-streamer-cli publish --events-dir ./events --registry-url http://localhost:8081 --topic <topic-name>`
   - **Options**:
+    - `--topic <name>`: **Required.** The topic name used to derive the schema subject (e.g., `<topic>-<event-code>`).
     - `--registry-auth <user:pass>`: For Schema Registry instances that require basic authentication.
     - `--dry-run`: Simulates the publish process without making any actual changes.
+    - `--force`: Forces the registration of a new schema version even if the schema has not changed.
 
 ---
 
@@ -103,7 +120,7 @@ async function sendUserRegistration() {
 
   await producer.emitWithSchema({
     topic: 'users',
-    eventName: 'UserRegistered', // Used to derive the subject name
+    eventCode: 'UserRegistered', // Used to derive the subject name
     data: eventData,
     schema: UserRegisteredSchema
   });
@@ -215,6 +232,7 @@ setConfig({
   ```ts
   import { emit } from '@comparaonline/event-streamer';
 
+  // Note: The legacy emit function still uses `eventName` for backward compatibility.
   await emit({
     topic: 'my-topic',
     eventName: 'my-event-name',
@@ -229,8 +247,8 @@ setConfig({
 
   const consumer = new ConsumerRouter();
 
-  consumer.add('topic-a', 'event-name-a', (data, emit) => { 
-    console.log('Handler for topic-a and event-name-a');
+  consumer.add('topic-a', 'eventName', (data, emit) => { 
+    console.log('Handler for topic-a and eventName');
   });
 
   await consumer.start();

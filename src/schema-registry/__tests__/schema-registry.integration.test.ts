@@ -25,7 +25,7 @@ describe('Schema Registry Integration Tests', () => {
   let client: SchemaRegistryClient;
   let producer: SchemaRegistryProducer;
   let consumer: SchemaRegistryConsumerRouter;
-  let uniqueEventName: string;
+  let uniqueEventCode: string;
 
   // Test schemas are imported from fixtures
 
@@ -49,13 +49,13 @@ describe('Schema Registry Integration Tests', () => {
 
     // Register schemas used in tests with topic-based subjects to match new naming
     const timestamp = Date.now();
-    uniqueEventName = `UserRegistered-${timestamp}`;
+    uniqueEventCode = `UserRegistered-${timestamp}`;
     try {
       const { zodToJsonSchema } = await import('zod-to-json-schema');
       const registry = (client as any).registry;
 
       // Register schema with topic-based subject
-      const userRegisteredSubject = client.getSubjectFromTopicAndEventCode('users', uniqueEventName);
+      const userRegisteredSubject = client.getSubjectFromTopicAndEventCode('users', uniqueEventCode);
       const userRegisteredJsonSchema = zodToJsonSchema(UserRegisteredSchema, { target: 'jsonSchema7' });
       await registry.register({ type: 'JSON', schema: JSON.stringify(userRegisteredJsonSchema) }, { subject: userRegisteredSubject });
 
@@ -81,7 +81,7 @@ describe('Schema Registry Integration Tests', () => {
       // Create a test event with Schema Registry envelope
       const userEvent = {
         ...createBaseEvent({
-          code: uniqueEventName,
+          code: uniqueEventCode,
           appName: 'integration-test'
         }),
         userId: randomUUID(),
@@ -94,7 +94,7 @@ describe('Schema Registry Integration Tests', () => {
       };
 
       // Validate and encode the event
-      const subject = client.getSubjectFromTopicAndEventCode('users', uniqueEventName);
+      const subject = client.getSubjectFromTopicAndEventCode('users', uniqueEventCode);
       const encoded = await client.encode(subject, UserRegisteredSchema, userEvent);
       expect(encoded).toBeInstanceOf(Buffer);
       expect(encoded.length).toBeGreaterThan(5); // Has magic byte + schema ID + data
@@ -117,7 +117,7 @@ describe('Schema Registry Integration Tests', () => {
         registrationSource: 'web' as const
       };
 
-      const subject = client.getSubjectFromTopicAndEventCode('users', uniqueEventName);
+      const subject = client.getSubjectFromTopicAndEventCode('users', uniqueEventCode);
       const encodedV1 = await client.encode(subject, UserRegisteredSchema, eventV1);
       const decodedV1 = await client.decodeAndValidate(encodedV1);
 
@@ -165,7 +165,7 @@ describe('Schema Registry Integration Tests', () => {
       // Set up consumer
       consumer.addWithSchema(
         testTopic,
-        uniqueEventName,
+        uniqueEventCode,
         async (event: UserRegistered) => {
           receivedEvents.push(event);
         },
@@ -182,7 +182,7 @@ describe('Schema Registry Integration Tests', () => {
       try {
         const { zodToJsonSchema } = await import('zod-to-json-schema');
         const registry = (client as any).registry;
-        const subject = client.getSubjectFromTopicAndEventCode(testTopic, uniqueEventName);
+        const subject = client.getSubjectFromTopicAndEventCode(testTopic, uniqueEventCode);
         const jsonSchema = zodToJsonSchema(UserRegisteredSchema, { target: 'jsonSchema7' });
         await registry.register({ type: 'JSON', schema: JSON.stringify(jsonSchema) }, { subject });
       } catch (_e) {
@@ -192,7 +192,7 @@ describe('Schema Registry Integration Tests', () => {
       // Produce events
       const testUser: UserRegistered = {
         ...createBaseEvent({
-          code: uniqueEventName,
+          code: uniqueEventCode,
           appName: 'integration-test'
         }),
         userId: randomUUID(),
@@ -205,7 +205,7 @@ describe('Schema Registry Integration Tests', () => {
 
       await producer.emitWithSchema({
         topic: testTopic,
-        eventName: uniqueEventName,
+        eventCode: uniqueEventCode,
         data: testUser,
         schema: UserRegisteredSchema
       });
@@ -240,7 +240,7 @@ describe('Schema Registry Integration Tests', () => {
       try {
         const { zodToJsonSchema } = await import('zod-to-json-schema');
         const registry = (client as any).registry;
-        const subject = client.getSubjectFromTopicAndEventCode(testTopic, uniqueEventName);
+        const subject = client.getSubjectFromTopicAndEventCode(testTopic, uniqueEventCode);
         const jsonSchema = zodToJsonSchema(UserRegisteredSchema, { target: 'jsonSchema7' });
         await registry.register({ type: 'JSON', schema: JSON.stringify(jsonSchema) }, { subject });
       } catch (_e) {
@@ -250,7 +250,7 @@ describe('Schema Registry Integration Tests', () => {
       // Send Schema Registry message
       const srEvent: UserRegistered = {
         ...createBaseEvent({
-          code: uniqueEventName,
+          code: uniqueEventCode,
           appName: 'integration-test'
         }),
         userId: randomUUID(),
@@ -267,7 +267,7 @@ describe('Schema Registry Integration Tests', () => {
       // Send legacy JSON message (fallback)
       const jsonEvent: UserRegistered = {
         ...createBaseEvent({
-          code: uniqueEventName,
+          code: uniqueEventCode,
           appName: 'integration-test'
         }),
         userId: randomUUID(),
