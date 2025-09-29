@@ -16,12 +16,12 @@ export async function validateSchema(schemaFilePath: string, options: ValidateOp
   // Check if file exists
   try {
     await fs.access(schemaFilePath);
-  } catch (error) {
+  } catch (_error) {
     throw new Error(`Schema file not found: ${schemaFilePath}`);
   }
 
   // Load the schema file
-  let moduleExports: Record<string, any>;
+  let moduleExports: Record<string, unknown>;
   try {
     const absolutePath = path.resolve(schemaFilePath);
     moduleExports = await import(absolutePath);
@@ -34,7 +34,7 @@ export async function validateSchema(schemaFilePath: string, options: ValidateOp
   for (const [key, value] of Object.entries(moduleExports)) {
     // Check if it's a Zod schema (has _def property)
     if (value && typeof value === 'object' && '_def' in value) {
-      schemas.push({ name: key, schema: value });
+      schemas.push({ name: key, schema: value as z.ZodSchema });
     }
   }
 

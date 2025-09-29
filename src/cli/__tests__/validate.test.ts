@@ -84,7 +84,7 @@ describe('Schema Validation Logic', () => {
       const notASchema = { type: 'object' };
 
       expect(TestSchema._def.typeName).toBe('ZodObject');
-      expect((notASchema as any)._def).toBeUndefined();
+      expect((notASchema as unknown as { _def: unknown })._def).toBeUndefined();
     });
 
     it('should detect different Zod schema types', () => {

@@ -5,16 +5,15 @@ jest.mock('../../helpers', () => ({
 
 // Mock filesystem operations for CLI functions
 jest.mock('fs', () => ({
+  ...jest.requireActual('fs'),
   promises: {
+    ...jest.requireActual('fs').promises,
     writeFile: jest.fn(),
     readFile: jest.fn(),
     mkdir: jest.fn(),
     access: jest.fn(),
     readdir: jest.fn()
   },
-  readdirSync: jest.fn(),
-  statSync: jest.fn(),
-  readFileSync: jest.fn()
 }));
 
 // Mock path module

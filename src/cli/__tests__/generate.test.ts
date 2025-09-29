@@ -8,8 +8,8 @@ jest.mock('fs', () => ({
     ...jest.requireActual('fs').promises,
     mkdir: jest.fn(),
     writeFile: jest.fn(),
-    access: jest.fn(),
-  },
+    access: jest.fn()
+  }
 }));
 
 // Mock debug function to avoid config initialization

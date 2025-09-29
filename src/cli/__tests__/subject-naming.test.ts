@@ -1,4 +1,5 @@
 import { SchemaRegistryClient } from '../../schema-registry/client';
+import { getSubjectName } from '../../helpers';
 import { SchemaRegistryProducer } from '../../producer/schema-registry-producer';
 import { setConfig } from '../../config';
 
@@ -11,18 +12,7 @@ jest.mock('../../helpers', () => ({
 describe('CLI-Producer Subject Naming Consistency', () => {
   const SCHEMA_REGISTRY_URL = 'http://localhost:8081';
 
-  // Helper function to convert to kebab-case (matching Schema Registry client)
-  function toKebabCase(str: string): string {
-    return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
-  }
 
-  // CLI subject name generation (extracted from CLI publish logic)
-  function getCliSubjectName(topic: string, schemaName: string): string {
-    const eventCode = schemaName.replace(/Schema$/, '');
-    const topicKebab = toKebabCase(topic);
-    const eventCodeKebab = toKebabCase(eventCode);
-    return `${topicKebab}-${eventCodeKebab}`;
-  }
 
   // Producer subject name generation
   function getProducerSubjectName(topic: string, eventCode: string): string {
@@ -35,7 +25,8 @@ describe('CLI-Producer Subject Naming Consistency', () => {
     });
 
     const producer = new SchemaRegistryProducer();
-    const producerClient = (producer as any).schemaRegistryClient as SchemaRegistryClient;
+    // @ts-ignore
+    const producerClient = producer.schemaRegistryClient as SchemaRegistryClient;
     return producerClient.getSubjectFromTopicAndEventCode(topic, eventCode);
   }
 
@@ -74,7 +65,7 @@ describe('CLI-Producer Subject Naming Consistency', () => {
     ];
 
     testCases.forEach(({ topic, schemaName, eventCode, expected }) => {
-      const cliSubject = getCliSubjectName(topic, schemaName);
+      const cliSubject = getSubjectName(topic, schemaName);
       const producerSubject = getProducerSubjectName(topic, eventCode);
 
       // Verify CLI generates expected subject
@@ -113,7 +104,7 @@ describe('CLI-Producer Subject Naming Consistency', () => {
     ];
 
     edgeCases.forEach(({ topic, schemaName, eventCode, expected }) => {
-      const cliSubject = getCliSubjectName(topic, schemaName);
+      const cliSubject = getSubjectName(topic, schemaName);
       const producerSubject = getProducerSubjectName(topic, eventCode);
 
       expect(cliSubject).toBe(expected);
@@ -140,7 +131,7 @@ describe('CLI-Producer Subject Naming Consistency', () => {
     examples.forEach(({ schemaFile, resultingSubject }) => {
       // Extract topic from the resulting subject
       const topic = resultingSubject.split('-')[0];
-      const cliSubject = getCliSubjectName(topic, schemaFile);
+      const cliSubject = getSubjectName(topic, schemaFile);
       expect(cliSubject).toBe(resultingSubject);
     });
 

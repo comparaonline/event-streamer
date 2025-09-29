@@ -1,4 +1,4 @@
-import { Command } from 'commander';
+import { program } from '../index';
 
 // Mock all CLI command implementations BEFORE importing
 jest.mock('../init', () => ({
@@ -10,7 +10,7 @@ jest.mock('../generate', () => ({
 }));
 
 jest.mock('../validate', () => ({
-  validateSchemasInDirectory: jest.fn().mockResolvedValue(undefined)
+  validateSchema: jest.fn().mockResolvedValue(undefined)
 }));
 
 jest.mock('../publish', () => ({
@@ -33,7 +33,7 @@ describe('CLI Index', () => {
     originalExit = process.exit;
 
     // Mock process.exit to prevent actual exit during tests
-    process.exit = jest.fn() as any;
+    process.exit = jest.fn() as unknown as (code?: number) => never;
 
     // Mock console to capture output
     consoleSpy = jest.spyOn(console, 'log').mockImplementation();
@@ -51,18 +51,23 @@ describe('CLI Index', () => {
     it('should show help when no command provided', async () => {
       process.argv = ['node', 'cli'];
 
-      const program = new Command();
-      program.name('event-streamer-cli').description('Event Streamer CLI for Schema Registry management');
+
+
+      // Prevent Commander from writing errors to stderr during this test
+      program.exitOverride();
+      program.configureOutput({
+        writeErr: jest.fn(),
+        outputError: jest.fn()
+      });
 
       // Capture help output
       jest.spyOn(program, 'outputHelp').mockImplementation();
 
       try {
         await program.parseAsync(process.argv);
-      } catch (error) {
-        // Expected to show help when no command provided
+      } catch (_error) {
+        // Expected to error due to no command; we suppress output above
       }
-
       // Should have attempted to show help
       expect(program.name()).toBe('event-streamer-cli');
     });
@@ -70,43 +75,21 @@ describe('CLI Index', () => {
     it('should parse init command with correct options', async () => {
       const initializeEventSchemas = initModule.initializeEventSchemas as jest.MockedFunction<typeof initModule.initializeEventSchemas>;
 
-      process.argv = ['node', 'cli', 'init', '--output-dir', '/test/output', '--service-name', 'test-service'];
-
-      // Create a new Command instance to test
-      const program = new Command();
-      program.name('event-streamer-cli').description('Event Streamer CLI for Schema Registry management');
-
-      program
-        .command('init')
-        .description('Initialize a new event schemas project')
-        .option('-o, --output-dir <dir>', 'Output directory', './events')
-        .option('-s, --service-name <name>', 'Service name for schemas')
-        .action(async (options) => {
-          await initializeEventSchemas(options);
-        });
+      process.argv = ['node', 'cli', 'init', '--service-name', 'test-service'];
 
       await program.parseAsync(process.argv);
 
       expect(initializeEventSchemas).toHaveBeenCalledWith({
-        outputDir: '/test/output',
         serviceName: 'test-service'
       });
     });
 
-    it('should parse generate command with event name', async () => {
+    it('should parse generate-example command with event name', async () => {
       const generateExampleSchema = generateModule.generateExampleSchema as jest.MockedFunction<typeof generateModule.generateExampleSchema>;
 
-      process.argv = ['node', 'cli', 'generate', 'user-registered', '--output-dir', '/test/events'];
+      process.argv = ['node', 'cli', 'generate-example', 'user-registered', '--output-dir', '/test/events'];
 
-      const program = new Command();
-      program
-        .command('generate')
-        .argument('<event-name>', 'Name of the event to generate')
-        .option('-o, --output-dir <dir>', 'Output directory', './events')
-        .option('-s, --service-name <name>', 'Service name for the event')
-        .action(async (eventName, options) => {
-          await generateExampleSchema(eventName, options);
-        });
+
 
       await program.parseAsync(process.argv);
 
@@ -116,26 +99,15 @@ describe('CLI Index', () => {
     });
 
     it('should parse validate command with directory option', async () => {
-      const validateSchemasInDirectory = validateModule.validateSchemasInDirectory as jest.MockedFunction<
-        typeof validateModule.validateSchemasInDirectory
+      const validateSchema = validateModule.validateSchema as jest.MockedFunction<
+        typeof validateModule.validateSchema
       >;
 
-      process.argv = ['node', 'cli', 'validate', '--events-dir', '/custom/events'];
-
-      const program = new Command();
-      program
-        .command('validate')
-        .description('Validate event schemas')
-        .option('-e, --events-dir <dir>', 'Directory containing event schemas', './events')
-        .action(async (options) => {
-          await validateSchemasInDirectory(options.eventsDir, options);
-        });
+      process.argv = ['node', 'cli', 'validate', '/custom/events/schema.ts'];
 
       await program.parseAsync(process.argv);
 
-      expect(validateSchemasInDirectory).toHaveBeenCalledWith('/custom/events', {
-        eventsDir: '/custom/events'
-      });
+      expect(validateSchema).toHaveBeenCalledWith('/custom/events/schema.ts', expect.any(Object));
     });
 
     it('should parse publish command with all options', async () => {
@@ -149,37 +121,17 @@ describe('CLI Index', () => {
         '/test/events',
         '--registry-url',
         'http://localhost:8081',
-        '--username',
-        'test-user',
-        '--password',
-        'test-pass',
-        '--compatibility-mode',
-        'BACKWARD',
+        '--registry-auth',
+        'test-user:test-pass',
         '--dry-run'
       ];
-
-      const program = new Command();
-      program
-        .command('publish')
-        .description('Publish schemas to Schema Registry')
-        .option('-e, --events-dir <dir>', 'Directory containing event schemas', './events')
-        .option('-r, --registry-url <url>', 'Schema Registry URL')
-        .option('-u, --username <username>', 'Schema Registry username')
-        .option('-p, --password <password>', 'Schema Registry password')
-        .option('-c, --compatibility-mode <mode>', 'Compatibility mode (BACKWARD, FORWARD, FULL)')
-        .option('--dry-run', 'Show what would be published without actually publishing')
-        .action(async (options) => {
-          await publishSchemas(options);
-        });
 
       await program.parseAsync(process.argv);
 
       expect(publishSchemas).toHaveBeenCalledWith({
         eventsDir: '/test/events',
         registryUrl: 'http://localhost:8081',
-        username: 'test-user',
-        password: 'test-pass',
-        compatibilityMode: 'BACKWARD',
+        registryAuth: 'test-user:test-pass',
         dryRun: true
       });
     });
@@ -187,8 +139,7 @@ describe('CLI Index', () => {
     it('should handle invalid commands gracefully', async () => {
       process.argv = ['node', 'cli', 'invalid-command'];
 
-      const program = new Command();
-      program.exitOverride(); // Prevent actual exit
+
 
       try {
         await program.parseAsync(process.argv);
@@ -201,8 +152,7 @@ describe('CLI Index', () => {
     it('should show version when --version flag is used', async () => {
       process.argv = ['node', 'cli', '--version'];
 
-      const program = new Command();
-      program.version('1.0.0');
+
 
       // Capture version output
       const versionSpy = jest.spyOn(program, 'version');

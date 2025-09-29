@@ -1,8 +1,9 @@
+import { SchemaType } from '@kafkajs/confluent-schema-registry';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { SchemaRegistryClient } from '../schema-registry/client';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { debug } from '../helpers';
+import { debug, getSubjectName } from '../helpers';
 import { Debug } from '../interfaces';
 
 interface PublishOptions {
@@ -17,7 +18,7 @@ interface PublishOptions {
 interface SchemaFile {
   filePath: string;
   fileName: string;
-  exports: Record<string, any>;
+  exports: Record<string, unknown>;
 }
 
 function parseAuth(authString: string): { username: string; password: string } {
@@ -29,7 +30,7 @@ function parseAuth(authString: string): { username: string; password: string } {
 }
 
 export function createSchemaRegistryClient(options: PublishOptions): SchemaRegistryClient {
-  const config: any = {
+  const config: { url: string; auth?: { username: string; password: string } } = {
     url: options.registryUrl
   };
 
@@ -59,7 +60,7 @@ async function findSchemaFiles(eventsDir: string): Promise<string[]> {
 
     return files;
   } catch (error) {
-    if ((error as any).code === 'ENOENT') {
+    if ((error as { code: string }).code === 'ENOENT') {
       throw new Error(`Events directory not found: ${eventsDir}`);
     }
     throw error;
@@ -79,7 +80,7 @@ async function loadSchemaFile(filePath: string): Promise<SchemaFile | null> {
     const fileName = path.basename(filePath, path.extname(filePath));
 
     // Find Zod schemas in the module
-    const schemas: Record<string, any> = {};
+    const schemas: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(moduleExports)) {
       console.log(
         `🔍 Checking export "${key}":`,
@@ -111,30 +112,15 @@ async function loadSchemaFile(filePath: string): Promise<SchemaFile | null> {
   }
 }
 
-// Helper function to convert to kebab-case (matching Schema Registry client)
-function toKebabCase(str: string): string {
-  return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
-}
 
-function getSubjectName(topic: string, schemaName: string): string {
-  // Remove 'Schema' suffix if present to get event code
-  const eventCode = schemaName.replace(/Schema$/, '');
 
-  // Convert both topic and event code to kebab-case using same logic as producer
-  const topicKebab = toKebabCase(topic);
-  const eventCodeKebab = toKebabCase(eventCode);
 
-  // Use same format as runtime: {topic}-{eventCode}
-  const subject = `${topicKebab}-${eventCodeKebab}`;
-  console.log(`🏷️ Subject name: "${topic}" + "${schemaName}" → "${subject}"`);
-  return subject;
-}
 
-async function publishSchema(client: SchemaRegistryClient, subject: string, schema: any, options: PublishOptions): Promise<void> {
+async function publishSchema(client: SchemaRegistryClient, subject: string, schema: unknown, options: PublishOptions): Promise<void> {
   try {
     // Convert Zod schema to JSON Schema
     // Use draft-07 for compatibility with Schema Registry AJV setup
-    const jsonSchema = zodToJsonSchema(schema, {
+    const jsonSchema = zodToJsonSchema(schema as any, {
       target: 'jsonSchema7',
       $refStrategy: 'relative'
     });
@@ -152,7 +138,7 @@ async function publishSchema(client: SchemaRegistryClient, subject: string, sche
       const existingId = await client.getRegistryIdBySchema(subject, schemaString);
       console.log(`⏭️  Schema for ${subject} is already up to date (ID: ${existingId})`);
       return;
-    } catch (error) {
+    } catch (_error) {
       // If it fails, it means the schema doesn't exist, so we can proceed to publish.
       // We assume a 404 error here. Other errors will be caught by the register call.
       debug(Debug.INFO, `Schema for ${subject} not found. Proceeding with publishing.`);
@@ -169,10 +155,11 @@ async function publishSchema(client: SchemaRegistryClient, subject: string, sche
 
 export async function registerSchemaToRegistry(client: SchemaRegistryClient, subject: string, schemaString: string): Promise<void> {
   // Use the underlying registry client with correct signature: register(schema, options)
-  const registry = (client as any).registry;
+  // @ts-ignore
+  const registry = client.registry;
   await registry.register(
     {
-      type: 'JSON',
+      type: SchemaType.JSON,
       schema: schemaString
     },
     {

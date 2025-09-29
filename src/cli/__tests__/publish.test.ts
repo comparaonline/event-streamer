@@ -1,10 +1,14 @@
 // Test the core business logic, not the CLI wrapper
 import { z } from 'zod';
+import { getSubjectName } from '../../helpers';
 import { SchemaRegistryClient } from '../../schema-registry/client';
 
 // Mock external dependencies only
 jest.mock('../../schema-registry/client');
-jest.mock('../../helpers', () => ({ debug: jest.fn() }));
+jest.mock('../../helpers', () => ({
+  ...jest.requireActual('../../helpers'),
+  debug: jest.fn()
+}));
 
 const MockSchemaRegistryClient = SchemaRegistryClient as jest.MockedClass<typeof SchemaRegistryClient>;
 
@@ -14,12 +18,10 @@ describe('Schema Publishing Logic', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockClient = {
-      validateAndEncode: jest.fn(),
-      preloadSchemasForProducer: jest.fn(),
-      getSubjectFromEventCode: jest.fn((code) => `${code.toLowerCase()}`),
-      getSubjectFromTopicAndEventCode: jest.fn((topic, code) => `${topic.toLowerCase()}-${code.toLowerCase()}`)
-    } as any;
-    MockSchemaRegistryClient.mockImplementation(() => mockClient);
+      getRegistryIdBySchema: jest.fn().mockResolvedValue(1),
+      register: jest.fn().mockResolvedValue({ id: 1 }),
+    } as unknown as jest.Mocked<SchemaRegistryClient>;
+    MockSchemaRegistryClient.mockImplementation(() => mockClient as unknown as SchemaRegistryClient);
   });
 
   describe('schema validation', () => {
@@ -37,25 +39,14 @@ describe('Schema Publishing Logic', () => {
     it('should reject non-Zod objects', () => {
       const fakeSchema = { type: 'object', properties: {} };
 
-      expect((fakeSchema as any)._def).toBeUndefined();
-      expect(typeof (fakeSchema as any).parse).toBe('undefined');
+      expect((fakeSchema as unknown as { _def: unknown })._def).toBeUndefined();
+      expect(typeof (fakeSchema as unknown as { parse: unknown }).parse).toBe('undefined');
     });
   });
 
   describe('subject name generation', () => {
     it('should convert topic and schema names to subject names', () => {
-      // Helper function to convert to kebab-case (matching Schema Registry client)
-      const toKebabCase = (str: string): string => {
-        return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
-      };
 
-      // Test core business logic with new topic-eventCode format
-      const getSubjectName = (topic: string, schemaName: string): string => {
-        const eventCode = schemaName.replace(/Schema$/, '');
-        const topicKebab = toKebabCase(topic);
-        const eventCodeKebab = toKebabCase(eventCode);
-        return `${topicKebab}-${eventCodeKebab}`;
-      };
 
       expect(getSubjectName('users', 'UserCreatedSchema')).toBe('users-user-created');
       expect(getSubjectName('orders', 'OrderProcessedSchema')).toBe('orders-order-processed');
