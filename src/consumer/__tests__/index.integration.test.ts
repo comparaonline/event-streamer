@@ -33,7 +33,19 @@ function getIncrementalId(): number {
   return topicCounter++;
 }
 
+let consumer: ConsumerRouter | null;
+
 describe('Consumer Integration Tests', () => {
+  beforeEach(() => {
+    consumer = new ConsumerRouter();
+  });
+
+  afterEach(async () => {
+    if (consumer) {
+      await consumer.stop();
+    }
+    consumer = null;
+  });
   describe('Consume online mode', () => {
     beforeEach(() => {
       jest.clearAllMocks();
