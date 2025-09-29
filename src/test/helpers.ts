@@ -1,6 +1,5 @@
-import { Kafka } from 'kafkajs';
-import { getConfig } from '../config';
 import { toArray } from '../helpers';
+import { getAdminClient, getProducer } from './kafka-manager';
 
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -8,20 +7,24 @@ export function sleep(ms: number): Promise<void> {
   });
 }
 
-export async function handlerToCall(handler: jest.Mock | jest.SpyInstance): Promise<void> {
-  while (handler.mock.calls.length === 0) {
-    await sleep(100);
-  }
+export function handlerToCall(
+  handler: jest.Mock | jest.SpyInstance,
+  expectedCalls = 1
+): Promise<void> {
+  return new Promise((resolve) => {
+    const check = () => {
+      if (handler.mock.calls.length >= expectedCalls) {
+        resolve();
+      } else {
+        setTimeout(check, 100);
+      }
+    };
+    check();
+  });
 }
 
 export async function createTopic(topicName: string): Promise<void> {
-  const config = getConfig();
-  const client = new Kafka({
-    brokers: config.host.split(','),
-    logLevel: config.kafkaJSLogs
-  });
-  const admin = client.admin();
-  await admin.connect();
+  const admin = getAdminClient();
   await admin.createTopics({
     topics: [
       {
@@ -31,17 +34,10 @@ export async function createTopic(topicName: string): Promise<void> {
       }
     ]
   });
-  await admin.disconnect();
 }
 
 export async function sendRawMessage(topicName: string, content: null | string | string[]): Promise<void> {
-  const config = getConfig();
-  const client = new Kafka({
-    brokers: config.host.split(','),
-    logLevel: config.kafkaJSLogs
-  });
-  const producer = client.producer();
-  await producer.connect();
+  const producer = getProducer();
   await producer.send({
     topic: topicName,
     messages: toArray(content).map((message) => ({

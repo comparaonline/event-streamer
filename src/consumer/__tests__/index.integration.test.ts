@@ -9,6 +9,8 @@ import { Config, Strategy, Unlimited } from '../../interfaces';
 import MockDate from 'mockdate';
 import { KAFKA_HOST_9092 } from '../../test/constants';
 
+import { connect, disconnect } from '../../test/kafka-manager';
+
 const TEST_TIMEOUT = 240000;
 
 interface Params {
@@ -36,6 +38,15 @@ function getIncrementalId(): number {
 let consumer: ConsumerRouter | null;
 
 describe('Consumer Integration Tests', () => {
+  beforeAll(async () => {
+    setConfig(generateConfig({}));
+    await connect();
+  });
+
+  afterAll(async () => {
+    await disconnect();
+  });
+
   afterEach(async () => {
     if (consumer) {
       await consumer.stop();
@@ -127,8 +138,8 @@ describe('Consumer Integration Tests', () => {
         });
 
         // assert
-        await handlerToCall(handlerC);
-        await sleep(1000);
+        await handlerToCall(handlerA, 2);
+        await handlerToCall(handlerC, 1);
 
         expect(handlerA).toHaveBeenCalledTimes(2);
         expect(handlerC).toHaveBeenCalledTimes(1);
@@ -208,7 +219,6 @@ describe('Consumer Integration Tests', () => {
         await handlerToCall(handlerC);
 
         // assert
-        await sleep(1000);
         expect(handlerA).toHaveBeenCalledTimes(2);
         expect(handlerB).toHaveBeenCalledTimes(1);
         expect(handlerC).toHaveBeenCalledTimes(1);
@@ -274,7 +284,6 @@ describe('Consumer Integration Tests', () => {
 
         // assert
         await handlerToCall(handler);
-        await sleep(1000);
         expect(handler).toHaveBeenCalled();
         expect(pauseSpy).toHaveBeenCalledWith([{ topic }]);
         expect(resumeSpy).toHaveBeenCalledWith([{ topic }]);

@@ -6,6 +6,8 @@ import { handlerToCall } from '../../test/helpers';
 import MockDate from 'mockdate';
 import { KAFKA_HOST_9092 } from '../../test/constants';
 
+import { connect, disconnect } from '../../test/kafka-manager';
+
 const defaultTopic = 'topic-a';
 const appName = 'event-streamer';
 const defaultDate = '2022-12-08 00:00:00Z';
@@ -19,7 +21,20 @@ const CONNECTION_TTL = 2000;
 const TEST_TIMEOUT = 120000;
 
 describe('Producer Integration Tests', () => {
+  beforeAll(async () => {
+    setConfig({
+      host: KAFKA_HOST_9092,
+      appName,
+      producer: {
+        connectionTTL: CONNECTION_TTL
+      }
+    });
+    MockDate.set('2022-12-08T00:00:00.000Z');
+    await connect();
+  });
+
   afterAll(async () => {
+    await disconnect();
     await closeAll();
   });
 
@@ -29,11 +44,11 @@ describe('Producer Integration Tests', () => {
         host: KAFKA_HOST_9092,
         appName,
         producer: {
-          connectionTTL: CONNECTION_TTL
-        }
+          connectionTTL: CONNECTION_TTL,
+        },
       });
-      MockDate.set('2022-12-08T00:00:00.000Z');
     });
+
     it(
       'Should emit a single event with different topic and code',
       async () => {

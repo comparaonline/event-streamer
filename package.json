@@ -39,7 +39,7 @@
     "lint": "eslint src --fix",
     "test": "jest --runInBand",
     "test:unit": "jest --runInBand",
-    "test:integration": "RUN_INTEGRATION_TESTS=true jest --config=jest.integration.config.js --runInBand --forceExit",
+    "test:integration": "RUN_INTEGRATION_TESTS=true jest --config=jest.integration.config.js --runInBand",
     "test:schema-registry": "jest src/schema-registry --runInBand",
     "test:integration:sr": "RUN_INTEGRATION_TESTS=true jest src/schema-registry/__tests__/integration.test.ts --runInBand",
     "test:evolution": "RUN_INTEGRATION_TESTS=true jest src/schema-registry/__tests__/schema-evolution.test.ts --runInBand",
