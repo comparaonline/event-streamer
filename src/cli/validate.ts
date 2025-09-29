@@ -30,7 +30,7 @@ export async function validateSchema(schemaFilePath: string, options: ValidateOp
   }
 
   // Find Zod schemas in the module
-  const schemas: Array<{ name: string; schema: any }> = [];
+  const schemas: Array<{ name: string; schema: z.ZodSchema }> = [];
   for (const [key, value] of Object.entries(moduleExports)) {
     // Check if it's a Zod schema (has _def property)
     if (value && typeof value === 'object' && '_def' in value) {

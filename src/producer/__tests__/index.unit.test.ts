@@ -63,6 +63,7 @@ describe('Producer Unit Tests', () => {
 
   describe('emit testing mode - success', () => {
     beforeEach(() => {
+      MockDate.set('2022-12-08T00:00:00.000Z');
       setConfig({
         host: 'any-host:9092',
         onlyTesting: true

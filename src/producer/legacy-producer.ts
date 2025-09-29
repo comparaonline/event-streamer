@@ -84,6 +84,7 @@ function getHosts(defaultHost: string, secondaries?: string | string[], overwrit
   return [defaultHost, ...toArray(secondaries)];
 }
 
+// eslint-disable-next-line no-undef
 const connections: Record<string, { producer: Producer; timeout?: NodeJS.Timeout }> = {};
 
 export async function createProducer(host: string): Promise<Producer> {

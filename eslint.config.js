@@ -88,6 +88,44 @@ module.exports = [
     }
   },
 
+  // Vitest test files configuration
+  {
+    files: ['**/*.test.{js,ts}', '**/__tests__/**/*.{js,ts}', 'src/test/**/*.{js,ts}'],
+    languageOptions: {
+      globals: {
+        // Vitest globals
+        vi: 'readonly',
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        beforeAll: 'readonly',
+        beforeEach: 'readonly',
+        afterAll: 'readonly',
+        afterEach: 'readonly',
+      }
+    }
+  },
+
+  // Vitest test files configuration
+  {
+    files: ['**/*.test.{js,ts}', '**/__tests__/**/*.{js,ts}', 'src/test/**/*.{js,ts}'],
+    languageOptions: {
+      globals: {
+        // Vitest globals
+        vi: 'readonly',
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        beforeAll: 'readonly',
+        beforeEach: 'readonly',
+        afterAll: 'readonly',
+        afterEach: 'readonly',
+      }
+    }
+  },
+
   // Prettier config (disables formatting rules) - must be last
   prettier,
 

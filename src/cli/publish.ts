@@ -116,7 +116,12 @@ async function loadSchemaFile(filePath: string): Promise<SchemaFile | null> {
 
 
 
-async function publishSchema(client: SchemaRegistryClient, subject: string, schema: unknown, options: PublishOptions): Promise<void> {
+import { z } from 'zod';
+// ... (rest of the imports)
+
+// ... (rest of the file)
+
+async function publishSchema(client: SchemaRegistryClient, subject: string, schema: z.ZodSchema<any>, options: PublishOptions): Promise<void> {
   try {
     // Convert Zod schema to JSON Schema
     // Use draft-07 for compatibility with Schema Registry AJV setup

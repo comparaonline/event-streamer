@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import { BaseEventSchema } from '../../schemas';
 
-jest.mock('../../helpers', () => ({ debug: jest.fn() }));
+vi.mock('../../helpers', () => ({ debug: vi.fn() }));
 
 describe('Schema Validation Logic', () => {
   describe('Zod schema validation', () => {

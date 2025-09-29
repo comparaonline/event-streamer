@@ -4,10 +4,13 @@ import { SchemaRegistryProducer } from '../../producer/schema-registry-producer'
 import { setConfig } from '../../config';
 
 // Mock debug function
-jest.mock('../../helpers', () => ({
-  ...jest.requireActual('../../helpers'),
-  debug: jest.fn()
-}));
+vi.mock('../../helpers', async () => {
+  const actual = await vi.importActual<typeof import('../../helpers')>('../../helpers');
+  return {
+    ...actual,
+    debug: vi.fn(),
+  };
+});
 
 describe('CLI-Producer Subject Naming Consistency', () => {
   const SCHEMA_REGISTRY_URL = 'http://localhost:8081';

@@ -2,26 +2,33 @@ import { generateExampleSchema } from '../generate';
 import { promises as fs } from 'fs';
 
 // Mock filesystem operations
-jest.mock('fs', () => ({
-  ...jest.requireActual('fs'),
-  promises: {
-    ...jest.requireActual('fs').promises,
-    mkdir: jest.fn(),
-    writeFile: jest.fn(),
-    access: jest.fn()
-  }
-}));
+vi.mock('fs', async () => {
+  const actual = await vi.importActual<typeof import('fs')>('fs');
+  return {
+    ...actual,
+    promises: {
+      ...actual.promises,
+      mkdir: vi.fn(),
+      writeFile: vi.fn(),
+      access: vi.fn(),
+    },
+  };
+});
 
 // Mock debug function to avoid config initialization
-jest.mock('../../helpers', () => ({
-  debug: jest.fn()
-}));
+vi.mock('../../helpers', async () => {
+  const actual = await vi.importActual<typeof import('../../helpers')>('../../helpers');
+  return {
+    ...actual,
+    debug: vi.fn(),
+  };
+});
 
-const mockFs = fs as jest.Mocked<typeof fs>;
+const mockFs = fs as vi.Mocked<typeof fs>;
 
 describe('CLI Generate Command', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('generateExampleSchema', () => {
@@ -87,7 +94,7 @@ describe('CLI Generate Command', () => {
       // Mock existing file
       mockFs.access.mockResolvedValue(undefined);
 
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation();
 
       await generateExampleSchema(eventName, options);
 

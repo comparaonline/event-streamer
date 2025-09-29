@@ -4,23 +4,26 @@ import { getSubjectName } from '../../helpers';
 import { SchemaRegistryClient } from '../../schema-registry/client';
 
 // Mock external dependencies only
-jest.mock('../../schema-registry/client');
-jest.mock('../../helpers', () => ({
-  ...jest.requireActual('../../helpers'),
-  debug: jest.fn()
-}));
+vi.mock('../../schema-registry/client');
+vi.mock('../../helpers', async () => {
+  const actual = await vi.importActual<typeof import('../../helpers')>('../../helpers');
+  return {
+    ...actual,
+    debug: vi.fn(),
+  };
+});
 
-const MockSchemaRegistryClient = SchemaRegistryClient as jest.MockedClass<typeof SchemaRegistryClient>;
+const MockSchemaRegistryClient = SchemaRegistryClient as vi.MockedClass<typeof SchemaRegistryClient>;
 
 describe('Schema Publishing Logic', () => {
-  let mockClient: jest.Mocked<SchemaRegistryClient>;
+  let mockClient: vi.Mocked<SchemaRegistryClient>;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockClient = {
-      getRegistryIdBySchema: jest.fn().mockResolvedValue(1),
-      register: jest.fn().mockResolvedValue({ id: 1 }),
-    } as unknown as jest.Mocked<SchemaRegistryClient>;
+      getRegistryIdBySchema: vi.fn().mockResolvedValue(1),
+      register: vi.fn().mockResolvedValue({ id: 1 }),
+    } as unknown as vi.Mocked<SchemaRegistryClient>;
     MockSchemaRegistryClient.mockImplementation(() => mockClient as unknown as SchemaRegistryClient);
   });
 

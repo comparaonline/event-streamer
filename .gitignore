@@ -8,3 +8,5 @@ build
 .claude
 CLAUDE.md
 examples
+yarn.lock
+package-lock.json

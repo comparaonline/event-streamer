@@ -141,9 +141,9 @@ describe('Consumer Unit Tests', () => {
       // arrange
       const consumer = new ConsumerRouter();
 
-      const handlerA = jest.fn();
-      const handlerB = jest.fn();
-      const handlerC = jest.fn();
+      const handlerA = vi.fn();
+      const handlerB = vi.fn();
+      const handlerC = vi.fn();
 
       consumer.add('topic-a', handlerA);
       consumer.add('topic-b', 'EventB', handlerB);

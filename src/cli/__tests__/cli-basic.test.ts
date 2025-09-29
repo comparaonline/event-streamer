@@ -1,35 +1,42 @@
 // Mock debug function to avoid config initialization
-jest.mock('../../helpers', () => ({
-  debug: jest.fn()
-}));
+vi.mock('../../helpers', async () => {
+  const actual = await vi.importActual<typeof import('../../helpers')>('../../helpers');
+  return {
+    ...actual,
+    debug: vi.fn(),
+  };
+});
 
 // Mock filesystem operations for CLI functions
-jest.mock('fs', () => ({
-  ...jest.requireActual('fs'),
-  promises: {
-    ...jest.requireActual('fs').promises,
-    writeFile: jest.fn(),
-    readFile: jest.fn(),
-    mkdir: jest.fn(),
-    access: jest.fn(),
-    readdir: jest.fn()
-  },
-}));
+vi.mock('fs', async () => {
+  const actual = await vi.importActual<typeof import('fs')>('fs');
+  return {
+    ...actual,
+    promises: {
+      ...actual.promises,
+      writeFile: vi.fn(),
+      readFile: vi.fn(),
+      mkdir: vi.fn(),
+      access: vi.fn(),
+      readdir: vi.fn(),
+    },
+  };
+});
 
 // Mock path module
-jest.mock('path', () => ({
-  resolve: jest.fn(),
-  join: jest.fn(),
-  extname: jest.fn()
+vi.mock('path', () => ({
+  resolve: vi.fn(),
+  join: vi.fn(),
+  extname: vi.fn()
 }));
 
 // Mock schema registry client to avoid dependencies
-jest.mock('../../schema-registry/client', () => ({
-  SchemaRegistryClient: jest.fn().mockImplementation(() => ({
-    validateAndEncode: jest.fn(),
-    preloadSchemasForProducer: jest.fn(),
-    getSubjectFromEventCode: jest.fn(),
-    getSubjectFromTopicAndEventCode: jest.fn()
+vi.mock('../../schema-registry/client', () => ({
+  SchemaRegistryClient: vi.fn().mockImplementation(() => ({
+    validateAndEncode: vi.fn(),
+    preloadSchemasForProducer: vi.fn(),
+    getSubjectFromEventCode: vi.fn(),
+    getSubjectFromTopicAndEventCode: vi.fn()
   }))
 }));
 
@@ -41,7 +48,7 @@ import * as publishModule from '../publish';
 // Basic CLI functionality tests
 describe('CLI Basic Functionality', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('CLI Module Loading', () => {

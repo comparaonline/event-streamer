@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BaseEventSchema } from './index';
+import { BaseEventSchema } from './base';
 
 export const DeadLetterQueueSchema = z
   .object({

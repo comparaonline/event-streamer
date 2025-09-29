@@ -8,7 +8,7 @@ export function sleep(ms: number): Promise<void> {
 }
 
 export function handlerToCall(
-  handler: jest.Mock | jest.SpyInstance,
+  handler: vi.Mock | vi.SpyInstance,
   expectedCalls = 1
 ): Promise<void> {
   return new Promise((resolve) => {

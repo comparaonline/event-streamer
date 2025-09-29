@@ -1,20 +1,20 @@
 import { program } from '../index';
 
 // Mock all CLI command implementations BEFORE importing
-jest.mock('../init', () => ({
-  initializeEventSchemas: jest.fn().mockResolvedValue(undefined)
+vi.mock('../init', () => ({
+  initializeEventSchemas: vi.fn().mockResolvedValue(undefined)
 }));
 
-jest.mock('../generate', () => ({
-  generateExampleSchema: jest.fn().mockResolvedValue(undefined)
+vi.mock('../generate', () => ({
+  generateExampleSchema: vi.fn().mockResolvedValue(undefined)
 }));
 
-jest.mock('../validate', () => ({
-  validateSchema: jest.fn().mockResolvedValue(undefined)
+vi.mock('../validate', () => ({
+  validateSchema: vi.fn().mockResolvedValue(undefined)
 }));
 
-jest.mock('../publish', () => ({
-  publishSchemas: jest.fn().mockResolvedValue(undefined)
+vi.mock('../publish', () => ({
+  publishSchemas: vi.fn().mockResolvedValue(undefined)
 }));
 
 // Import after mocking
@@ -26,19 +26,19 @@ import * as publishModule from '../publish';
 describe('CLI Index', () => {
   let originalArgv: string[];
   let originalExit: typeof process.exit;
-  let consoleSpy: jest.SpyInstance;
+  let consoleSpy: vi.SpyInstance;
 
   beforeEach(() => {
     originalArgv = process.argv;
     originalExit = process.exit;
 
     // Mock process.exit to prevent actual exit during tests
-    process.exit = jest.fn() as unknown as (code?: number) => never;
+    process.exit = vi.fn() as unknown as (code?: number) => never;
 
     // Mock console to capture output
-    consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+    consoleSpy = vi.spyOn(console, 'log').mockImplementation();
 
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -56,12 +56,12 @@ describe('CLI Index', () => {
       // Prevent Commander from writing errors to stderr during this test
       program.exitOverride();
       program.configureOutput({
-        writeErr: jest.fn(),
-        outputError: jest.fn()
+        writeErr: vi.fn(),
+        outputError: vi.fn()
       });
 
       // Capture help output
-      jest.spyOn(program, 'outputHelp').mockImplementation();
+      vi.spyOn(program, 'outputHelp').mockImplementation();
 
       try {
         await program.parseAsync(process.argv);
@@ -73,7 +73,7 @@ describe('CLI Index', () => {
     });
 
     it('should parse init command with correct options', async () => {
-      const initializeEventSchemas = initModule.initializeEventSchemas as jest.MockedFunction<typeof initModule.initializeEventSchemas>;
+      const initializeEventSchemas = initModule.initializeEventSchemas as vi.MockedFunction<typeof initModule.initializeEventSchemas>;
 
       process.argv = ['node', 'cli', 'init', '--service-name', 'test-service'];
 
@@ -85,7 +85,7 @@ describe('CLI Index', () => {
     });
 
     it('should parse generate-example command with event name', async () => {
-      const generateExampleSchema = generateModule.generateExampleSchema as jest.MockedFunction<typeof generateModule.generateExampleSchema>;
+      const generateExampleSchema = generateModule.generateExampleSchema as vi.MockedFunction<typeof generateModule.generateExampleSchema>;
 
       process.argv = ['node', 'cli', 'generate-example', 'user-registered', '--output-dir', '/test/events'];
 
@@ -99,7 +99,7 @@ describe('CLI Index', () => {
     });
 
     it('should parse validate command with directory option', async () => {
-      const validateSchema = validateModule.validateSchema as jest.MockedFunction<
+      const validateSchema = validateModule.validateSchema as vi.MockedFunction<
         typeof validateModule.validateSchema
       >;
 
@@ -111,7 +111,7 @@ describe('CLI Index', () => {
     });
 
     it('should parse publish command with all options', async () => {
-      const publishSchemas = publishModule.publishSchemas as jest.MockedFunction<typeof publishModule.publishSchemas>;
+      const publishSchemas = publishModule.publishSchemas as vi.MockedFunction<typeof publishModule.publishSchemas>;
 
       process.argv = [
         'node',
@@ -155,7 +155,7 @@ describe('CLI Index', () => {
 
 
       // Capture version output
-      const versionSpy = jest.spyOn(program, 'version');
+      const versionSpy = vi.spyOn(program, 'version');
 
       expect(versionSpy).toBeDefined();
     });
