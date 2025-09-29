@@ -9,9 +9,10 @@ RUN apk --no-cache add ca-certificates \
   make \
   g++ \
   python3
-COPY package.json yarn.lock ./
-RUN yarn install
+COPY package.json pnpm-lock.yaml ./
+RUN npm install -g pnpm
+RUN pnpm install
 COPY tsconfig.json  ./
 
 COPY src/ ./src
-RUN yarn build
+RUN pnpm build

@@ -11,7 +11,7 @@ pipeline {
     stage('Prepare') {
       steps {
         nvm(env.NODE_VERSION) {
-          sh 'yarn install'
+          sh 'pnpm install'
         }
       }
     }
@@ -24,7 +24,7 @@ pipeline {
       }
       steps {
         nvm(env.NODE_VERSION) {
-          sh 'yarn build'
+          sh 'pnpm build'
         }
       }
     }
@@ -55,7 +55,7 @@ pipeline {
 
 def published_version() {
   return sh (
-      script: 'npm view $(jq -r .name < package.json) version',
+      script: 'pnpm view $(jq -r .name < package.json) version',
       returnStdout: true
   ).trim()
 }
@@ -72,7 +72,7 @@ def new_version() {
 }
 
 def publish() {
-  sh 'npm publish'
+  sh 'pnpm publish'
   sh "git tag -a 'v${package_version()}' -m 'npm version v${package_version()}'"
   sh "git push origin 'v${package_version()}'"
 }

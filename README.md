@@ -9,7 +9,7 @@ This is a wrapper around [kafka-js](https://github.com/tulios/kafkajs) and [@kaf
 ## Installation
 
 ```bash
-yarn add @comparaonline/event-streamer
+pnpm add @comparaonline/event-streamer
 ```
 
 ## Initialization
@@ -67,13 +67,13 @@ export function createUserRegistered(data: Partial<UserRegistered>): UserRegiste
 ### 2. CLI Commands
 
 - **`generate-example <event-name>`**: Creates a new example schema file to get you started.
-  - **Usage**: `yarn event-streamer-cli generate-example user-created`
+  - **Usage**: `pnpm event-streamer-cli generate-example user-created`
 
 - **`validate <schema-file-path>`**: Validates a single Zod schema file to ensure it's correctly structured.
-  - **Usage**: `yarn event-streamer-cli validate ./events/user-registered.schema.ts`
+  - **Usage**: `pnpm event-streamer-cli validate ./events/user-registered.schema.ts`
 
 - **`publish`**: Publishes all schemas from a directory to the Schema Registry.
-  - **Usage**: `yarn event-streamer-cli publish --events-dir ./events --registry-url http://localhost:8081`
+  - **Usage**: `pnpm event-streamer-cli publish --events-dir ./events --registry-url http://localhost:8081`
   - **Options**:
     - `--registry-auth <user:pass>`: For Schema Registry instances that require basic authentication.
     - `--dry-run`: Simulates the publish process without making any actual changes.
@@ -176,9 +176,9 @@ The integration tests require live Kafka, Zookeeper, and Schema Registry instanc
     ```
 
 2.  **Run the tests:**
-    - **Unit tests:** `yarn test`
-    - **Integration tests:** `yarn test:integration`
-    - **All tests:** `yarn test:all`
+    - **Unit tests:** `pnpm test`
+    - **Integration tests:** `pnpm test:integration`
+    - **All tests:** `pnpm test:all`
 
 3.  **Stop the services:**
     ```sh
