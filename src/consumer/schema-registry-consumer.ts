@@ -2,26 +2,29 @@ import { z } from 'zod';
 import { Consumer, Kafka } from 'kafkajs';
 import { SchemaRegistryClient } from '../schema-registry/client';
 import { getConfig } from '../config';
-import { debug, getParsedJson, stringToUpperCamelCase } from '../helpers';
+import { debug, stringToUpperCamelCase } from '../helpers';
 import { Debug, Strategy } from '../interfaces';
 import { BaseEvent, EventHandler, EventMetadata } from '../schemas';
 import { Input, Config } from '../interfaces';
 import { QueueManager, QueueConfig } from '../shared/queue-manager';
 import { ErrorHandler, ErrorStrategy, ErrorHandlerConfig } from '../shared/error-handler';
-import { getProducer } from '../producer/legacy-producer';
+import { MessageDecoder } from './internal/message-decoder';
+import { RouteRegistry } from './internal/route-registry';
+import { Validator } from './internal/validator';
+import { ErrorCoordinator } from './internal/error-coordinator';
 
+// New, simplified route definition for non-legacy code
 interface SchemaRegistryRoute<T extends BaseEvent = BaseEvent> {
   topic: string | string[];
-  eventName?: string | string[];
-  schema?: z.ZodSchema<T>; // Optional Zod schema for additional business validation
-  callback: EventHandler<T>;
-  validateWithRegistry?: boolean; // Whether to validate against Schema Registry schemas
+  eventCode?: string | string[]; // Replaces legacy eventName
+  schema?: z.ZodSchema<T>; // Optional business validation (Zod)
+  handler: EventHandler<T>;
+  validateWithRegistry?: boolean; // Toggle SR (AJV) validation on consumer side
 }
 
 export interface SchemaRegistryConsumerConfig {
   errorStrategy?: ErrorStrategy;
   deadLetterTopic?: string;
-  maxRetries?: number;
   strategy?: Strategy;
   maxMessagesPerTopic?: number | 'unlimited';
   maxMessagesPerSpecificTopic?: Record<string, number | 'unlimited'>;
@@ -29,7 +32,10 @@ export interface SchemaRegistryConsumerConfig {
 
 export class SchemaRegistryConsumerRouter {
   private schemaRegistryClient?: SchemaRegistryClient;
-  private schemaRoutes: SchemaRegistryRoute<any>[] = [];
+  private routes = new RouteRegistry();
+  private decoder?: MessageDecoder;
+  private validator?: Validator;
+  private errorCoordinator?: ErrorCoordinator;
   private consumer: Consumer | null = null;
   private queueManager?: QueueManager;
   private errorHandler?: ErrorHandler;
@@ -42,6 +48,11 @@ export class SchemaRegistryConsumerRouter {
     if (config.schemaRegistry) {
       this.schemaRegistryClient = new SchemaRegistryClient(config.schemaRegistry);
       debug(Debug.INFO, 'Schema Registry consumer initialized with validation caching');
+      this.decoder = new MessageDecoder(this.schemaRegistryClient);
+      this.validator = new Validator(this.schemaRegistryClient);
+    } else {
+      this.decoder = new MessageDecoder();
+      this.validator = new Validator();
     }
 
     // Initialize error handler if strategy is provided
@@ -49,81 +60,46 @@ export class SchemaRegistryConsumerRouter {
       const errorConfig: ErrorHandlerConfig = {
         strategy: consumerConfig.errorStrategy,
         deadLetterTopic: consumerConfig.deadLetterTopic,
-        maxRetries: consumerConfig.maxRetries || 3,
         appName: config.appName || config.consumer?.groupId || 'unknown',
         consumerGroupId: config.consumer?.groupId || 'unknown'
       };
 
       this.errorHandler = new ErrorHandler(errorConfig);
+      this.errorCoordinator = new ErrorCoordinator(this.errorHandler, consumerConfig.deadLetterTopic);
       debug(Debug.INFO, 'Error handler initialized', errorConfig);
     }
   }
 
-  // Add route with Schema Registry support
-  addWithSchema<T extends BaseEvent>(
-    topic: string | string[],
-    handler: EventHandler<T>,
-    options?: { schema?: z.ZodSchema<T>; validateWithRegistry?: boolean }
-  ): void;
-  addWithSchema<T extends BaseEvent>(
-    topic: string | string[],
-    eventName: string | string[],
-    handler: EventHandler<T>,
-    options?: { schema?: z.ZodSchema<T>; validateWithRegistry?: boolean }
-  ): void;
-  addWithSchema<T extends BaseEvent>(route: SchemaRegistryRoute<T>): void;
-  addWithSchema<T extends BaseEvent>(
-    param1: string | string[] | SchemaRegistryRoute<T>,
-    param2?: EventHandler<T> | string | string[],
-    param3?: EventHandler<T> | { schema?: z.ZodSchema<T>; validateWithRegistry?: boolean },
-    param4?: { schema?: z.ZodSchema<T>; validateWithRegistry?: boolean }
-  ): void {
-    let route: SchemaRegistryRoute<T>;
+  // New API: object-first add()
+  add<T extends BaseEvent>(route: SchemaRegistryRoute<T>): void {
+    const topics = Array.isArray(route.topic) ? route.topic : [route.topic];
+    const eventCodes = route.eventCode
+      ? (Array.isArray(route.eventCode) ? route.eventCode : [route.eventCode]).map((n) => stringToUpperCamelCase(n))
+      : [undefined];
 
-    if (typeof param1 === 'object' && !Array.isArray(param1)) {
-      // Route object passed
-      route = param1;
-    } else {
-      // Parse parameters
-      const topics = Array.isArray(param1) ? param1 : [param1];
+    this.routes.add(route);
 
-      if (typeof param2 === 'function') {
-        // No eventName provided
-        route = {
-          topic: topics,
-          callback: param2,
-          schema: (param3 as any)?.schema,
-          validateWithRegistry: (param3 as any)?.validateWithRegistry ?? true
-        };
-      } else {
-        // EventName provided
-        const rawEventNames = Array.isArray(param2) ? param2 : [param2];
-        const normalizedEventNames = rawEventNames.filter((name): name is string => name !== undefined).map((name) => stringToUpperCamelCase(name));
-        route = {
-          topic: topics,
-          eventName: normalizedEventNames,
-          callback: param3 as EventHandler<T>,
-          schema: (param4 as any)?.schema,
-          validateWithRegistry: (param4 as any)?.validateWithRegistry ?? true
-        };
-      }
-    }
-
-    // @ts-ignore
-    this.schemaRoutes.push(route);
-
-    debug(Debug.INFO, 'Schema Registry route added', {
-      topics: Array.isArray(route.topic) ? route.topic : [route.topic],
-      eventNames: route.eventName ? (Array.isArray(route.eventName) ? route.eventName : [route.eventName]) : undefined,
+    debug(Debug.INFO, 'Route added', {
+      topics,
+      eventCodes,
       hasSchema: !!route.schema,
-      validateWithRegistry: !!route.validateWithRegistry
+      validateWithRegistry: route.validateWithRegistry ?? true
     });
+  }
+
+
+
+  // Add fallback per topic
+  addFallback<T = unknown>(config: { topic: string; handler: EventHandler<T> }): void {
+    this.routes.addFallback(config.topic, config.handler as EventHandler<any>);
+    debug(Debug.INFO, 'Fallback handler added', { topic: config.topic });
   }
 
   // Start the consumer with Schema Registry message processing
   async start(): Promise<void> {
-    if (this.schemaRoutes.length === 0) {
-      debug(Debug.WARN, 'No Schema Registry routes defined');
+    const topics = this.routes.listTopics();
+    if (topics.length === 0 && this.consumerConfig.deadLetterTopic == null) {
+      debug(Debug.WARN, 'No routes or fallbacks defined');
       return;
     }
 
@@ -146,14 +122,8 @@ export class SchemaRegistryConsumerRouter {
       return Promise.resolve();
     }
 
-    // Get all topics from schema routes
-    const allTopics = new Set<string>();
-    this.schemaRoutes.forEach((route) => {
-      const topics = Array.isArray(route.topic) ? route.topic : [route.topic];
-      topics.forEach((topic) => allTopics.add(topic));
-    });
-
-    const topics = Array.from(allTopics);
+    // Include fallback-only topics if any
+    // Fallback topics are included via listTopics()
 
     // Initialize queue manager for parallel processing (topic strategy)
     const strategy = this.consumerConfig.strategy || config.consumer?.strategy || 'topic';
@@ -224,91 +194,41 @@ export class SchemaRegistryConsumerRouter {
 
     let parsedEvent: Input;
     let metadata: EventMetadata;
+    let schemaId: number | undefined;
 
-    // Check if message is Schema Registry encoded
-      // @ts-ignore
-      if (this.schemaRegistryClient && message.value && SchemaRegistryClient.isSchemaRegistryEncoded(message.value)) {
-
-      // this.schemaRegistryClient is checked above
-
-      try {
-        const decoded = await this.schemaRegistryClient.decodeAndValidate(message.value, true);
-        parsedEvent = decoded.value as Input;
-
-        metadata = {
-          topic,
-          partition,
-          offset: message.offset,
-          timestamp: message.timestamp,
-                        // @ts-ignore
-                        headers: message.headers || {},
-                        isSchemaRegistryMessage: true,          schemaId: decoded.schemaId
-        };
-
-        if (!decoded.valid && decoded.validationErrors?.length) {
-          debug(Debug.WARN, 'Schema Registry validation failed', {
-            topic,
-            schemaId: decoded.schemaId,
-            errors: decoded.validationErrors
-          });
-        }
-      } catch (error) {
-        debug(Debug.ERROR, 'Failed to decode Schema Registry message', { topic, error });
-        return;
-      }
-    } else {
-      // Legacy JSON message
-      try {
-        const parsed = getParsedJson<Input>(message.value);
-        if (!parsed) {
-          debug(Debug.DEBUG, 'Could not parse JSON message', { topic });
-          return;
-        }
-        parsedEvent = parsed;
-
-        metadata = {
-          topic,
-          partition,
-          offset: message.offset,
-          timestamp: message.timestamp,
-          // @ts-ignore
-          headers: message.headers || {},
-          isSchemaRegistryMessage: false
-        };
-      } catch (error) {
-        debug(Debug.ERROR, 'Failed to parse JSON message', { topic, error });
-        return;
-      }
+    // Decode without implicit validation; route-level flags decide
+    try {
+      const decoded = await this.decoder!.decode<Input>(topic, partition, message);
+      if (!decoded) return;
+      parsedEvent = decoded.value as Input;
+      metadata = decoded.metadata;
+      schemaId = decoded.schemaId;
+    } catch (error) {
+      debug(Debug.ERROR, 'Failed to decode message', { topic, error });
+      return;
     }
 
-    // Find and execute matching routes
-    const matchingRoutes = this.schemaRoutes.filter((route) => {
-      const topics = Array.isArray(route.topic) ? route.topic : [route.topic];
-      const eventNames = route.eventName ? (Array.isArray(route.eventName) ? route.eventName : [route.eventName]) : [undefined];
+    // Match routes for this topic
+    const matchingRoutes = this.routes.getRoutes(topic, parsedEvent.code);
 
-      const topicMatches = topics.includes(topic);
-      const eventMatches = eventNames.some((eventName) => eventName === undefined || eventName === parsedEvent.code);
-
-      return topicMatches && eventMatches;
-    });
-
-    // Process each matching route
-    for (const route of matchingRoutes) {
-      // Respect route-level registry validation preference for SR messages
-      const shouldValidate = route.validateWithRegistry !== undefined ? route.validateWithRegistry : true;
-
-      // Additional Zod validation if schema provided
-      if (route.schema && shouldValidate) {
-        const validation = route.schema.safeParse(parsedEvent);
-        if (!validation.success) {
-          const validationError = new Error(
-            `Route schema validation failed: ${validation.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ')}`
-          );
-          throw validationError;
-        }
+    if (matchingRoutes.length === 0) {
+      const fallback = this.routes.getFallback(topic);
+      if (fallback) {
+        await fallback(parsedEvent, metadata);
+        return;
       }
+      debug(Debug.DEBUG, 'No matching routes and no fallback for topic', { topic, code: parsedEvent.code });
+      return;
+    }
 
-      await route.callback(parsedEvent as any, metadata);
+    for (const route of matchingRoutes) {
+      // SR validation (AJV) if enabled and SR message
+      await this.validator!.validateWithRegistry(schemaId, parsedEvent, !!route.validateWithRegistry && !!metadata.isSchemaRegistryMessage);
+
+      // Business validation (Zod)
+      this.validator!.validateWithZod(route.schema as any, parsedEvent);
+
+      await route.handler(parsedEvent as any, metadata);
     }
   }
 
@@ -316,79 +236,7 @@ export class SchemaRegistryConsumerRouter {
    * Handle processing errors using configured error strategy
    */
   private async handleProcessingError(error: Error, topic: string, message: any, partition: number): Promise<void> {
-    if (!this.errorHandler) {
-      // No error handler configured, use legacy behavior (log and continue)
-      debug(Debug.ERROR, 'Message processing error (no error handler)', {
-        topic,
-        partition,
-        offset: message.offset,
-        error: error.message
-      });
-      return;
-    }
-
-    // Extract event code if possible
-    let originalCode = 'UnknownEvent';
-    let originalPayload = message.value;
-
-    try {
-      if (SchemaRegistryClient.isSchemaRegistryEncoded(message.value)) {
-        // For Schema Registry messages, we can't easily extract the code without decoding
-        // Use topic name as fallback
-        originalCode = topic;
-      } else {
-        // For JSON messages, try to extract the code
-        const parsed = getParsedJson<Input>(message.value);
-        if (parsed?.code) {
-          originalCode = parsed.code;
-        }
-        // @ts-ignore
-        originalPayload = parsed;
-      }
-    } catch {
-      // If we can't parse, use topic name
-      originalCode = topic;
-    }
-
-    const context = {
-      topic,
-      partition,
-      offset: message.offset,
-      timestamp: message.timestamp,
-      originalCode,
-      originalPayload,
-      retryCount: 0 // TODO: Implement retry tracking if needed
-    };
-
-    const result = this.errorHandler.handleError(error, context);
-
-    // If we have a DLQ event, send it to the dead letter topic
-    if (result.deadLetterEvent && this.consumerConfig.deadLetterTopic) {
-      try {
-        const config = getConfig();
-        const producer = await getProducer(config.host);
-        await producer.send({
-          topic: this.consumerConfig.deadLetterTopic,
-          messages: [
-            {
-              value: JSON.stringify(result.deadLetterEvent)
-            }
-          ]
-        });
-
-        debug(Debug.INFO, 'Sent message to dead letter queue', {
-          originalTopic: topic,
-          originalOffset: message.offset,
-          deadLetterTopic: this.consumerConfig.deadLetterTopic
-        });
-      } catch (dlqError) {
-        debug(Debug.ERROR, 'Failed to send message to dead letter queue', {
-          originalTopic: topic,
-          originalOffset: message.offset,
-          dlqError
-        });
-      }
-    }
+    await this.errorCoordinator?.handle(error, topic, message, partition);
   }
 
   async stop(): Promise<void> {
@@ -401,21 +249,5 @@ export class SchemaRegistryConsumerRouter {
     if (this.consumer != null) {
       await this.consumer.disconnect();
     }
-  }
-
-  getCacheStats(): any {
-    return this.schemaRegistryClient?.getCacheStats();
-  }
-
-  clearCaches(): void {
-    this.schemaRegistryClient?.clearCaches();
-  }
-
-  getQueueStats(): any {
-    return this.queueManager?.getQueueStats() || {};
-  }
-
-  getErrorHandlerConfig(): any {
-    return this.errorHandler?.getConfig();
   }
 }

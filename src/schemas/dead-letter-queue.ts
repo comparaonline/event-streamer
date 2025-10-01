@@ -18,7 +18,6 @@ export const DeadLetterQueueSchema = z
 
     // Retry information
     retryCount: z.number().default(0).describe('Number of times processing was attempted'),
-    maxRetries: z.number().default(3).describe('Maximum retry attempts configured'),
 
     // Original message payload (for potential reprocessing)
     originalPayload: z.unknown().describe('Original message payload that failed processing'),
@@ -44,7 +43,6 @@ export function createDeadLetterQueueEvent(params: {
   errorType: DeadLetterQueueEvent['errorType'];
   errorStack?: string;
   retryCount?: number;
-  maxRetries?: number;
   originalPayload: unknown;
   consumerGroupId: string;
   processingHost?: string;
@@ -70,7 +68,6 @@ export function createDeadLetterQueueEvent(params: {
     errorStack: params.errorStack,
 
     retryCount: params.retryCount || 0,
-    maxRetries: params.maxRetries || 3,
 
     originalPayload: params.originalPayload,
 

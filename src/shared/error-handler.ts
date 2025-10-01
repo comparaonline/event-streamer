@@ -7,7 +7,6 @@ export type ErrorStrategy = 'IGNORE' | 'DEAD_LETTER';
 export interface ErrorHandlerConfig {
   strategy: ErrorStrategy;
   deadLetterTopic?: string;
-  maxRetries?: number;
   appName: string;
   consumerGroupId: string;
 }
@@ -50,7 +49,6 @@ export class ErrorHandler {
    */
   handleError(error: Error, context: MessageContext): ErrorHandlerResult {
     const errorType = this.categorizeError(error);
-    const shouldRetry = this.shouldRetry(context, error);
 
     debug(Debug.ERROR, 'Message processing error', {
       topic: context.topic,
@@ -68,7 +66,7 @@ export class ErrorHandler {
         return this.handleIgnoreStrategy(error, context);
 
       case 'DEAD_LETTER':
-        return this.handleDeadLetterStrategy(error, context, errorType, shouldRetry);
+        return this.handleDeadLetterStrategy(error, context, errorType);
 
       default:
         // Should never happen with TypeScript, but handle gracefully
@@ -102,22 +100,7 @@ export class ErrorHandler {
     error: Error,
     context: MessageContext,
     errorType: DeadLetterQueueEvent['errorType'],
-    shouldRetry: boolean
   ): ErrorHandlerResult {
-    if (shouldRetry) {
-      debug(Debug.INFO, 'Message will be retried, not sending to DLQ yet', {
-        topic: context.topic,
-        offset: context.offset,
-        retryCount: context.retryCount || 0,
-        maxRetries: this.config.maxRetries || 3
-      });
-
-      return {
-        shouldContinue: false, // Don't continue, let retry logic handle it
-        errorLogged: true
-      };
-    }
-
     const deadLetterEvent = createDeadLetterQueueEvent({
       originalCode: context.originalCode || 'UnknownEvent',
       originalTopic: context.topic,
@@ -131,7 +114,6 @@ export class ErrorHandler {
       errorStack: error.stack,
 
       retryCount: context.retryCount || 0,
-      maxRetries: this.config.maxRetries || 3,
 
       originalPayload: context.originalPayload,
       consumerGroupId: this.config.consumerGroupId,
@@ -175,20 +157,7 @@ export class ErrorHandler {
     return 'UNKNOWN_ERROR';
   }
 
-  /**
-   * Determine if the message should be retried based on retry count and config
-   */
-  private shouldRetry(context: MessageContext, error: Error): boolean {
-    const maxRetries = this.config.maxRetries || 3;
-    const currentRetries = context.retryCount || 0;
 
-    // Don't retry validation errors - they will keep failing
-    if (this.categorizeError(error) === 'VALIDATION_ERROR') {
-      return false;
-    }
-
-    return currentRetries < maxRetries;
-  }
 
   /**
    * Get configuration for monitoring/debugging
