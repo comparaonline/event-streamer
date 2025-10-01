@@ -184,6 +184,27 @@ export class SchemaRegistryClient {
     }
   }
 
+  /**
+   * Validate a decoded value against a schema by ID using the cached validator.
+   * Returns { valid, errors }. If no validator is available, returns valid: true.
+   */
+  async validateValue(schemaId: number, value: unknown): Promise<{ valid: boolean; errors: any[] }> {
+    try {
+      const cachedSchema = await this.getSchemaForConsumer(schemaId);
+      if (!cachedSchema.validator) {
+        debug(Debug.WARN, 'No validator available for schema; skipping validation', { schemaId: cachedSchema.id });
+        return { valid: true, errors: [] };
+      }
+
+      const isValid = cachedSchema.validator(value);
+      return { valid: !!isValid, errors: isValid ? [] : cachedSchema.validator.errors || [] };
+    } catch (error) {
+      debug(Debug.ERROR, 'Failed to validate value against schema', { schemaId, error });
+      // Consider validation inconclusive as a schema error
+      return { valid: false, errors: [{ message: String(error) }] };
+    }
+  }
+
   static isSchemaRegistryEncoded(buffer: Buffer): boolean {
     return buffer.length >= 5 && buffer[0] === 0;
   }
