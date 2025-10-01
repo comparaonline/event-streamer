@@ -28,6 +28,7 @@ export interface SchemaRegistryConsumerConfig {
   strategy?: Strategy;
   maxMessagesPerTopic?: number | 'unlimited';
   maxMessagesPerSpecificTopic?: Record<string, number | 'unlimited'>;
+  fromBeginning?: boolean;
 }
 
 export class SchemaRegistryConsumerRouter {
@@ -67,7 +68,7 @@ export class SchemaRegistryConsumerRouter {
         strategy: this.consumerConfig.errorStrategy,
         deadLetterTopic: this.consumerConfig.deadLetterTopic,
         appName: config.appName || config.consumer?.groupId || 'unknown',
-        consumerGroupId: config.consumer?.groupId || 'unknown',
+        consumerGroupId: config.consumer?.groupId || 'unknown'
       };
 
       this.errorHandler = new ErrorHandler(errorConfig);
@@ -92,8 +93,6 @@ export class SchemaRegistryConsumerRouter {
       validateWithRegistry: route.validateWithRegistry ?? true
     });
   }
-
-
 
   // Add fallback per topic
   addFallback<T = unknown>(config: { topic: string; handler: EventHandler<T> }): void {
@@ -149,7 +148,7 @@ export class SchemaRegistryConsumerRouter {
     if (strategy === 'topic') {
       const queueConfig: QueueConfig = {
         maxMessagesPerTopic: this.consumerConfig.maxMessagesPerTopic || config.consumer?.maxMessagesPerTopic || 10,
-        maxMessagesPerSpecificTopic: this.consumerConfig.maxMessagesPerSpecificTopic || config.consumer?.maxMessagesPerSpecificTopic,
+        maxMessagesPerSpecificTopic: this.consumerConfig.maxMessagesPerSpecificTopic || config.consumer?.maxMessagesPerSpecificTopic
       };
 
       this.queueManager = new QueueManager(queueConfig);
@@ -165,7 +164,7 @@ export class SchemaRegistryConsumerRouter {
     const config = getConfig();
     const kafka = new Kafka({
       brokers: config.host.split(','),
-      logLevel: config.kafkaJSLogs,
+      logLevel: config.kafkaJSLogs
     });
 
     this.consumer = kafka.consumer({ groupId: config.consumer!.groupId! });
@@ -176,7 +175,10 @@ export class SchemaRegistryConsumerRouter {
       this.queueManager.setConsumer(this.consumer);
     }
 
-    await this.consumer.subscribe({ topics: this.routes.listTopics() });
+    await this.consumer.subscribe({
+      topics: this.routes.listTopics(),
+      fromBeginning: this.consumerConfig.fromBeginning
+    });
   }
 
   /**
@@ -186,7 +188,7 @@ export class SchemaRegistryConsumerRouter {
     const config = getConfig();
     const processingStrategy = this.consumerConfig.strategy || config.consumer?.strategy || 'topic';
 
-    await this.consumer!.run({
+    await this.consumer?.run({
       eachMessage: async ({ topic, message, partition }) => {
         if (processingStrategy === 'one-by-one') {
           try {
@@ -203,14 +205,14 @@ export class SchemaRegistryConsumerRouter {
             this.queueManager.addToQueue(topic, processingPromise);
           }
         }
-      },
+      }
     });
 
     debug(Debug.INFO, 'Schema Registry consumer started with enhanced validation', {
       topics: this.routes.listTopics(),
       strategy: processingStrategy,
       errorStrategy: this.consumerConfig.errorStrategy || 'none',
-      hasQueueManager: !!this.queueManager,
+      hasQueueManager: !!this.queueManager
     });
   }
 

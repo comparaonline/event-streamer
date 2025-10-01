@@ -31,10 +31,13 @@ describe('Dead Letter Queue Integration', () => {
   let consumerRouter: SchemaRegistryConsumerRouter;
   let producer: SchemaRegistryProducer;
   let srClient: SchemaRegistryClient;
-  let dlqReader: ReturnType<Kafka['consumer']>;
   const receivedDlq: any[] = [];
 
   beforeAll(async () => {
+    // Define schemas before they are used
+    const { zodToJsonSchema } = await import('zod-to-json-schema');
+    mergedSchema = SchemaRegistryEventSchema.merge(failingSchema);
+
     // Configure runtime
     setConfig({
       host: KAFKA_BROKERS,
@@ -57,59 +60,53 @@ describe('Dead Letter Queue Integration', () => {
     });
     await admin.disconnect();
 
-    // DLQ reader
-    dlqReader = kafka.consumer({ groupId: `dlq-reader-${Date.now()}` });
-    await dlqReader.connect();
-    await dlqReader.subscribe({ topic: dlqTopic, fromBeginning: true });
-    await dlqReader.run({
-      eachMessage: async ({ message }) => {
-        try {
-          const obj = JSON.parse((message.value || Buffer.from('{}')).toString('utf8'));
-          receivedDlq.push(obj);
-        } catch {
-          // ignore
-        }
-      }
-    });
-
-    // Pre-register subject for SR producer
+    // Pre-register schemas
     srClient = new SchemaRegistryClient({ url: SCHEMA_REGISTRY_URL });
-    const subject = srClient.getSubjectFromTopicAndEventCode(mainTopic, eventCode);
-    const { zodToJsonSchema } = await import('zod-to-json-schema');
-    mergedSchema = SchemaRegistryEventSchema.merge(failingSchema);
-    const jsonSchema = zodToJsonSchema(mergedSchema as any, { target: 'jsonSchema7' });
     const registry = (srClient as any).registry;
+    
+    const subject = srClient.getSubjectFromTopicAndEventCode(mainTopic, eventCode);
+    const jsonSchema = zodToJsonSchema(mergedSchema as any, { target: 'jsonSchema7' });
     await registry.register({ type: 'JSON', schema: JSON.stringify(jsonSchema) }, { subject });
 
-    // Consumer
+    const dlqSubject = srClient.getSubjectFromTopicAndEventCode(dlqTopic, 'DeadLetterQueueEvent');
+    const dlqJsonSchema = zodToJsonSchema(DeadLetterQueueSchema as any, { target: 'jsonSchema7' });
+    await registry.register({ type: 'JSON', schema: JSON.stringify(dlqJsonSchema) }, { subject: dlqSubject });
+    
+    // A single consumer for both topics
     consumerRouter = new SchemaRegistryConsumerRouter({
       errorStrategy: 'DEAD_LETTER',
       deadLetterTopic: dlqTopic,
-      maxRetries: 0
+      fromBeginning: true,
+      strategy: 'one-by-one',
     });
 
+    // Route for the main topic (designed to fail)
     consumerRouter.add({
       topic: mainTopic,
       eventCode,
-      // Always fail,wha to trigger DLQ
+      schema: mergedSchema,
       handler: () => {
         throw new Error('Processing failed!');
-      }
+      },
+    });
+
+    // Route for the DLQ topic (to verify the message)
+    consumerRouter.add({
+      topic: dlqTopic,
+      eventCode: 'DeadLetterQueueEvent',
+      schema: DeadLetterQueueSchema,
+      handler: async (message) => {
+        receivedDlq.push(message);
+      },
     });
 
     await consumerRouter.start();
-    await sleep(2000); // give time to join group and subscribe
     producer = new SchemaRegistryProducer();
   }, TEST_TIMEOUT);
 
   afterAll(async () => {
     try {
       await consumerRouter.stop();
-    } catch {
-      void 0; // ignore cleanup errors
-    }
-    try {
-      await dlqReader.disconnect();
     } catch {
       void 0; // ignore cleanup errors
     }

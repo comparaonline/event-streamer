@@ -1,10 +1,9 @@
 import { ErrorHandler } from '../../shared/error-handler';
-import { getConfig } from '../../config';
-import { getProducer } from '../../producer/legacy-producer';
-import { Input } from '../../interfaces';
 import { getParsedJson, debug } from '../../helpers';
-import { Debug } from '../../interfaces';
+import { Debug, Input } from '../../interfaces';
 import { SchemaRegistryClient } from '../../schema-registry/client';
+import { SchemaRegistryProducer } from '../../producer/schema-registry-producer';
+import { DeadLetterQueueSchema } from '../../schemas';
 
 export class ErrorCoordinator {
   constructor(
@@ -18,7 +17,7 @@ export class ErrorCoordinator {
         topic,
         partition,
         offset: message.offset,
-        error: error.message
+        error: error.message,
       });
       return;
     }
@@ -45,28 +44,29 @@ export class ErrorCoordinator {
       timestamp: message.timestamp,
       originalCode,
       originalPayload,
-      retryCount: 0
+      retryCount: 0,
     };
 
     const result = this.errorHandler.handleError(error, context);
     if (result.deadLetterEvent && this.deadLetterTopic) {
       try {
-        const config = getConfig();
-        const producer = await getProducer(config.host);
-        await producer.send({
+        const producer = new SchemaRegistryProducer();
+        await producer.emitWithSchema({
           topic: this.deadLetterTopic,
-          messages: [{ value: JSON.stringify(result.deadLetterEvent) }]
+          eventCode: 'DeadLetterQueueEvent',
+          data: result.deadLetterEvent,
+          schema: DeadLetterQueueSchema,
         });
         debug(Debug.INFO, 'Sent message to dead letter queue', {
           originalTopic: topic,
           originalOffset: message.offset,
-          deadLetterTopic: this.deadLetterTopic
+          deadLetterTopic: this.deadLetterTopic,
         });
       } catch (dlqError) {
         debug(Debug.ERROR, 'Failed to send message to dead letter queue', {
           originalTopic: topic,
           originalOffset: message.offset,
-          dlqError
+          dlqError,
         });
       }
     }

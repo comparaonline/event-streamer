@@ -53,7 +53,6 @@ export class ConsumerRouter {
       const errorConfig: ErrorHandlerConfig = {
         strategy: legacyConfig.errorStrategy,
         deadLetterTopic: legacyConfig.deadLetterTopic,
-        maxRetries: legacyConfig.maxRetries || 3,
         appName: config.appName || config.consumer?.groupId || 'unknown',
         consumerGroupId: config.consumer?.groupId || 'unknown'
       };

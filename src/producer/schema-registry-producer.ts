@@ -1,8 +1,7 @@
 import { z } from 'zod';
-import { RecordMetadata, Message } from 'kafkajs';
+import { RecordMetadata, Message, Kafka, Producer } from 'kafkajs';
 import { getConfig } from '../config';
 import { SchemaRegistryClient } from '../schema-registry/client';
-import { getProducer } from './legacy-producer';
 import { stringToUpperCamelCase, debug, toArray } from '../helpers';
 import { Debug } from '../interfaces';
 import { BaseEvent, createBaseEvent, createSchemaRegistryEvent } from '../schemas';
@@ -24,25 +23,58 @@ interface SchemaRegistryMessage {
   headers: Record<string, string>;
 }
 
+let instance: SchemaRegistryProducer | null = null;
+
 export class SchemaRegistryProducer {
   private schemaRegistryClient?: SchemaRegistryClient;
-  private preloadedSubjects = new Set<string>();
+  private producer: Producer;
+  private isConnected = false;
 
   constructor() {
-    const config = getConfig() as Config;
+    if (instance) {
+      return instance;
+    }
+
+    const config = getConfig();
 
     if (config.schemaRegistry) {
       this.schemaRegistryClient = new SchemaRegistryClient(config.schemaRegistry);
       debug(Debug.INFO, 'Schema Registry producer initialized with startup caching');
     }
+
+    const kafka = new Kafka({
+      brokers: config.host.split(','),
+      logLevel: config.kafkaJSLogs,
+    });
+
+    this.producer = kafka.producer({
+      allowAutoTopicCreation: true,
+      idempotent: config.producer?.idempotent ?? true,
+    });
+
+    instance = this;
   }
 
+  private async connect(): Promise<void> {
+    if (!this.isConnected) {
+      await this.producer.connect();
+      this.isConnected = true;
+    }
+  }
+
+  async disconnect(): Promise<void> {
+    if (this.isConnected) {
+      await this.producer.disconnect();
+      this.isConnected = false;
+    }
+  }
   
 
   async emitWithSchema<T extends BaseEvent>(
     output: SchemaRegistryOutput<T> | SchemaRegistryOutput<T>[],
     overwriteHosts?: string | string[]
   ): Promise<EmitResponse[]> {
+    await this.connect();
     const config = getConfig() as Config;
     const outputs = toArray(output);
 
@@ -67,7 +99,14 @@ export class SchemaRegistryProducer {
             this.validateEventData(item);
 
             const itemAny = item as { code?: string; appName?: string };
-            const rawEventCode = (eventCode ?? itemAny?.code ?? topic) as string;
+            const rawEventCode = eventCode ?? itemAny?.code;
+
+            if (!rawEventCode) {
+              throw new Error(
+                'An eventCode must be provided either in the emitWithSchema options or as a `code` property in the event data.'
+              );
+            }
+            
             const resolvedEventCode = stringToUpperCamelCase(rawEventCode);
 
             // Create the full event object with all required fields.
@@ -111,11 +150,12 @@ export class SchemaRegistryProducer {
       })
     );
 
-    return this.sendMessages(messages.flat(), overwriteHosts);
+    return this.sendMessages(messages.flat());
   }
 
   // Emit with legacy JSON format (backward compatibility)
   async emitAsJson<T extends BaseEvent>(outputs: SchemaRegistryOutput<T>[], overwriteHosts?: string | string[]): Promise<EmitResponse[]> {
+    await this.connect();
     const config = getConfig();
     const appName = config.appName ?? config.consumer?.groupId ?? process.env.HOSTNAME?.split('-')[0] ?? 'unknown';
 
@@ -139,57 +179,39 @@ export class SchemaRegistryProducer {
   }
 
   // Send messages using Kafka producer
-  private async sendMessages(messages: SchemaRegistryMessage[], overwriteHosts?: string | string[]): Promise<EmitResponse[]> {
-    const config = getConfig() as Config;
-    const hosts = this.getHosts(config.host, config.producer?.additionalHosts, overwriteHosts);
+  private async sendMessages(messages: SchemaRegistryMessage[]): Promise<EmitResponse[]> {
+    await this.connect();
+    const config = getConfig();
+    const result: RecordMetadata[] = [];
 
-    return Promise.all(
-      hosts.map(async (host): Promise<EmitResponse> => {
-        const producer = await getProducer(host);
-        const result: RecordMetadata[] = [];
+    const messagesByTopic = messages.reduce<Record<string, unknown[]>>((acc, msg) => {
+      if (!acc[msg.topic]) {
+        acc[msg.topic] = [];
+      }
+      acc[msg.topic].push({
+        key: msg.key,
+        value: msg.value,
+        headers: msg.headers,
+        partition: msg.partition,
+      });
+      return acc;
+    }, {});
 
-        // Group messages by topic for efficient sending
-        const messagesByTopic = messages.reduce<Record<string, unknown[]>>((acc, msg) => {
-          if (!acc[msg.topic]) {
-            acc[msg.topic] = [];
-          }
-          acc[msg.topic].push({
-            key: msg.key,
-            value: msg.value,
-            headers: msg.headers,
-            partition: msg.partition
-          });
-          return acc;
-        }, {});
-
-        // Send messages by topic
-        for (const [topic, msgs] of Object.entries(messagesByTopic)) {
-          const topicResult = await producer.send({
-            topic,
-            messages: msgs as Message[],
-            compression: config.producer?.compressionType
-          });
-          result.push(...topicResult);
-        }
-
-        debug(Debug.INFO, 'Schema Registry messages sent', {
-          host,
-          messageCount: messages.length,
-          topics: Object.keys(messagesByTopic)
-        });
-
-        return result;
-      })
-    );
-  }
-
-  // Get hosts for producer (from legacy producer logic)
-  private getHosts(defaultHost: string, secondaries?: string | string[], overwrite?: string | string[]): string[] {
-    if (overwrite != null) {
-      return Array.isArray(overwrite) ? overwrite : [overwrite];
+    for (const [topic, msgs] of Object.entries(messagesByTopic)) {
+      const topicResult = await this.producer.send({
+        topic,
+        messages: msgs as Message[],
+        compression: config.producer?.compressionType,
+      });
+      result.push(...topicResult);
     }
-    const secondaryHosts = secondaries ? (Array.isArray(secondaries) ? secondaries : [secondaries]) : [];
-    return [defaultHost, ...secondaryHosts];
+
+    debug(Debug.INFO, 'Schema Registry messages sent', {
+      messageCount: messages.length,
+      topics: Object.keys(messagesByTopic),
+    });
+
+    return [result];
   }
 
   // Get subject name from topic and event code to avoid collisions
@@ -209,10 +231,6 @@ export class SchemaRegistryProducer {
     if (Array.isArray(data)) {
       throw new Error('Event data cannot be an array at the top level');
     }
-
-    // Allow data to include or not include the 'code' field
-    // If 'code' is provided, it should match the eventName
-    // If 'code' is not provided, it will be auto-generated
   }
 
   // Get cache statistics
@@ -223,12 +241,5 @@ export class SchemaRegistryProducer {
   // Clear caches (for testing/debugging)
   clearCaches(): void {
     this.schemaRegistryClient?.clearCaches();
-    this.preloadedSubjects.clear();
-    debug(Debug.DEBUG, 'Producer caches cleared');
-  }
-
-  // Check if subject is preloaded
-  isSubjectPreloaded(subject: string): boolean {
-    return this.preloadedSubjects.has(subject);
   }
 }
