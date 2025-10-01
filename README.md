@@ -137,12 +137,12 @@ import { UserRegisteredSchema, UserRegistered } from './events/user-registered.s
 
 const consumer = new SchemaRegistryConsumerRouter();
 
-// Handler for valid, schema-registry encoded messages
+// Handler for valid messages (Schema Registry or JSON)
 consumer.add({
   topic: 'users',
   eventCode: 'UserRegistered',
   schema: UserRegisteredSchema,
-  handler: (data: UserRegistered, metadata, emit) => {
+  handler: (data: UserRegistered, metadata) => {
     console.log('Received a valid UserRegistered event:', data);
   }
 });
@@ -150,11 +150,8 @@ consumer.add({
 // Fallback handler for all other messages on the topic
 consumer.addFallback({
   topic: 'users',
-  handler: (data, metadata, emit) => {
+  handler: (data, metadata) => {
     console.warn('Received a message on the fallback handler:', data);
-    if (metadata.error) {
-      console.error('Error processing message:', metadata.error);
-    }
   }
 });
 
