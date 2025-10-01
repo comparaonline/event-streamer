@@ -86,32 +86,35 @@ describe('Mixed Format and Multiple Event Type Tests', () => {
       consumers.push(consumer);
 
       // Set up consumer to handle multiple event types
-      consumer.addWithSchema(
-        testTopic,
-        'UserEvent',
-        async (event: UserEvent) => {
+      consumer.add({
+        topic: testTopic,
+        eventCode: 'UserEvent',
+        handler: async (event: UserEvent) => {
           receivedEvents.push({ eventType: 'UserEvent', data: event });
         },
-        { schema: UserEventSchema, validateWithRegistry: true }
-      );
+        schema: UserEventSchema,
+        validateWithRegistry: true,
+      });
 
-      consumer.addWithSchema(
-        testTopic,
-        'OrderEvent',
-        async (event: OrderEvent) => {
+      consumer.add({
+        topic: testTopic,
+        eventCode: 'OrderEvent',
+        handler: async (event: OrderEvent) => {
           receivedEvents.push({ eventType: 'OrderEvent', data: event });
         },
-        { schema: OrderEventSchema, validateWithRegistry: true }
-      );
+        schema: OrderEventSchema,
+        validateWithRegistry: true,
+      });
 
-      consumer.addWithSchema(
-        testTopic,
-        'NotificationEvent',
-        async (event: NotificationEvent) => {
+      consumer.add({
+        topic: testTopic,
+        eventCode: 'NotificationEvent',
+        handler: async (event: NotificationEvent) => {
           receivedEvents.push({ eventType: 'NotificationEvent', data: event });
         },
-        { schema: NotificationEventSchema, validateWithRegistry: true }
-      );
+        schema: NotificationEventSchema,
+        validateWithRegistry: true,
+      });
 
       await consumer.start();
       await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -226,28 +229,31 @@ describe('Mixed Format and Multiple Event Type Tests', () => {
       consumers.push(consumer);
 
       // Handler for only user events
-      consumer.addWithSchema(
-        testTopic,
-        'UserEvent',
-        async () => {
+      consumer.add({
+        topic: testTopic,
+        eventCode: 'UserEvent',
+        handler: async () => {
           userEventCount.count++;
         },
-        { schema: UserEventSchema }
-      );
+        schema: UserEventSchema,
+      });
 
       // Handler for only order events
-      consumer.addWithSchema(
-        testTopic,
-        'OrderEvent',
-        async () => {
+      consumer.add({
+        topic: testTopic,
+        eventCode: 'OrderEvent',
+        handler: async () => {
           orderEventCount.count++;
         },
-        { schema: OrderEventSchema }
-      );
+        schema: OrderEventSchema,
+      });
 
       // Handler for all events in topic (no event name filter)
-      consumer.addWithSchema(testTopic, async () => {
-        allEventCount.count++;
+      consumer.add({
+        topic: testTopic,
+        handler: async () => {
+          allEventCount.count++;
+        },
       });
 
       await consumer.start();
@@ -334,12 +340,15 @@ describe('Mixed Format and Multiple Event Type Tests', () => {
       consumers.push(consumer);
 
       // Consumer that handles both formats
-      consumer.addWithSchema(testTopic, async (event: any, metadata: any) => {
-        receivedMessages.push({
-          data: event,
-          format: metadata.isSchemaRegistryMessage ? 'schema-registry' : 'json',
-          eventType: event.code
-        });
+      consumer.add({
+        topic: testTopic,
+        handler: async (event: any, metadata: any) => {
+          receivedMessages.push({
+            data: event,
+            format: metadata.isSchemaRegistryMessage ? 'schema-registry' : 'json',
+            eventType: event.code,
+          });
+        },
       });
 
       await consumer.start();
@@ -455,17 +464,17 @@ describe('Mixed Format and Multiple Event Type Tests', () => {
       const consumer = new SchemaRegistryConsumerRouter();
       consumers.push(consumer);
 
-      consumer.addWithSchema(
-        testTopic,
-        async (event: any, metadata: any) => {
+      consumer.add({
+        topic: testTopic,
+        handler: async (event: any, metadata: any) => {
           try {
             validMessages.push({ event, format: metadata.isSchemaRegistryMessage ? 'sr' : 'json' });
           } catch (_error) {
             errorCount.count++;
           }
         },
-        { validateWithRegistry: false } // Don't validate to test error handling
-      );
+        validateWithRegistry: false,
+      });
 
       setConfig({
         host: KAFKA_BROKERS,

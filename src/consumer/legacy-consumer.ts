@@ -34,11 +34,6 @@ export interface LegacyConsumerConfig {
  * const consumer = new ConsumerRouter();
  * consumer.add('my-topic', 'MyEvent', handler);
  *
- * // New way
- * import { SchemaRegistryConsumerRouter } from '@comparaonline/event-streamer';
- * const consumer = new SchemaRegistryConsumerRouter();
- * consumer.addWithSchema('my-topic', 'MyEvent', handler, { schema: MyEventSchema });
- * ```
  */
 export class ConsumerRouter {
   private routes: Route[] = [];

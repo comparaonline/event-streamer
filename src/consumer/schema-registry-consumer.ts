@@ -5,7 +5,7 @@ import { getConfig } from '../config';
 import { debug, stringToUpperCamelCase } from '../helpers';
 import { Debug, Strategy } from '../interfaces';
 import { BaseEvent, EventHandler, EventMetadata } from '../schemas';
-import { Input, Config } from '../interfaces';
+import { Input } from '../interfaces';
 import { QueueManager, QueueConfig } from '../shared/queue-manager';
 import { ErrorHandler, ErrorStrategy, ErrorHandlerConfig } from '../shared/error-handler';
 import { MessageDecoder } from './internal/message-decoder';
@@ -42,12 +42,19 @@ export class SchemaRegistryConsumerRouter {
   private consumerConfig: SchemaRegistryConsumerConfig;
 
   constructor(consumerConfig: SchemaRegistryConsumerConfig = {}) {
-    const config = getConfig() as Config;
     this.consumerConfig = consumerConfig;
+    this._initializeDependencies();
+  }
+
+  /**
+   * Initializes and configures the dependencies for the consumer router.
+   */
+  private _initializeDependencies(): void {
+    const config = getConfig();
 
     if (config.schemaRegistry) {
       this.schemaRegistryClient = new SchemaRegistryClient(config.schemaRegistry);
-      debug(Debug.INFO, 'Schema Registry consumer initialized with validation caching');
+      debug(Debug.INFO, 'Schema Registry client initialized with validation caching.');
       this.decoder = new MessageDecoder(this.schemaRegistryClient);
       this.validator = new Validator(this.schemaRegistryClient);
     } else {
@@ -55,17 +62,16 @@ export class SchemaRegistryConsumerRouter {
       this.validator = new Validator();
     }
 
-    // Initialize error handler if strategy is provided
-    if (consumerConfig.errorStrategy) {
+    if (this.consumerConfig.errorStrategy) {
       const errorConfig: ErrorHandlerConfig = {
-        strategy: consumerConfig.errorStrategy,
-        deadLetterTopic: consumerConfig.deadLetterTopic,
+        strategy: this.consumerConfig.errorStrategy,
+        deadLetterTopic: this.consumerConfig.deadLetterTopic,
         appName: config.appName || config.consumer?.groupId || 'unknown',
-        consumerGroupId: config.consumer?.groupId || 'unknown'
+        consumerGroupId: config.consumer?.groupId || 'unknown',
       };
 
       this.errorHandler = new ErrorHandler(errorConfig);
-      this.errorCoordinator = new ErrorCoordinator(this.errorHandler, consumerConfig.deadLetterTopic);
+      this.errorCoordinator = new ErrorCoordinator(this.errorHandler, this.consumerConfig.deadLetterTopic);
       debug(Debug.INFO, 'Error handler initialized', errorConfig);
     }
   }
@@ -95,69 +101,92 @@ export class SchemaRegistryConsumerRouter {
     debug(Debug.INFO, 'Fallback handler added', { topic: config.topic });
   }
 
-  // Start the consumer with Schema Registry message processing
   async start(): Promise<void> {
-    const topics = this.routes.listTopics();
-    if (topics.length === 0 && this.consumerConfig.deadLetterTopic == null) {
-      debug(Debug.WARN, 'No routes or fallbacks defined');
+    if (!this._validatePreconditions()) {
       return;
     }
 
-    if (!this.schemaRegistryClient) {
-      debug(Debug.WARN, 'Schema Registry client not initialized, consumer will handle only JSON messages');
-      // Continue with JSON-only behavior; routes without SR messages will still work
+    const config = getConfig();
+    if (config.onlyTesting) {
+      return;
     }
 
-    const config = getConfig() as Config;
+    this._initializeQueueManager();
+    await this._initializeKafkaConsumer();
+    await this._runMessageProcessingLoop();
+  }
 
-    if (config.consumer == null || config.consumer.groupId == null || config.consumer.groupId.trim() === '') {
+  /**
+   * Validates that the consumer can start.
+   * @returns `true` if the consumer can start, `false` otherwise.
+   */
+  private _validatePreconditions(): boolean {
+    const topics = this.routes.listTopics();
+    if (topics.length === 0 && !this.consumerConfig.deadLetterTopic) {
+      debug(Debug.WARN, 'No routes or fallbacks defined, consumer will not start.');
+      return false;
+    }
+
+    if (!this.schemaRegistryClient) {
+      debug(Debug.WARN, 'Schema Registry client not initialized, consumer will handle only JSON messages.');
+    }
+
+    const config = getConfig();
+    if (!config.consumer?.groupId) {
       throw new Error('Missing configuration config.consumer.groupId for consumer');
     }
 
-    const groupId = config.consumer.groupId;
-    const kafkaHost = config.host;
-    const onlyTesting = config.onlyTesting ?? false;
+    return true;
+  }
 
-    if (onlyTesting) {
-      return Promise.resolve();
-    }
-
-    // Include fallback-only topics if any
-    // Fallback topics are included via listTopics()
-
-    // Initialize queue manager for parallel processing (topic strategy)
+  /**
+   * Initializes the QueueManager if the strategy is 'topic'.
+   */
+  private _initializeQueueManager(): void {
+    const config = getConfig();
     const strategy = this.consumerConfig.strategy || config.consumer?.strategy || 'topic';
+
     if (strategy === 'topic') {
       const queueConfig: QueueConfig = {
         maxMessagesPerTopic: this.consumerConfig.maxMessagesPerTopic || config.consumer?.maxMessagesPerTopic || 10,
-        maxMessagesPerSpecificTopic: this.consumerConfig.maxMessagesPerSpecificTopic || config.consumer?.maxMessagesPerSpecificTopic
+        maxMessagesPerSpecificTopic: this.consumerConfig.maxMessagesPerSpecificTopic || config.consumer?.maxMessagesPerSpecificTopic,
       };
 
       this.queueManager = new QueueManager(queueConfig);
-      this.queueManager.initializeQueues(topics);
+      this.queueManager.initializeQueues(this.routes.listTopics());
       debug(Debug.INFO, 'Queue manager initialized for parallel processing', queueConfig);
     }
+  }
 
-    // Initialize Kafka consumer
+  /**
+   * Initializes the Kafka consumer, connects it, and subscribes to topics.
+   */
+  private async _initializeKafkaConsumer(): Promise<void> {
+    const config = getConfig();
     const kafka = new Kafka({
-      brokers: kafkaHost.split(','),
-      logLevel: config.kafkaJSLogs
+      brokers: config.host.split(','),
+      logLevel: config.kafkaJSLogs,
     });
 
-    this.consumer = kafka.consumer({ groupId });
+    this.consumer = kafka.consumer({ groupId: config.consumer!.groupId! });
     await this.consumer.connect();
     debug(Debug.INFO, 'Schema Registry consumer connected');
 
-    // Set consumer in queue manager for pause/resume functionality
     if (this.queueManager) {
       this.queueManager.setConsumer(this.consumer);
     }
 
-    await this.consumer.subscribe({ topics });
+    await this.consumer.subscribe({ topics: this.routes.listTopics() });
+  }
 
+  /**
+   * Starts the main message processing loop for the consumer.
+   */
+  private async _runMessageProcessingLoop(): Promise<void> {
+    const config = getConfig();
     const processingStrategy = this.consumerConfig.strategy || config.consumer?.strategy || 'topic';
 
-    await this.consumer.run({
+    await this.consumer!.run({
       eachMessage: async ({ topic, message, partition }) => {
         if (processingStrategy === 'one-by-one') {
           try {
@@ -166,7 +195,6 @@ export class SchemaRegistryConsumerRouter {
             await this.handleProcessingError(error as Error, topic, message, partition);
           }
         } else {
-          // Topic-based parallel processing with queue management
           const processingPromise = this.processSchemaRegistryMessage(topic, message, partition).catch((error) =>
             this.handleProcessingError(error as Error, topic, message, partition)
           );
@@ -175,14 +203,14 @@ export class SchemaRegistryConsumerRouter {
             this.queueManager.addToQueue(topic, processingPromise);
           }
         }
-      }
+      },
     });
 
     debug(Debug.INFO, 'Schema Registry consumer started with enhanced validation', {
-      topics,
+      topics: this.routes.listTopics(),
       strategy: processingStrategy,
       errorStrategy: this.consumerConfig.errorStrategy || 'none',
-      hasQueueManager: !!this.queueManager
+      hasQueueManager: !!this.queueManager,
     });
   }
 

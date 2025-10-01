@@ -79,14 +79,14 @@ describe('Simple Schema Registry Integration Test', () => {
     const receivedEvents: UserRegistered[] = [];
 
     // Set up consumer
-    consumer.addWithSchema(
-      testTopic,
+    consumer.add({
+      topic: testTopic,
       eventCode,
-      async (event: UserRegistered) => {
+      handler: async (event: UserRegistered) => {
         receivedEvents.push(event);
       },
-      { schema: UserRegisteredSchema }
-    );
+      schema: UserRegisteredSchema
+    });
 
     // Start consumer
     await consumer.start();

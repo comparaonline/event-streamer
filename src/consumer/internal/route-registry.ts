@@ -59,6 +59,7 @@ export class RouteRegistry {
   }
 
   listTopics(): string[] {
-    return Array.from(this.routesByTopic.keys());
+    const allTopics = new Set([...this.routesByTopic.keys(), ...this.fallbackByTopic.keys()]);
+    return Array.from(allTopics);
   }
 }

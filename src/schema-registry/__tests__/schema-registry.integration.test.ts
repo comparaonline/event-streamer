@@ -163,14 +163,15 @@ describe('Schema Registry Integration Tests', () => {
       const receivedEvents: UserRegistered[] = [];
 
       // Set up consumer
-      consumer.addWithSchema(
-        testTopic,
-        uniqueEventCode,
-        async (event: UserRegistered) => {
+      consumer.add({
+        topic: testTopic,
+        eventCode: uniqueEventCode,
+        handler: async (event: UserRegistered) => {
           receivedEvents.push(event);
         },
-        { schema: UserRegisteredSchema, validateWithRegistry: true }
-      );
+        schema: UserRegisteredSchema,
+        validateWithRegistry: true,
+      });
 
       // Start consumer (in a real environment, this would be long-running)
       await consumer.start();
@@ -229,8 +230,11 @@ describe('Schema Registry Integration Tests', () => {
       const receivedEvents: any[] = [];
 
       // Consumer that handles both formats
-      consumer.addWithSchema(testTopic, async (event: any, metadata: any) => {
-        receivedEvents.push({ event, isSchemaRegistry: metadata.isSchemaRegistryMessage });
+      consumer.add({
+        topic: testTopic,
+        handler: async (event: any, metadata: any) => {
+          receivedEvents.push({ event, isSchemaRegistry: metadata.isSchemaRegistryMessage });
+        },
       });
 
       await consumer.start();

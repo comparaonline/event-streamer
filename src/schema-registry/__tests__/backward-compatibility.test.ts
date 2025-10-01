@@ -67,13 +67,13 @@ describe('Schema Registry Backward Compatibility', () => {
 
       let handlerCalled = false;
 
-      consumer.addWithSchema(
-        'test-topic',
-        async () => {
+      consumer.add({
+        topic: 'test-topic',
+        handler: async () => {
           handlerCalled = true;
         },
-        { schema: TestEventSchema }
-      );
+        schema: TestEventSchema,
+      });
 
       expect(handlerCalled).toBe(false);
     });
@@ -81,14 +81,14 @@ describe('Schema Registry Backward Compatibility', () => {
     it('should accept event-name based routing', () => {
       let handlerCalled = false;
 
-      consumer.addWithSchema(
-        'test-topic',
-        'TestEvent',
-        async () => {
+      consumer.add({
+        topic: 'test-topic',
+        eventCode: 'TestEvent',
+        handler: async () => {
           handlerCalled = true;
         },
-        { schema: TestEventSchema }
-      );
+        schema: TestEventSchema,
+      });
 
       expect(handlerCalled).toBe(false);
     });
