@@ -10,7 +10,10 @@ setConfig({ host: 'cli' });
 
 const program = new Command();
 
-program.name('event-streamer-cli').description('CLI toolkit for CompareOnline event-streamer schema management').version('8.2.7');
+program
+  .name('event-streamer-cli')
+  .description('CLI toolkit for CompareOnline event-streamer schema management')
+  .version(require('../../package.json').version);
 
 program
   .command('publish')

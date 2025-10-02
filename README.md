@@ -335,3 +335,9 @@ setConfig({
   ```
 </details>
 
+---
+
+## TODO
+
+- [ ] Refactor the `src/test` and `src/local-tests` directories into a unified `tests` directory with `utils` and `manual` subdirectories for better organization.
+

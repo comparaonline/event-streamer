@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { setConfig } from '../../config';
 import { SchemaRegistryConsumerRouter } from '../schema-registry-consumer';
 import { SchemaRegistryProducer } from '../../producer/schema-registry-producer';
-import { DeadLetterQueueSchema } from '../../schemas/dead-letter-queue';
 import { SchemaRegistryClient } from '../../schema-registry/client';
 import { SchemaRegistryEventSchema } from '../../schemas';
 import { zodToJsonSchema } from 'zod-to-json-schema';
