@@ -11,7 +11,7 @@
   "contributors": [],
   "license": "MIT",
   "engines": {
-    "node": ">=14.17.0"
+    "node": ">=18.18.0"
   },
   "keywords": [
     "comparaonline",
@@ -47,9 +47,9 @@
     "test-producer": "ts-node src/local-tests/producer.ts",
     "docker:up": "docker compose up -d --wait",
     "docker:down": "docker compose down",
-    "docker:test": "docker compose up -d --wait && pnpm run test:unit && docker-compose down",
-    "docker:test:integration": "docker-compose up -d --wait && pnpm run test:integration && docker-compose down",
-    "docker:test:all": "docker-compose up -d --wait && pnpm run test:unit && RUN_INTEGRATION_TESTS=true pnpm run test:integration && docker-compose down",
+    "docker:test": "docker compose up -d --wait && pnpm run test:unit && docker compose down",
+    "docker:test:integration": "docker compose up -d --wait && pnpm run test:integration && docker compose down",
+    "docker:test:all": "docker compose up -d --wait && pnpm run test:unit && RUN_INTEGRATION_TESTS=true pnpm run test:integration && docker compose down",
     "cli:publish": "node build/cli/index.js publish",
     "cli:validate": "node build/cli/index.js validate",
     "cli:init": "node build/cli/index.js init"
@@ -59,7 +59,10 @@
     "ajv": "^7.2.4",
     "ajv-formats": "^1.6.1",
     "commander": "^14.0.1",
+    "fast-glob": "^3.3.3",
+    "jiti": "^2.6.1",
     "kafkajs": "^2.2.4",
+    "p-limit": "^7.1.1",
     "zod": "^3.25.76",
     "zod-to-json-schema": "^3.24.6"
   },

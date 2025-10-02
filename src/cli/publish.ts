@@ -1,10 +1,12 @@
 import { SchemaType } from '@kafkajs/confluent-schema-registry';
-import { promises as fs } from 'fs';
+import fg from 'fast-glob';
+import jitiFactory from 'jiti';
+import pLimit from 'p-limit';
 import * as path from 'path';
 import { z } from 'zod';
+import { getSubjectName } from '../helpers';
 import { SchemaRegistryClient } from '../schema-registry/client';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { getSubjectName } from '../helpers';
 
 interface PublishOptions {
   eventsDir: string;
@@ -13,6 +15,14 @@ interface PublishOptions {
   registryAuth?: string;
   dryRun?: boolean;
   force?: boolean;
+
+  // new:
+  include?: string[];
+  exclude?: string[];
+  allowIndex?: boolean;
+  concurrency?: number;
+  verbose?: boolean;
+  bail?: boolean;
 }
 
 interface SchemaFile {
@@ -41,59 +51,81 @@ export function createSchemaRegistryClient(options: PublishOptions): SchemaRegis
   return new SchemaRegistryClient(config);
 }
 
-async function findSchemaFiles(eventsDir: string): Promise<string[]> {
-  try {
-    const entries = await fs.readdir(eventsDir, { withFileTypes: true });
-    const files: string[] = [];
-
-    for (const entry of entries) {
-      const fullPath = path.join(eventsDir, entry.name);
-      if (entry.isDirectory()) {
-        files.push(...(await findSchemaFiles(fullPath)));
-      } else if ((entry.name.endsWith('.ts') || entry.name.endsWith('.js')) && !entry.name.endsWith('.d.ts')) {
-        files.push(fullPath);
-      }
-    }
-    return files;
-  } catch (error) {
-    if ((error as { code: string }).code === 'ENOENT') {
-      throw new Error(`Events directory not found: ${eventsDir}`);
-    }
-    throw error;
-  }
+function defaultIncludeGlobs(): string[] {
+  // only “*.schema.*” by default
+  return ['**/*.schema.{ts,js,mjs,cjs}'];
 }
+
+function defaultExcludeGlobs(allowIndex: boolean | undefined): string[] {
+  const base = [
+    '**/{__tests__,__mocks__,__fixtures__}/**',
+    '**/*.{test,spec}.*',
+    '**/*.d.ts',
+  ];
+  return allowIndex ? base : base.concat(['**/index.*']);
+}
+
+async function resolveFilePaths(root: string, include?: string[], exclude?: string[], allowIndex?: boolean): Promise<string[]> {
+  const includes = include && include.length > 0 ? include : defaultIncludeGlobs();
+  const ignores = [
+    ...defaultExcludeGlobs(allowIndex),
+    ...(exclude ?? []),
+  ];
+  const entries = await fg(includes, {
+    cwd: root,
+    absolute: true,
+    onlyFiles: true,
+    followSymbolicLinks: true,
+    ignore: ignores,
+  });
+  return entries;
+}
+
+const jiti = jitiFactory(__filename, { interopDefault: true });
 
 async function _loadFile(filePath: string): Promise<Record<string, unknown>> {
   try {
     const absolutePath = path.resolve(filePath);
-    console.log(`📂 Loading schema file: ${absolutePath}`);
-    return await import(absolutePath);
+    // jiti is sync; wrap to keep signature
+    const mod = jiti(absolutePath);
+    return Promise.resolve(mod);
   } catch (error) {
     throw new Error(`Failed to load schema file ${filePath}: ${error}`);
   }
 }
 
-function _findZodSchemas(moduleExports: Record<string, unknown>): Record<string, z.ZodSchema> {
+function isZodSchema(value: unknown): value is z.ZodSchema {
+  return !!value && typeof value === 'object' && typeof (value as { safeParse?: unknown }).safeParse === 'function';
+}
+
+function _findZodSchemas(moduleExports: Record<string, unknown>, verbose = false): Record<string, z.ZodSchema> {
   const schemas: Record<string, z.ZodSchema> = {};
-  console.log(`📦 Module exports:`, Object.keys(moduleExports));
+  if (verbose) console.log(`📦 Exports:`, Object.keys(moduleExports));
+
+  // allow explicit aggregator export: export const schemas = { FooSchema, BarSchema }
+  const aggregator = moduleExports.schemas;
+  if (aggregator && typeof aggregator === 'object') {
+    for (const [k, v] of Object.entries(aggregator as Record<string, unknown>)) {
+      if (isZodSchema(v)) schemas[k] = v as z.ZodSchema;
+    }
+  }
 
   for (const [key, value] of Object.entries(moduleExports)) {
-    const isZodSchema = value && typeof value === 'object' && '_def' in value;
-    console.log(`🔍 Checking export "${key}":`, typeof value, isZodSchema ? 'IS ZOD SCHEMA' : 'not a zod schema');
-    if (isZodSchema) {
+    if (isZodSchema(value)) {
       schemas[key] = value as z.ZodSchema;
     }
   }
 
-  console.log(`📋 Found ${Object.keys(schemas).length} Zod schemas:`, Object.keys(schemas));
+  if (verbose) console.log(`📋 Found ${Object.keys(schemas).length} Zod schemas:`, Object.keys(schemas));
   return schemas;
 }
 
-async function loadSchemaFile(filePath: string): Promise<SchemaFile | null> {
+async function loadSchemaFile(filePath: string, options: PublishOptions): Promise<SchemaFile | null> {
   const moduleExports = await _loadFile(filePath);
-  const schemas = _findZodSchemas(moduleExports);
+  const schemas = _findZodSchemas(moduleExports, !!options.verbose);
 
   if (Object.keys(schemas).length === 0) {
+    if (options.verbose) console.log('   (no Zod schemas exported, skipping)');
     return null;
   }
 
@@ -148,12 +180,12 @@ export async function registerSchemaToRegistry(client: SchemaRegistryClient, sub
 async function _processSchemaFile(filePath: string, options: PublishOptions, client: SchemaRegistryClient): Promise<Array<{ subject: string; schemaName: string; file: string }>> {
   const processedInFile: Array<{ subject: string; schemaName: string; file: string }> = [];
   try {
-    const schemaFile = await loadSchemaFile(filePath);
+    const schemaFile = await loadSchemaFile(filePath, options);
     if (!schemaFile) {
       return [];
     }
 
-    console.log(`📄 Processing ${schemaFile.fileName}...`);
+    if (options.verbose) console.log(`📄 Processing ${schemaFile.fileName}...`);
 
     for (const [schemaName, schema] of Object.entries(schemaFile.exports)) {
       const subject = getSubjectName(options.topic, schemaName);
@@ -175,28 +207,44 @@ async function _processSchemaFile(filePath: string, options: PublishOptions, cli
 
 export async function publishSchemas(options: PublishOptions): Promise<void> {
   const client = createSchemaRegistryClient(options);
-  const schemaFilePaths = await findSchemaFiles(options.eventsDir);
-
-  if (schemaFilePaths.length === 0) {
-    throw new Error(`No TypeScript files found in ${options.eventsDir}`);
+  const files = await resolveFilePaths(options.eventsDir, options.include, options.exclude, options.allowIndex);
+  if (files.length === 0) {
+    throw new Error(`No schema files found. Searched in ${options.eventsDir} with includes=${(options.include||['<default>']).join(', ')} excludes=${(options.exclude||['<default>']).join(', ')}`);
   }
 
-  console.log(`📁 Found ${schemaFilePaths.length} potential schema files`);
-
-  const allProcessedSchemas: Array<{ subject: string; schemaName: string; file: string }> = [];
-
-  for (const filePath of schemaFilePaths) {
-    const processed = await _processSchemaFile(filePath, options, client);
-    allProcessedSchemas.push(...processed);
+  if (options.verbose) {
+    console.log(`📁 Candidate files: ${files.length}`);
+    files.forEach((f) => console.log(`  • ${f}`));
   }
+
+  const limit = pLimit(Math.max(1, options.concurrency ?? 4));
+  const allProcessed: Array<{ subject: string; schemaName: string; file: string }> = [];
+  const errors: Array<{ file: string; error: unknown }> = [];
+
+  await Promise.all(
+    files.map((filePath) =>
+      limit(async () => {
+        try {
+          const processed = await _processSchemaFile(filePath, options, client);
+          allProcessed.push(...processed);
+        } catch (e) {
+          errors.push({ file: filePath, error: e });
+          console.error(`❌ Error processing ${filePath}:`, e instanceof Error ? e.message : e);
+          if (options.bail) throw e;
+        }
+      })
+    )
+  );
 
   console.log(`\n📊 Summary:`);
-  console.log(`   Files processed: ${schemaFilePaths.length}`);
-  console.log(`   Schemas processed: ${allProcessedSchemas.length}`);
-
-  if (allProcessedSchemas.length > 0) {
+  console.log(`   Files processed: ${files.length}`);
+  console.log(`   Schemas processed: ${allProcessed.length}`);
+  if (errors.length > 0) {
+    console.log(`   Files failed: ${errors.length}`);
+  }
+  if (options.verbose && allProcessed.length > 0) {
     console.log(`\n📋 Processed schemas:`);
-    for (const { subject, schemaName, file } of allProcessedSchemas) {
+    for (const { subject, schemaName, file } of allProcessed) {
       console.log(`   ${subject} (${schemaName} from ${file})`);
     }
   }

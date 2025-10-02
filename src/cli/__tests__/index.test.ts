@@ -135,7 +135,11 @@ describe('CLI Index', () => {
         registryUrl: 'http://localhost:8081',
         registryAuth: 'test-user:test-pass',
         topic: 'test-topic',
-        dryRun: true
+        dryRun: true,
+        allowIndex: false,
+        bail: false,
+        concurrency: 4,
+        verbose: false,
       });
     });
 

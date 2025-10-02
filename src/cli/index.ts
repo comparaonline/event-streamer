@@ -24,6 +24,12 @@ program
   .option('--registry-auth <user:password>', 'Registry authentication credentials')
   .option('--dry-run', 'Show what would be published without actually doing it')
   .option('--force', 'Force update existing schemas (use with caution)')
+  .option('--include <globs...>', 'Extra glob patterns to include (relative to events-dir)')
+  .option('--exclude <globs...>', 'Extra glob patterns to exclude (relative to events-dir)')
+  .option('--allow-index', 'Allow index.* files (off by default)', false)
+  .option('--concurrency <n>', 'Parallel registrations (default 4)', (v) => parseInt(v, 10), 4)
+  .option('--verbose', 'Verbose logging', false)
+  .option('--bail', 'Abort on first file error', false)
   .action(async (options) => {
     try {
       if (!options.registryUrl) {

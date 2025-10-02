@@ -33,7 +33,7 @@ describe('CLI Publish Command Integration Test', () => {
     'should execute the publish command and register a schema',
     async () => {
       const topic = `cli-publish-test-${Date.now()}`;
-      const command = `${cliCommand} --events-dir ${tempDir} --registry-url ${SCHEMA_REGISTRY_URL} --topic ${topic}`;
+      const command = `${cliCommand} --events-dir ${tempDir} --registry-url ${SCHEMA_REGISTRY_URL} --topic ${topic} --verbose`;
 
       const output = await new Promise<string>((resolve, reject) => {
         exec(command, (error, stdout, stderr) => {
@@ -45,10 +45,9 @@ describe('CLI Publish Command Integration Test', () => {
       });
 
       // 1. Check the CLI output
-      expect(output).toContain('Found 1 potential schema files');
+      expect(output).toContain('Candidate files: 1');
       expect(output).toContain('Processing cli-test.schema...');
       expect(output).toContain(`Published schema for subject: ${topic}-cli-test`);
-      expect(output).toContain('Summary:');
 
       // 2. Verify with a NEW Schema Registry client
       const client = new SchemaRegistryClient({ url: SCHEMA_REGISTRY_URL });

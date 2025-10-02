@@ -1,5 +1,6 @@
 import { Kafka, Admin, Producer } from 'kafkajs';
 import { getConfig } from '../config';
+import { SchemaRegistryProducer } from '../producer';
 
 let kafka: Kafka;
 let admin: Admin;
@@ -38,6 +39,10 @@ export async function connect(): Promise<void> {
 }
 
 export async function disconnect(): Promise<void> {
+  // Also disconnect the singleton producer if it was used
+  const srProducer = new SchemaRegistryProducer();
+  await srProducer.disconnect();
+
   await getAdminClient().disconnect();
   await getProducer().disconnect();
 }

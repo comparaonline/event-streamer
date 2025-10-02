@@ -55,4 +55,4 @@ export function createSchemaRegistryEvent(data: { code: string } & Partial<BaseE
 }
 
 // Dead Letter Queue exports
-export { DeadLetterQueueSchema, DeadLetterQueueEvent, createDeadLetterQueueEvent } from './dead-letter-queue';
+export { DeadLetterQueueSchema, DeadLetterQueueEvent, createDeadLetterQueueEvent } from './dead-letter-queue.schema';

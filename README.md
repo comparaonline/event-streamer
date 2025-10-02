@@ -14,9 +14,15 @@ pnpm add @comparaonline/event-streamer
 
 ## Initialization
 
-Before using the library, you must initialize it with `setConfig`.
+Before using the library, you must initialize it with `setConfig`. This function sets up a **global, singleton-like configuration object** that all library components (producers, consumers, etc.) will access internally.
+
+**It is crucial to call this function once at your application's entry point**, before any other library features are used.
+
+### How It Works
+When you call `setConfig`, the configuration is stored in a private, module-level variable. Library components like `SchemaRegistryProducer` or `SchemaRegistryConsumerRouter` don't need you to pass the configuration to their constructors; instead, they call an internal `getConfig()` function to retrieve the settings you provided. This design simplifies usage by avoiding the need to pass configuration objects throughout your codebase.
 
 ```ts
+// In your application's main entry file (e.g., index.ts)
 import { setConfig } from '@comparaonline/event-streamer';
 
 setConfig({
@@ -28,6 +34,9 @@ setConfig({
     url: 'http://schema-registry:8081'
   }
 });
+
+// Now you can import and use producers/consumers anywhere else in your app
+// without needing to configure them again.
 ```
 
 ### Configuration Options
@@ -76,6 +85,35 @@ export function createUserRegistered(data: Partial<UserRegistered>): UserRegiste
 }
 ```
 
+### Schema Organization Best Practices
+
+While you can place all your schema files in a single directory, we recommend organizing them by **topic**. This approach scales better and keeps related event schemas grouped together.
+
+A recommended structure looks like this:
+
+```
+src/
+└── events/
+    ├── users/
+    │   ├── user-registered.schema.ts
+    │   └── user-updated.schema.ts
+    └── orders/
+        ├── order-created.schema.ts
+        └── order-shipped.schema.ts
+```
+
+With this structure, you can easily publish all schemas for a specific topic:
+
+```bash
+# Publish all schemas related to the 'users' topic
+pnpm event-streamer-cli publish --events-dir ./src/events/users --topic users ...
+
+# Or publish all schemas for all topics at once
+pnpm event-streamer-cli publish --events-dir ./src/events --topic <default-topic> ...
+```
+
+The CLI's default file discovery (`**/*.schema.ts`) is designed to work perfectly with this nested structure.
+
 ### 2. CLI Commands
 
 - **`init`**: Scaffolds a new event schema structure in your project by creating a `./src/events` directory with an example schema and a README.
@@ -89,11 +127,22 @@ export function createUserRegistered(data: Partial<UserRegistered>): UserRegiste
 
 - **`publish`**: Publishes all schemas from a directory to the Schema Registry.
   - **Usage**: `pnpm event-streamer-cli publish --events-dir ./events --registry-url http://localhost:8081 --topic <topic-name>`
+  - **Discovery by Default**: By default, the CLI looks for files matching `**/*.schema.{ts,js,mjs,cjs}` and ignores test/fixture folders and `index.*` files.
+  - **Subject Naming**: Schema subjects are created as `<topic>-<event-code>`, where `event-code` is the kebab-cased name of the exported Zod schema variable (e.g., `UserRegisteredSchema` becomes `user-registered`).
   - **Options**:
-    - `--topic <name>`: **Required.** The topic name used to derive the schema subject (e.g., `<topic>-<event-code>`).
+    - `--topic <name>`: **Required.** The topic name used to derive the schema subject.
     - `--registry-auth <user:pass>`: For Schema Registry instances that require basic authentication.
     - `--dry-run`: Simulates the publish process without making any actual changes.
     - `--force`: Forces the registration of a new schema version even if the schema has not changed.
+  - **Advanced Options**:
+    | Flag                  | Description                                                                  | Default                               |
+    | --------------------- | ---------------------------------------------------------------------------- | ------------------------------------- |
+    | `--include <globs...>`  | Override the default file search patterns.                                   | `**/*.schema.{ts,js,mjs,cjs}`         |
+    | `--exclude <globs...>`  | Add glob patterns to exclude files.                                          | (several, e.g., `**/__tests__/**`)    |
+    | `--allow-index`       | Allow `index.ts` or `index.js` files to be processed.                        | `false`                               |
+    | `--concurrency <n>`   | The number of schemas to publish in parallel.                                | `4`                                   |
+    | `--verbose`           | Enable detailed logging for debugging.                                       | `false`                               |
+    | `--bail`              | Stop the publishing process on the first file that fails.                    | `false`                               |
 
 ---
 
