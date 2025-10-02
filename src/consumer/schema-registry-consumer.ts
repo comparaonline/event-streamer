@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { Consumer, Kafka } from 'kafkajs';
 import { SchemaRegistryClient } from '../schema-registry/client';
 import { getConfig } from '../config';
-import { stringToUpperCamelCase } from '../helpers';
 import { Strategy } from '../interfaces';
 import { BaseEvent, EventHandler, EventMetadata } from '../schemas';
 import { Input } from '../interfaces';

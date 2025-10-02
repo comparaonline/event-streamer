@@ -105,7 +105,7 @@ export class SchemaRegistryClient {
       if (cachedSchema.jsonSchema) {
         try {
           cachedSchema.validator = this.ajv.compile(cachedSchema.jsonSchema);
-        } catch (compileError) {
+        } catch (_compileError) {
           // ignore compile error
         }
       }

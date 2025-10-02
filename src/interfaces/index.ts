@@ -38,7 +38,6 @@ export interface Config {
       password: string;
     };
   };
-  debug?: false | Debug;
   kafkaJSLogs?: logLevel;
   /** set to true if you want to avoid connecting to kafka and make some functionalities available */
   onlyTesting?: boolean;

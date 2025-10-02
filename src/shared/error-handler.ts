@@ -63,7 +63,7 @@ export class ErrorHandler {
   /**
    * IGNORE strategy: Log the error and continue processing
    */
-  private handleIgnoreStrategy(error: Error, context: MessageContext): ErrorHandlerResult {
+  private handleIgnoreStrategy(_error: Error, _context: MessageContext): ErrorHandlerResult {
     return {
       shouldContinue: true,
       errorLogged: true

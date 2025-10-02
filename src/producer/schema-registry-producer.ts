@@ -3,7 +3,7 @@ import { RecordMetadata, Message, Kafka, Producer } from 'kafkajs';
 import { getConfig } from '../config';
 import { SchemaRegistryClient } from '../schema-registry/client';
 import { stringToUpperCamelCase, toArray } from '../helpers';
-import { BaseEvent, createBaseEvent, createSchemaRegistryEvent } from '../schemas';
+import { BaseEvent, createSchemaRegistryEvent } from '../schemas';
 import { Output, Config } from '../interfaces';
 
 type EmitResponse = RecordMetadata[];

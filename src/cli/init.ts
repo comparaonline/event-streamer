@@ -75,7 +75,7 @@ await producer.emitWithSchema({
 - \`yarn event-streamer-cli generate-example <event-name>\`: Generate example schema
 `;
 
-export async function initializeEventSchemas(options: InitOptions): Promise<void> {
+export async function initializeEventSchemas(_options: InitOptions): Promise<void> {
   const eventsDir = path.resolve('./src/events');
   const exampleFile = path.join(eventsDir, 'example-event.ts');
   const readmeFile = path.join(eventsDir, 'README.md');

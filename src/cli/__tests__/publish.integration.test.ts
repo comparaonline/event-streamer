@@ -2,7 +2,6 @@ import { exec } from 'child_process';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { SchemaRegistryClient } from '../../schema-registry/client';
-import { setConfig } from '../../config';
 
 const TEST_TIMEOUT = 60000; // 60s
 
