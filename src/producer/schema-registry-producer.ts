@@ -2,8 +2,7 @@ import { z } from 'zod';
 import { RecordMetadata, Message, Kafka, Producer } from 'kafkajs';
 import { getConfig } from '../config';
 import { SchemaRegistryClient } from '../schema-registry/client';
-import { stringToUpperCamelCase, debug, toArray } from '../helpers';
-import { Debug } from '../interfaces';
+import { stringToUpperCamelCase, toArray } from '../helpers';
 import { BaseEvent, createBaseEvent, createSchemaRegistryEvent } from '../schemas';
 import { Output, Config } from '../interfaces';
 
@@ -39,7 +38,6 @@ export class SchemaRegistryProducer {
 
     if (config.schemaRegistry) {
       this.schemaRegistryClient = new SchemaRegistryClient(config.schemaRegistry);
-      debug(Debug.INFO, 'Schema Registry producer initialized with startup caching');
     }
 
     const kafka = new Kafka({
@@ -124,12 +122,6 @@ export class SchemaRegistryProducer {
             // Get the subject for the schema registry.
             const subject = this.getSubjectFromTopicAndEventCode(topic, rawEventCode);
 
-            debug(Debug.TRACE, 'Encoding event for Schema Registry', {
-              eventCode: resolvedEventCode,
-              subject,
-              dataKeys: Object.keys(eventData)
-            });
-
             if (!this.schemaRegistryClient) {
               throw new Error('Schema Registry client is not initialized');
             }
@@ -178,11 +170,6 @@ export class SchemaRegistryProducer {
       });
       result.push(...topicResult);
     }
-
-    debug(Debug.INFO, 'Schema Registry messages sent', {
-      messageCount: messages.length,
-      topics: Object.keys(messagesByTopic),
-    });
 
     return [result];
   }

@@ -1,5 +1,3 @@
-import { debug } from '../helpers';
-import { Debug } from '../interfaces';
 import { DeadLetterQueueEvent, createDeadLetterQueueEvent } from '../schemas';
 
 export type ErrorStrategy = 'IGNORE' | 'DEAD_LETTER';
@@ -50,17 +48,6 @@ export class ErrorHandler {
   handleError(error: Error, context: MessageContext): ErrorHandlerResult {
     const errorType = this.categorizeError(error);
 
-    debug(Debug.ERROR, 'Message processing error', {
-      topic: context.topic,
-      partition: context.partition,
-      offset: context.offset,
-      originalCode: context.originalCode || 'unknown',
-      errorType,
-      errorMessage: error.message,
-      retryCount: context.retryCount || 0,
-      strategy: this.config.strategy
-    });
-
     switch (this.config.strategy) {
       case 'IGNORE':
         return this.handleIgnoreStrategy(error, context);
@@ -69,10 +56,6 @@ export class ErrorHandler {
         return this.handleDeadLetterStrategy(error, context, errorType);
 
       default:
-        // Should never happen with TypeScript, but handle gracefully
-        debug(Debug.WARN, 'Unknown error strategy, falling back to IGNORE', {
-          strategy: this.config.strategy
-        });
         return this.handleIgnoreStrategy(error, context);
     }
   }
@@ -81,12 +64,6 @@ export class ErrorHandler {
    * IGNORE strategy: Log the error and continue processing
    */
   private handleIgnoreStrategy(error: Error, context: MessageContext): ErrorHandlerResult {
-    debug(Debug.WARN, 'Ignoring failed message as per error strategy', {
-      topic: context.topic,
-      offset: context.offset,
-      errorMessage: error.message
-    });
-
     return {
       shouldContinue: true,
       errorLogged: true
@@ -120,13 +97,6 @@ export class ErrorHandler {
       processingHost: process.env.HOSTNAME,
 
       appName: this.config.appName
-    });
-
-    debug(Debug.INFO, 'Created dead letter queue event', {
-      originalTopic: context.topic,
-      originalOffset: context.offset,
-      deadLetterTopic: this.config.deadLetterTopic,
-      errorType
     });
 
     return {
@@ -175,7 +145,5 @@ export class ErrorHandler {
     if (strategy === 'DEAD_LETTER' && deadLetterTopic) {
       this.config.deadLetterTopic = deadLetterTopic;
     }
-
-    debug(Debug.INFO, 'Error handler strategy updated', { strategy, deadLetterTopic });
   }
 }

@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { Consumer, Kafka } from 'kafkajs';
 import { SchemaRegistryClient } from '../schema-registry/client';
 import { getConfig } from '../config';
-import { debug, stringToUpperCamelCase } from '../helpers';
-import { Debug, Strategy } from '../interfaces';
+import { stringToUpperCamelCase } from '../helpers';
+import { Strategy } from '../interfaces';
 import { BaseEvent, EventHandler, EventMetadata } from '../schemas';
 import { Input } from '../interfaces';
 import { QueueManager, QueueConfig } from '../shared/queue-manager';
@@ -55,7 +55,6 @@ export class SchemaRegistryConsumerRouter {
 
     if (config.schemaRegistry) {
       this.schemaRegistryClient = new SchemaRegistryClient(config.schemaRegistry);
-      debug(Debug.INFO, 'Schema Registry client initialized with validation caching.');
       this.decoder = new MessageDecoder(this.schemaRegistryClient);
       this.validator = new Validator(this.schemaRegistryClient);
     } else {
@@ -73,31 +72,17 @@ export class SchemaRegistryConsumerRouter {
 
       this.errorHandler = new ErrorHandler(errorConfig);
       this.errorCoordinator = new ErrorCoordinator(this.errorHandler, this.consumerConfig.deadLetterTopic);
-      debug(Debug.INFO, 'Error handler initialized', errorConfig);
     }
   }
 
   // New API: object-first add()
   add<T extends BaseEvent>(route: SchemaRegistryRoute<T>): void {
-    const topics = Array.isArray(route.topic) ? route.topic : [route.topic];
-    const eventCodes = route.eventCode
-      ? (Array.isArray(route.eventCode) ? route.eventCode : [route.eventCode]).map((n) => stringToUpperCamelCase(n))
-      : [undefined];
-
     this.routes.add(route);
-
-    debug(Debug.INFO, 'Route added', {
-      topics,
-      eventCodes,
-      hasSchema: !!route.schema,
-      validateWithRegistry: route.validateWithRegistry ?? true
-    });
   }
 
   // Add fallback per topic
   addFallback<T = unknown>(config: { topic: string; handler: EventHandler<T> }): void {
     this.routes.addFallback(config.topic, config.handler as EventHandler<any>);
-    debug(Debug.INFO, 'Fallback handler added', { topic: config.topic });
   }
 
   async start(): Promise<void> {
@@ -122,12 +107,12 @@ export class SchemaRegistryConsumerRouter {
   private _validatePreconditions(): boolean {
     const topics = this.routes.listTopics();
     if (topics.length === 0 && !this.consumerConfig.deadLetterTopic) {
-      debug(Debug.WARN, 'No routes or fallbacks defined, consumer will not start.');
+      console.warn('No routes or fallbacks defined, consumer will not start.');
       return false;
     }
 
     if (!this.schemaRegistryClient) {
-      debug(Debug.WARN, 'Schema Registry client not initialized, consumer will handle only JSON messages.');
+      console.warn('Schema Registry client not initialized, consumer will handle only JSON messages.');
     }
 
     const config = getConfig();
@@ -153,7 +138,6 @@ export class SchemaRegistryConsumerRouter {
 
       this.queueManager = new QueueManager(queueConfig);
       this.queueManager.initializeQueues(this.routes.listTopics());
-      debug(Debug.INFO, 'Queue manager initialized for parallel processing', queueConfig);
     }
   }
 
@@ -169,7 +153,6 @@ export class SchemaRegistryConsumerRouter {
 
     this.consumer = kafka.consumer({ groupId: config.consumer!.groupId! });
     await this.consumer.connect();
-    debug(Debug.INFO, 'Schema Registry consumer connected');
 
     if (this.queueManager) {
       this.queueManager.setConsumer(this.consumer);
@@ -207,18 +190,10 @@ export class SchemaRegistryConsumerRouter {
         }
       }
     });
-
-    debug(Debug.INFO, 'Schema Registry consumer started with enhanced validation', {
-      topics: this.routes.listTopics(),
-      strategy: processingStrategy,
-      errorStrategy: this.consumerConfig.errorStrategy || 'none',
-      hasQueueManager: !!this.queueManager
-    });
   }
 
   private async processSchemaRegistryMessage(topic: string, message: any, partition: number): Promise<void> {
     if (!message.value) {
-      debug(Debug.DEBUG, 'Ignoring empty message', { topic, partition });
       return;
     }
 
@@ -234,7 +209,7 @@ export class SchemaRegistryConsumerRouter {
       metadata = decoded.metadata;
       schemaId = decoded.schemaId;
     } catch (error) {
-      debug(Debug.ERROR, 'Failed to decode message', { topic, error });
+      console.error('Failed to decode message', { topic, error });
       return;
     }
 
@@ -247,7 +222,6 @@ export class SchemaRegistryConsumerRouter {
         await fallback(parsedEvent, metadata);
         return;
       }
-      debug(Debug.DEBUG, 'No matching routes and no fallback for topic', { topic, code: parsedEvent.code });
       return;
     }
 
@@ -272,7 +246,6 @@ export class SchemaRegistryConsumerRouter {
   async stop(): Promise<void> {
     // Wait for all queued messages to complete if using parallel processing
     if (this.queueManager) {
-      debug(Debug.INFO, 'Waiting for message queues to complete...');
       await this.queueManager.waitForAllQueues();
     }
 

@@ -1,7 +1,5 @@
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import { debug } from '../helpers';
-import { Debug } from '../interfaces';
 
 interface GenerateOptions {
   outputDir: string;
@@ -99,8 +97,6 @@ export function create${pascalName}(
 }
 
 export async function generateExampleSchema(eventName: string, options: GenerateOptions): Promise<void> {
-  debug(Debug.INFO, 'Generating example schema', { eventName, options });
-
   const pascalName = toPascalCase(eventName);
   const kebabName = toKebabCase(eventName);
   const fileName = `${kebabName}.ts`;
@@ -136,10 +132,7 @@ export async function generateExampleSchema(eventName: string, options: Generate
     console.log(`   1. Edit ${fileName} to match your actual event structure`);
     console.log(`   2. Validate the schema: yarn event-streamer-cli validate ${outputPath}`);
     console.log(`   3. Publish to registry: yarn event-streamer-cli publish --events-dir ${options.outputDir}`);
-
-    debug(Debug.INFO, 'Schema generation completed', { outputPath });
   } catch (error) {
-    debug(Debug.ERROR, 'Failed to generate schema', { eventName, error });
     throw new Error(`Failed to generate schema for ${eventName}: ${error}`);
   }
 }

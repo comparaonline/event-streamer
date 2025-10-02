@@ -1,7 +1,5 @@
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import { debug } from '../helpers';
-import { Debug } from '../interfaces';
 
 interface InitOptions {
   serviceName?: string;
@@ -78,8 +76,6 @@ await producer.emitWithSchema({
 `;
 
 export async function initializeEventSchemas(options: InitOptions): Promise<void> {
-  debug(Debug.INFO, 'Initializing event schemas structure', options);
-
   const eventsDir = path.resolve('./src/events');
   const exampleFile = path.join(eventsDir, 'example-event.ts');
   const readmeFile = path.join(eventsDir, 'README.md');
@@ -111,10 +107,7 @@ export async function initializeEventSchemas(options: InitOptions): Promise<void
     console.log(`\n💡 Suggested package.json scripts:`);
     console.log(`   "schemas:publish": "event-streamer-cli publish --events-dir ./src/events --registry-url $SCHEMA_REGISTRY_URL"`);
     console.log(`   "schemas:validate": "event-streamer-cli validate src/events/**/*.ts"`);
-
-    debug(Debug.INFO, 'Event schemas initialization completed');
   } catch (error) {
-    debug(Debug.ERROR, 'Failed to initialize event schemas', { error });
     throw new Error(`Failed to initialize event schemas: ${error}`);
   }
 }

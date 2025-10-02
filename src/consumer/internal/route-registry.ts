@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { BaseEvent, EventHandler } from '../../schemas';
-import { stringToUpperCamelCase, debug } from '../../helpers';
-import { Debug } from '../../interfaces';
+import { stringToUpperCamelCase } from '../../helpers';
 
 export interface Route<T extends BaseEvent = BaseEvent> {
   topic: string;
@@ -40,13 +39,10 @@ export class RouteRegistry {
       }
       this.routesByTopic.set(topic, existing);
     }
-
-    debug(Debug.INFO, 'Route registered', { topics, eventCodes, hasSchema: !!route.schema });
   }
 
   addFallback<T = unknown>(topic: string, handler: EventHandler<T>): void {
     this.fallbackByTopic.set(topic, handler as EventHandler<any>);
-    debug(Debug.INFO, 'Fallback registered', { topic });
   }
 
   getRoutes(topic: string, eventCode?: string): Route[] {

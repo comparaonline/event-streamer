@@ -1,7 +1,7 @@
 import { getConfig } from '../config';
 import { Producer, Kafka, RecordMetadata } from 'kafkajs';
-import { Debug, Output } from '../interfaces';
-import { debug, stringToUpperCamelCase, toArray, validateTestingConfig } from '../helpers';
+import { Output } from '../interfaces';
+import { stringToUpperCamelCase, toArray, validateTestingConfig } from '../helpers';
 import { DEFAULT_CONFIG } from '../constants';
 
 function warnDeprecation(message: string): void {
@@ -224,7 +224,6 @@ export async function emit(
             compression: config.producer?.compressionType ?? DEFAULT_CONFIG.compressionType
           });
         }
-        debug(Debug.INFO, 'Emitted', result);
         return result;
       })
     );

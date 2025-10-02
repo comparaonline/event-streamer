@@ -1,15 +1,5 @@
 import { CompressionTypes, logLevel, RetryOptions, DefaultPartitioner, LegacyPartitioner } from 'kafkajs';
 
-export enum Debug {
-  NONE = 6,
-  TRACE = 0,
-  DEBUG = 1,
-  INFO = 2,
-  WARN = 3,
-  ERROR = 4,
-  FATAL = 5
-}
-
 export type Unlimited = 'unlimited';
 export type Strategy = 'topic' | 'one-by-one';
 

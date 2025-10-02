@@ -1,8 +1,6 @@
 import { SchemaRegistry, SchemaType } from '@kafkajs/confluent-schema-registry';
 import { z } from 'zod';
 import { SchemaRegistryConfig } from '../schemas';
-import { debug } from '../helpers';
-import { Debug } from '../interfaces';
 import Ajv, { ValidateFunction } from 'ajv';
 import { createAjvInstance } from '../utils/ajv';
 
@@ -50,8 +48,6 @@ export class SchemaRegistryClient {
         ajvInstance: this.ajv
       }
     });
-
-    debug(Debug.INFO, 'Schema Registry client initialized with dual caching strategy', { url: config.url });
   }
 
   public disconnect(): void {
@@ -76,11 +72,6 @@ export class SchemaRegistryClient {
       return this.registry.encode(id, data);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      debug(Debug.ERROR, 'Failed to encode data', {
-        subject,
-        errorMessage: message
-      });
-
       // Re-throw a more specific error for validation failures.
       if (/invalid payload/i.test(message)) {
         throw new Error(`Schema validation failed for subject ${subject}: ${message}`);
@@ -94,7 +85,6 @@ export class SchemaRegistryClient {
     if (this.schemaIdCache.has(schemaId)) {
       const cached = this.schemaIdCache.get(schemaId);
       if (cached) {
-        debug(Debug.TRACE, 'Retrieved schema from ID cache', { schemaId });
         return cached;
       }
     }
@@ -116,16 +106,14 @@ export class SchemaRegistryClient {
         try {
           cachedSchema.validator = this.ajv.compile(cachedSchema.jsonSchema);
         } catch (compileError) {
-          debug(Debug.WARN, 'Failed to compile JSON schema validator', { schemaId, error: compileError });
+          // ignore compile error
         }
       }
 
       this.schemaIdCache.set(schemaId, cachedSchema);
-      debug(Debug.DEBUG, 'Cached schema for consumer', { schemaId });
 
       return cachedSchema;
     } catch (error) {
-      debug(Debug.ERROR, 'Failed to fetch schema for consumer', { schemaId, error });
       throw new Error(`Failed to fetch schema with ID ${schemaId}: ${error}`);
     }
   }
@@ -156,13 +144,10 @@ export class SchemaRegistryClient {
       const decodedValue = await this.registry.decode(buffer);
       const schemaId = buffer.readInt32BE(1);
 
-      debug(Debug.TRACE, 'Decoded Schema Registry data', { schemaId });
-
       if (validateAgainstSchema) {
         const cachedSchema = await this.getSchemaForConsumer(schemaId);
         
         if (!cachedSchema.validator) {
-            debug(Debug.WARN, 'No validator available for schema', { schemaId: cachedSchema.id });
             return { value: decodedValue, schemaId, valid: true }; // Skip validation
         }
 
@@ -179,7 +164,6 @@ export class SchemaRegistryClient {
 
       return { value: decodedValue, schemaId };
     } catch (error) {
-      debug(Debug.ERROR, 'Failed to decode and validate buffer', { error });
       throw new Error(`Failed to decode Schema Registry buffer: ${error}`);
     }
   }
@@ -192,14 +176,12 @@ export class SchemaRegistryClient {
     try {
       const cachedSchema = await this.getSchemaForConsumer(schemaId);
       if (!cachedSchema.validator) {
-        debug(Debug.WARN, 'No validator available for schema; skipping validation', { schemaId: cachedSchema.id });
         return { valid: true, errors: [] };
       }
 
       const isValid = cachedSchema.validator(value);
       return { valid: !!isValid, errors: isValid ? [] : cachedSchema.validator.errors || [] };
     } catch (error) {
-      debug(Debug.ERROR, 'Failed to validate value against schema', { schemaId, error });
       // Consider validation inconclusive as a schema error
       return { valid: false, errors: [{ message: String(error) }] };
     }
@@ -229,7 +211,6 @@ export class SchemaRegistryClient {
   clearCaches(): void {
     this.schemaIdCache.clear();
     this.subjectCache.clear();
-    debug(Debug.DEBUG, 'All schema caches cleared');
   }
 
   // Get subject name from topic and event code to avoid collisions
@@ -268,10 +249,8 @@ export class SchemaRegistryClient {
       // Extract schema ID from result
       const schemaId = typeof registrationResult === 'object' ? registrationResult.id : registrationResult;
 
-      debug(Debug.INFO, 'Registered schema', { eventName, subject, schemaId });
       return schemaId as number;
     } catch (error) {
-      debug(Debug.ERROR, 'Failed to register schema', { eventName, error });
       throw new Error(`Failed to register schema for event ${eventName}: ${error}`);
     }
   }

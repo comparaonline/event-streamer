@@ -1,10 +1,10 @@
 import { SchemaType } from '@kafkajs/confluent-schema-registry';
 import { promises as fs } from 'fs';
 import * as path from 'path';
+import { z } from 'zod';
 import { SchemaRegistryClient } from '../schema-registry/client';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { debug, getSubjectName } from '../helpers';
-import { Debug } from '../interfaces';
+import { getSubjectName } from '../helpers';
 
 interface PublishOptions {
   eventsDir: string;
@@ -18,7 +18,7 @@ interface PublishOptions {
 interface SchemaFile {
   filePath: string;
   fileName: string;
-  exports: Record<string, unknown>;
+  exports: Record<string, z.ZodSchema>;
 }
 
 function parseAuth(authString: string): { username: string; password: string } {
@@ -31,7 +31,7 @@ function parseAuth(authString: string): { username: string; password: string } {
 
 export function createSchemaRegistryClient(options: PublishOptions): SchemaRegistryClient {
   const config: { url: string; auth?: { username: string; password: string } } = {
-    url: options.registryUrl
+    url: options.registryUrl,
   };
 
   if (options.registryAuth) {
@@ -48,16 +48,12 @@ async function findSchemaFiles(eventsDir: string): Promise<string[]> {
 
     for (const entry of entries) {
       const fullPath = path.join(eventsDir, entry.name);
-
       if (entry.isDirectory()) {
-        // Recursively search subdirectories
-        const subFiles = await findSchemaFiles(fullPath);
-        files.push(...subFiles);
+        files.push(...(await findSchemaFiles(fullPath)));
       } else if ((entry.name.endsWith('.ts') || entry.name.endsWith('.js')) && !entry.name.endsWith('.d.ts')) {
         files.push(fullPath);
       }
     }
-
     return files;
   } catch (error) {
     if ((error as { code: string }).code === 'ENOENT') {
@@ -67,69 +63,53 @@ async function findSchemaFiles(eventsDir: string): Promise<string[]> {
   }
 }
 
-async function loadSchemaFile(filePath: string): Promise<SchemaFile | null> {
+async function _loadFile(filePath: string): Promise<Record<string, unknown>> {
   try {
-    // Use dynamic import to load TypeScript files
-    // Note: This requires the files to be compiled first
     const absolutePath = path.resolve(filePath);
     console.log(`📂 Loading schema file: ${absolutePath}`);
-
-    const moduleExports = await import(absolutePath);
-    console.log(`📦 Module exports:`, Object.keys(moduleExports));
-
-    const fileName = path.basename(filePath, path.extname(filePath));
-
-    // Find Zod schemas in the module
-    const schemas: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(moduleExports)) {
-      console.log(
-        `🔍 Checking export "${key}":`,
-        typeof value,
-        value && typeof value === 'object' && '_def' in value ? 'IS ZOD SCHEMA' : 'not a zod schema'
-      );
-      // Check if it's a Zod schema (has _def property)
-      if (value && typeof value === 'object' && '_def' in value) {
-        schemas[key] = value;
-      }
-    }
-
-    console.log(`📋 Found ${Object.keys(schemas).length} Zod schemas:`, Object.keys(schemas));
-
-    if (Object.keys(schemas).length === 0) {
-      debug(Debug.WARN, 'No Zod schemas found in file', { filePath });
-      return null;
-    }
-
-    return {
-      filePath,
-      fileName,
-      exports: schemas
-    };
+    return await import(absolutePath);
   } catch (error) {
-    console.error(`❌ Failed to load schema file ${filePath}:`, error);
-    debug(Debug.ERROR, 'Failed to load schema file', { filePath, error });
     throw new Error(`Failed to load schema file ${filePath}: ${error}`);
   }
 }
 
+function _findZodSchemas(moduleExports: Record<string, unknown>): Record<string, z.ZodSchema> {
+  const schemas: Record<string, z.ZodSchema> = {};
+  console.log(`📦 Module exports:`, Object.keys(moduleExports));
 
+  for (const [key, value] of Object.entries(moduleExports)) {
+    const isZodSchema = value && typeof value === 'object' && '_def' in value;
+    console.log(`🔍 Checking export "${key}":`, typeof value, isZodSchema ? 'IS ZOD SCHEMA' : 'not a zod schema');
+    if (isZodSchema) {
+      schemas[key] = value as z.ZodSchema;
+    }
+  }
 
+  console.log(`📋 Found ${Object.keys(schemas).length} Zod schemas:`, Object.keys(schemas));
+  return schemas;
+}
 
+async function loadSchemaFile(filePath: string): Promise<SchemaFile | null> {
+  const moduleExports = await _loadFile(filePath);
+  const schemas = _findZodSchemas(moduleExports);
 
-import { z } from 'zod';
-// ... (rest of the imports)
+  if (Object.keys(schemas).length === 0) {
+    return null;
+  }
 
-// ... (rest of the file)
+  return {
+    filePath,
+    fileName: path.basename(filePath, path.extname(filePath)),
+    exports: schemas,
+  };
+}
 
 async function publishSchema(client: SchemaRegistryClient, subject: string, schema: z.ZodSchema<any>, options: PublishOptions): Promise<void> {
   try {
-    // Convert Zod schema to JSON Schema
-    // Use draft-07 for compatibility with Schema Registry AJV setup
-    const jsonSchema = zodToJsonSchema(schema as any, {
+    const jsonSchema = zodToJsonSchema(schema, {
       target: 'jsonSchema7',
-      $refStrategy: 'relative'
+      $refStrategy: 'relative',
     });
-
     const schemaString = JSON.stringify(jsonSchema, null, 2);
 
     if (options.dryRun) {
@@ -138,48 +118,64 @@ async function publishSchema(client: SchemaRegistryClient, subject: string, sche
       return;
     }
 
-    // Check if an identical schema already exists.
     try {
       const existingId = await client.getRegistryIdBySchema(subject, schemaString);
       console.log(`⏭️  Schema for ${subject} is already up to date (ID: ${existingId})`);
       return;
     } catch (_error) {
-      // If it fails, it means the schema doesn't exist, so we can proceed to publish.
-      // We assume a 404 error here. Other errors will be caught by the register call.
-      debug(Debug.INFO, `Schema for ${subject} not found. Proceeding with publishing.`);
+      // Schema not found, proceed to publish
     }
 
-    // Register the new schema.
     await registerSchemaToRegistry(client, subject, schemaString);
     console.log(`✅ Published schema for subject: ${subject}`);
   } catch (error) {
-    debug(Debug.ERROR, 'Failed to publish schema', { subject, error });
     throw new Error(`Failed to publish schema for ${subject}: ${error}`);
   }
 }
 
 export async function registerSchemaToRegistry(client: SchemaRegistryClient, subject: string, schemaString: string): Promise<void> {
-  // Use the underlying registry client with correct signature: register(schema, options)
-  // @ts-ignore
-  const registry = client.registry;
+  const registry = (client as any).registry;
   await registry.register(
     {
       type: SchemaType.JSON,
-      schema: schemaString
+      schema: schemaString,
     },
     {
-      subject: subject
+      subject: subject,
     }
   );
 }
 
+async function _processSchemaFile(filePath: string, options: PublishOptions, client: SchemaRegistryClient): Promise<Array<{ subject: string; schemaName: string; file: string }>> {
+  const processedInFile: Array<{ subject: string; schemaName: string; file: string }> = [];
+  try {
+    const schemaFile = await loadSchemaFile(filePath);
+    if (!schemaFile) {
+      return [];
+    }
+
+    console.log(`📄 Processing ${schemaFile.fileName}...`);
+
+    for (const [schemaName, schema] of Object.entries(schemaFile.exports)) {
+      const subject = getSubjectName(options.topic, schemaName);
+      await publishSchema(client, subject, schema, options);
+      processedInFile.push({
+        subject,
+        schemaName,
+        file: schemaFile.fileName,
+      });
+    }
+  } catch (error) {
+    console.error(`❌ Error processing ${filePath}:`, error);
+    if (!options.force) {
+      throw error;
+    }
+  }
+  return processedInFile;
+}
+
 export async function publishSchemas(options: PublishOptions): Promise<void> {
-  debug(Debug.INFO, 'Starting schema publishing', options);
-
-  // Create Schema Registry client
   const client = createSchemaRegistryClient(options);
-
-  // Find all schema files
   const schemaFilePaths = await findSchemaFiles(options.eventsDir);
 
   if (schemaFilePaths.length === 0) {
@@ -188,49 +184,21 @@ export async function publishSchemas(options: PublishOptions): Promise<void> {
 
   console.log(`📁 Found ${schemaFilePaths.length} potential schema files`);
 
-  // Load and process each file
-  const processedSchemas: Array<{ subject: string; schemaName: string; file: string }> = [];
+  const allProcessedSchemas: Array<{ subject: string; schemaName: string; file: string }> = [];
 
   for (const filePath of schemaFilePaths) {
-    try {
-      const schemaFile = await loadSchemaFile(filePath);
-
-      if (!schemaFile) {
-        continue; // Skip files without schemas
-      }
-
-      console.log(`📄 Processing ${schemaFile.fileName}...`);
-
-      // Process each schema in the file
-      for (const [schemaName, schema] of Object.entries(schemaFile.exports)) {
-        const subject = getSubjectName(options.topic, schemaName);
-
-        await publishSchema(client, subject, schema, options);
-
-        processedSchemas.push({
-          subject,
-          schemaName,
-          file: schemaFile.fileName
-        });
-      }
-    } catch (error) {
-      console.error(`❌ Error processing ${filePath}:`, error);
-      if (!options.force) {
-        throw error;
-      }
-    }
+    const processed = await _processSchemaFile(filePath, options, client);
+    allProcessedSchemas.push(...processed);
   }
 
   console.log(`\n📊 Summary:`);
   console.log(`   Files processed: ${schemaFilePaths.length}`);
-  console.log(`   Schemas processed: ${processedSchemas.length}`);
+  console.log(`   Schemas processed: ${allProcessedSchemas.length}`);
 
-  if (processedSchemas.length > 0) {
+  if (allProcessedSchemas.length > 0) {
     console.log(`\n📋 Processed schemas:`);
-    for (const { subject, schemaName, file } of processedSchemas) {
+    for (const { subject, schemaName, file } of allProcessedSchemas) {
       console.log(`   ${subject} (${schemaName} from ${file})`);
     }
   }
-
-  debug(Debug.INFO, 'Schema publishing completed', { processedCount: processedSchemas.length });
 }

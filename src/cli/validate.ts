@@ -3,15 +3,12 @@ import * as path from 'path';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { BaseEventSchema } from '../schemas';
-import { debug } from '../helpers';
-import { Debug } from '../interfaces';
 
 interface ValidateOptions {
   baseEventValidation?: boolean;
 }
 
 export async function validateSchema(schemaFilePath: string, options: ValidateOptions = {}): Promise<void> {
-  debug(Debug.INFO, 'Validating schema file', { schemaFilePath, options });
 
   // Check if file exists
   try {

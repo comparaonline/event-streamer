@@ -1,6 +1,4 @@
 import { Consumer } from 'kafkajs';
-import { debug } from '../helpers';
-import { Debug } from '../interfaces';
 
 interface Queue {
   status: 'alive' | 'paused';
@@ -37,11 +35,6 @@ export class QueueManager {
         promises: []
       };
     }
-
-    debug(Debug.DEBUG, 'Queue manager initialized', {
-      topics,
-      maxMessagesPerTopic: this.config.maxMessagesPerTopic
-    });
   }
 
   /**
@@ -58,7 +51,6 @@ export class QueueManager {
   addToQueue(topic: string, processingPromise: Promise<void>): boolean {
     const topicQueue = this.queues[topic];
     if (!topicQueue) {
-      debug(Debug.WARN, 'Topic queue not initialized', { topic });
       return true; // Process the message anyway
     }
 
@@ -66,12 +58,6 @@ export class QueueManager {
 
     // Check if we need to pause the topic
     if (topicMaxQueue !== 'unlimited' && topicQueue.promises.length + 1 >= topicMaxQueue) {
-      debug(Debug.INFO, 'Queue limit reached, pausing topic', {
-        topic,
-        queueSize: topicQueue.promises.length,
-        maxQueue: topicMaxQueue
-      });
-
       if (this.consumer) {
         this.consumer.pause([{ topic }]);
       }
@@ -86,8 +72,8 @@ export class QueueManager {
       .finally(() => {
         this.removeFromQueue(topic, processingPromise);
       })
-      .catch((error) => {
-        debug(Debug.ERROR, 'Processing promise failed in queue manager', { topic, error });
+      .catch(() => {
+        // ignore, error is handled elsewhere
       });
 
     return true;
@@ -110,11 +96,6 @@ export class QueueManager {
 
     // Resume the topic if it was paused and queue has space
     if (topicQueue.status === 'paused') {
-      debug(Debug.INFO, 'Queue space available, resuming topic', {
-        topic,
-        queueSize: topicQueue.promises.length
-      });
-
       if (this.consumer) {
         this.consumer.resume([{ topic }]);
       }
@@ -164,8 +145,6 @@ export class QueueManager {
       for (const topic of topics) {
         this.queues[topic].status = 'paused';
       }
-
-      debug(Debug.INFO, 'All topics paused manually', { topics });
     }
   }
 
@@ -181,8 +160,6 @@ export class QueueManager {
       for (const topic of topics) {
         this.queues[topic].status = 'alive';
       }
-
-      debug(Debug.INFO, 'All topics resumed manually', { topics });
     }
   }
 
@@ -193,10 +170,6 @@ export class QueueManager {
     const allPromises = Object.values(this.queues).flatMap((queue) => queue.promises);
 
     if (allPromises.length > 0) {
-      debug(Debug.INFO, 'Waiting for queue processing to complete', {
-        totalPromises: allPromises.length
-      });
-
       await Promise.all(allPromises);
     }
   }
@@ -211,7 +184,5 @@ export class QueueManager {
         promises: []
       };
     }
-
-    debug(Debug.DEBUG, 'All queues cleared');
   }
 }

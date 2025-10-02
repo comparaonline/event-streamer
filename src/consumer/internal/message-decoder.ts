@@ -1,7 +1,6 @@
 import { SchemaRegistryClient } from '../../schema-registry/client';
-import { getParsedJson, debug } from '../../helpers';
+import { getParsedJson } from '../../helpers';
 import { EventMetadata } from '../../schemas';
-import { Debug } from '../../interfaces';
 
 export interface DecodeResult<T = unknown> {
   value: T | null;
@@ -42,7 +41,6 @@ export class MessageDecoder {
 
   async decode<T = unknown>(topic: string, partition: number, message: any): Promise<DecodeResult<T> | null> {
     if (!message?.value) {
-      debug(Debug.DEBUG, 'Ignoring empty message', { topic, partition });
       return null;
     }
 
@@ -65,7 +63,7 @@ export class MessageDecoder {
           schemaId: decoded.schemaId
         };
       } catch (error) {
-        debug(Debug.ERROR, 'Failed to decode Schema Registry message', { topic, error });
+        console.error('Failed to decode Schema Registry message', { topic, error });
         return null;
       }
     }
@@ -73,12 +71,11 @@ export class MessageDecoder {
     try {
       const parsed = getParsedJson<T>(message.value);
       if (!parsed) {
-        debug(Debug.DEBUG, 'Could not parse JSON message', { topic });
         return null;
       }
       return { value: parsed, metadata: { ...baseMeta, isSchemaRegistryMessage: false } };
     } catch (error) {
-      debug(Debug.ERROR, 'Failed to parse JSON message', { topic, error });
+      console.error('Failed to parse JSON message', { topic, error });
       return null;
     }
   }

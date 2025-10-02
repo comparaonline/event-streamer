@@ -1,6 +1,6 @@
 import { ErrorHandler } from '../../shared/error-handler';
-import { getParsedJson, debug } from '../../helpers';
-import { Debug, Input } from '../../interfaces';
+import { getParsedJson } from '../../helpers';
+import { Input } from '../../interfaces';
 import { SchemaRegistryClient } from '../../schema-registry/client';
 import { SchemaRegistryProducer } from '../../producer/schema-registry-producer';
 import { DeadLetterQueueSchema } from '../../schemas';
@@ -13,7 +13,7 @@ export class ErrorCoordinator {
 
   async handle(error: Error, topic: string, message: any, partition: number): Promise<void> {
     if (!this.errorHandler) {
-      debug(Debug.ERROR, 'Message processing error (no error handler)', {
+      console.error('Message processing error (no error handler)', {
         topic,
         partition,
         offset: message.offset,
@@ -57,13 +57,8 @@ export class ErrorCoordinator {
           data: result.deadLetterEvent,
           schema: DeadLetterQueueSchema,
         });
-        debug(Debug.INFO, 'Sent message to dead letter queue', {
-          originalTopic: topic,
-          originalOffset: message.offset,
-          deadLetterTopic: this.deadLetterTopic,
-        });
       } catch (dlqError) {
-        debug(Debug.ERROR, 'Failed to send message to dead letter queue', {
+        console.error('Failed to send message to dead letter queue', {
           originalTopic: topic,
           originalOffset: message.offset,
           dlqError,

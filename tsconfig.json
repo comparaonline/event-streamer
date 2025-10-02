@@ -12,8 +12,7 @@
       "./node_modules/@types"
     ],
     "types": [
-      "node",
-      "vitest/globals"
+      "node"
     ],
     "esModuleInterop": true,
     "inlineSourceMap": true,
@@ -26,6 +25,11 @@
   "exclude": [
     "build",
     "node_modules",
-    "examples"
+    "examples",
+    "src/**/__tests__",
+    "src/local-tests",
+    "src/test",
+    "**/*.test.ts",
+    "**/*.integration.test.ts"
   ]
 }

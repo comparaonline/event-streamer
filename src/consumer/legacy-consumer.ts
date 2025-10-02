@@ -1,8 +1,8 @@
 import { Consumer, EachMessagePayload, Kafka } from 'kafkajs';
 import { getConfig } from '../config';
 import { DEFAULT_CONFIG } from '../constants';
-import { debug, getParsedJson, stringToUpperCamelCase, validateTestingConfig } from '../helpers';
-import { Input, Callback, Debug, Output, Route, Strategy } from '../interfaces';
+import { getParsedJson, stringToUpperCamelCase, validateTestingConfig } from '../helpers';
+import { Input, Callback, Output, Route, Strategy } from '../interfaces';
 import { emit } from '../producer';
 import { QueueManager, QueueConfig } from '../shared/queue-manager';
 import { ErrorHandler, ErrorStrategy, ErrorHandlerConfig } from '../shared/error-handler';
@@ -58,7 +58,6 @@ export class ConsumerRouter {
       };
 
       this.errorHandler = new ErrorHandler(errorConfig);
-      debug(Debug.INFO, 'Legacy consumer error handler initialized', errorConfig);
     }
   }
 
@@ -90,7 +89,6 @@ export class ConsumerRouter {
           eventName,
           callback
         };
-        debug(Debug.INFO, 'Adding route', route);
         this.routes.push(route);
       }
     }
@@ -109,7 +107,6 @@ export class ConsumerRouter {
   public async stop(): Promise<void> {
     // Wait for all queued messages to complete if using parallel processing
     if (this.queueManager) {
-      debug(Debug.INFO, 'Waiting for legacy consumer message queues to complete...');
       await this.queueManager.waitForAllQueues();
     }
 
@@ -130,21 +127,13 @@ export class ConsumerRouter {
     const matchingRoutes = this.routes.filter((route) => topic === route.topic && (route.eventName == null || route.eventName === content.code));
 
     if (matchingRoutes.length === 0) {
-      debug(Debug.DEBUG, 'No matching routes for message', { topic, eventCode: content.code });
       return;
     }
 
     // Process all matching routes
     for (const route of matchingRoutes) {
-      debug(Debug.TRACE, 'Processing message on route', route);
       await route.callback(content, emit);
     }
-
-    debug(Debug.DEBUG, 'Message processed successfully', {
-      topic,
-      eventCode: content.code,
-      routeCount: matchingRoutes.length
-    });
   }
 
   /**
@@ -153,7 +142,7 @@ export class ConsumerRouter {
   private async handleProcessingError(error: Error, topic: string, content: Input): Promise<void> {
     if (!this.errorHandler) {
       // No error handler configured, use legacy behavior (log and continue)
-      debug(Debug.ERROR, 'Legacy consumer processing error (no error handler)', {
+      console.error('Legacy consumer processing error (no error handler)', {
         topic,
         eventCode: content.code,
         error: error.message
@@ -185,14 +174,8 @@ export class ConsumerRouter {
             }
           ]
         });
-
-        debug(Debug.INFO, 'Sent legacy message to dead letter queue', {
-          originalTopic: topic,
-          eventCode: content.code,
-          deadLetterTopic: this.legacyConfig.deadLetterTopic
-        });
       } catch (dlqError) {
-        debug(Debug.ERROR, 'Failed to send legacy message to dead letter queue', {
+        console.error('Failed to send legacy message to dead letter queue', {
           originalTopic: topic,
           eventCode: content.code,
           dlqError
@@ -227,7 +210,6 @@ export class ConsumerRouter {
 
       this.consumer = kafka.consumer({ groupId });
       await this.consumer.connect();
-      debug(Debug.DEBUG, 'Consumer connected');
       await this.consumer.subscribe({ topics });
 
       const maxMessagesPerTopic = config.consumer?.maxMessagesPerTopic ?? DEFAULT_CONFIG.maxMessagesPerTopic;
@@ -243,7 +225,6 @@ export class ConsumerRouter {
         this.queueManager = new QueueManager(queueConfig);
         this.queueManager.initializeQueues(topics);
         this.queueManager.setConsumer(this.consumer);
-        debug(Debug.INFO, 'Legacy consumer queue manager initialized', queueConfig);
       }
 
       await this.consumer.run({
@@ -251,7 +232,6 @@ export class ConsumerRouter {
           const content = getParsedJson<Input>(message.value);
 
           if (content == null) {
-            debug(Debug.DEBUG, 'Skipping message without content');
             return;
           }
 
@@ -263,7 +243,6 @@ export class ConsumerRouter {
             }
           } else {
             // Topic-based parallel processing with shared queue manager
-            debug(Debug.DEBUG, 'Processing message in parallel', { topic, offset: message.offset });
             const processingPromise = this.processMessage(topic, content).catch((error) =>
               this.handleProcessingError(error as Error, topic, content)
             );
