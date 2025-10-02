@@ -1,4 +1,4 @@
-FROM node:16-alpine as build
+FROM node:18-alpine as build
 WORKDIR /code
 RUN apk --no-cache add ca-certificates \
   lz4-dev \

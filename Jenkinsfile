@@ -5,7 +5,7 @@ pipeline {
     timeout(time: 30, unit: 'MINUTES')
   }
   environment {
-    NODE_VERSION = "16"
+    NODE_VERSION = "18"
   }
   stages {
     stage('Prepare') {
