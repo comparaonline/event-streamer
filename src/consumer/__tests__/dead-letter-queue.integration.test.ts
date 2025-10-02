@@ -25,43 +25,65 @@ describe('Dead Letter Queue Integration', () => {
   const eventCode = 'FailingEvent';
 
   const failingSchema = z.object({ id: z.string(), data: z.string() });
-  // Merged SR schema (business + envelope)
   let mergedSchema: z.ZodSchema<any>;
-
-  let consumerRouter: SchemaRegistryConsumerRouter;
   let producer: SchemaRegistryProducer;
-  let srClient: SchemaRegistryClient;
-  const receivedDlq: any[] = [];
+
+  // This function contains the core test logic and will be reused for both strategies.
+  const runDLQTest = async (consumer: SchemaRegistryConsumerRouter, receivedDlq: any[]) => {
+    // Produce a failing event
+    const eventPayload = { id: randomUUID(), data: 'boom' };
+    await producer.emitWithSchema({
+      topic: mainTopic,
+      eventCode,
+      data: eventPayload,
+      schema: mergedSchema,
+    });
+
+    // Wait for the message to arrive in the DLQ
+    const started = Date.now();
+    while (receivedDlq.length === 0 && Date.now() - started < 15000) { // 15s timeout
+      await sleep(500);
+    }
+
+    // Assertions
+    expect(receivedDlq.length).toBeGreaterThan(0);
+    const dlq = DeadLetterQueueSchema.parse(receivedDlq[0]);
+    expect(dlq.code).toBe('DeadLetterQueueEvent');
+    expect(dlq.originalTopic).toBe(mainTopic);
+    expect(dlq.errorMessage).toContain('Processing failed');
+  };
 
   beforeAll(async () => {
-    // Define schemas before they are used
-    const { zodToJsonSchema } = await import('zod-to-json-schema');
-    mergedSchema = SchemaRegistryEventSchema.merge(failingSchema);
-
-    // Configure runtime
+    // --- One-time setup for all tests in this file ---
+    
+    // Configure runtime first, as constructors depend on it.
     setConfig({
       host: KAFKA_BROKERS,
       consumer: { groupId },
       schemaRegistry: { url: SCHEMA_REGISTRY_URL },
       producer: { useSchemaRegistry: true },
-      onlyTesting: false
+      onlyTesting: false,
     });
 
-    // Ensure topics exist
+    mergedSchema = SchemaRegistryEventSchema.merge(failingSchema);
+    producer = new SchemaRegistryProducer();
+
+    // Create topics
     const kafka = new Kafka({ brokers: KAFKA_BROKERS.split(',') });
     const admin = kafka.admin();
     await admin.connect();
     await admin.createTopics({
       topics: [
         { topic: mainTopic, numPartitions: 1, replicationFactor: 1 },
-        { topic: dlqTopic, numPartitions: 1, replicationFactor: 1 }
+        { topic: dlqTopic, numPartitions: 1, replicationFactor: 1 },
       ],
-      waitForLeaders: true
+      waitForLeaders: true,
     });
     await admin.disconnect();
 
-    // Pre-register schemas
-    srClient = new SchemaRegistryClient({ url: SCHEMA_REGISTRY_URL });
+    // Register schemas
+    const srClient = new SchemaRegistryClient({ url: SCHEMA_REGISTRY_URL });
+    const { zodToJsonSchema } = await import('zod-to-json-schema');
     const registry = (srClient as any).registry;
     
     const subject = srClient.getSubjectFromTopicAndEventCode(mainTopic, eventCode);
@@ -71,75 +93,81 @@ describe('Dead Letter Queue Integration', () => {
     const dlqSubject = srClient.getSubjectFromTopicAndEventCode(dlqTopic, 'DeadLetterQueueEvent');
     const dlqJsonSchema = zodToJsonSchema(DeadLetterQueueSchema as any, { target: 'jsonSchema7' });
     await registry.register({ type: 'JSON', schema: JSON.stringify(dlqJsonSchema) }, { subject: dlqSubject });
-    
-    // A single consumer for both topics
-    consumerRouter = new SchemaRegistryConsumerRouter({
-      errorStrategy: 'DEAD_LETTER',
-      deadLetterTopic: dlqTopic,
-      fromBeginning: true,
-      strategy: 'one-by-one',
-    });
-
-    // Route for the main topic (designed to fail)
-    consumerRouter.add({
-      topic: mainTopic,
-      eventCode,
-      schema: mergedSchema,
-      handler: () => {
-        throw new Error('Processing failed!');
-      },
-    });
-
-    // Route for the DLQ topic (to verify the message)
-    consumerRouter.add({
-      topic: dlqTopic,
-      eventCode: 'DeadLetterQueueEvent',
-      schema: DeadLetterQueueSchema,
-      handler: async (message) => {
-        receivedDlq.push(message);
-      },
-    });
-
-    await consumerRouter.start();
-    producer = new SchemaRegistryProducer();
   }, TEST_TIMEOUT);
 
-  afterAll(async () => {
-    try {
-      await consumerRouter.stop();
-    } catch {
-      void 0; // ignore cleanup errors
-    }
-  }, TEST_TIMEOUT);
+  describe('with "one-by-one" strategy', () => {
+    let consumerRouter: SchemaRegistryConsumerRouter;
+    const receivedDlq: any[] = [];
 
-  it(
-    'sends failed messages to DLQ topic',
-    async () => {
-      // Produce a failing event (SR-encoded)
-      const eventPayload = {
-        id: randomUUID(),
-        data: 'boom'
-      } as any;
-      await producer.emitWithSchema({
-        topic: mainTopic,
-        eventCode,
-        data: eventPayload,
-        schema: mergedSchema as any
+    beforeEach(async () => {
+      receivedDlq.length = 0; // Clear array before each test
+      consumerRouter = new SchemaRegistryConsumerRouter({
+        errorStrategy: 'DEAD_LETTER',
+        deadLetterTopic: dlqTopic,
+        fromBeginning: true,
+        strategy: 'one-by-one',
       });
 
-      // Wait for DLQ
-      const started = Date.now();
-      while (receivedDlq.length === 0 && Date.now() - started < TEST_TIMEOUT - 1000) {
-        await sleep(500);
-      }
+      consumerRouter.add({
+        topic: mainTopic,
+        eventCode,
+        schema: mergedSchema,
+        handler: () => { throw new Error('Processing failed!'); },
+      });
+      consumerRouter.add({
+        topic: dlqTopic,
+        eventCode: 'DeadLetterQueueEvent',
+        schema: DeadLetterQueueSchema,
+        handler: async (message) => { receivedDlq.push(message); },
+      });
 
-      expect(receivedDlq.length).toBeGreaterThan(0);
-      const dlq = DeadLetterQueueSchema.parse(receivedDlq[0]);
+      await consumerRouter.start();
+    });
 
-      expect(dlq.code).toBe('DeadLetterQueueEvent');
-      expect(dlq.originalTopic).toBe(mainTopic);
-      expect(dlq.errorMessage).toContain('Processing failed');
-    },
-    TEST_TIMEOUT
-  );
+    afterEach(async () => {
+      await consumerRouter.stop();
+    });
+
+    it('sends failed messages to DLQ topic', async () => {
+      await runDLQTest(consumerRouter, receivedDlq);
+    }, TEST_TIMEOUT);
+  });
+
+  describe('with "topic" strategy (QueueManager)', () => {
+    let consumerRouter: SchemaRegistryConsumerRouter;
+    const receivedDlq: any[] = [];
+
+    beforeEach(async () => {
+      receivedDlq.length = 0;
+      consumerRouter = new SchemaRegistryConsumerRouter({
+        errorStrategy: 'DEAD_LETTER',
+        deadLetterTopic: dlqTopic,
+        fromBeginning: true,
+        strategy: 'topic', // Default strategy, enables QueueManager
+      });
+
+      consumerRouter.add({
+        topic: mainTopic,
+        eventCode,
+        schema: mergedSchema,
+        handler: () => { throw new Error('Processing failed!'); },
+      });
+      consumerRouter.add({
+        topic: dlqTopic,
+        eventCode: 'DeadLetterQueueEvent',
+        schema: DeadLetterQueueSchema,
+        handler: async (message) => { receivedDlq.push(message); },
+      });
+
+      await consumerRouter.start();
+    });
+
+    afterEach(async () => {
+      await consumerRouter.stop();
+    });
+
+    it('sends failed messages to DLQ topic', async () => {
+      await runDLQTest(consumerRouter, receivedDlq);
+    }, TEST_TIMEOUT);
+  });
 });

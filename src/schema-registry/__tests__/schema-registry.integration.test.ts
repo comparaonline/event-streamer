@@ -268,31 +268,27 @@ describe('Schema Registry Integration Tests', () => {
         schema: UserRegisteredSchema
       });
 
-      // Send legacy JSON message (fallback)
-      const jsonEvent: UserRegistered = {
-        ...createBaseEvent({
-          code: uniqueEventCode,
-          appName: 'integration-test'
-        }),
+      // Send legacy JSON message
+      const { emit } = await import('../../producer/legacy-producer');
+      const jsonEvent = { // Manually construct the object without `code`
+        appName: 'integration-test',
         userId: randomUUID(),
         email: 'json-test@example.com',
         registrationSource: 'mobile'
       };
+      await emit({
+        topic: testTopic,
+        eventName: uniqueEventCode,
+        data: jsonEvent,
+      });
 
-      // Force JSON fallback by temporarily disabling SR
+      // Restore config for subsequent tests
       setConfig({
         host: KAFKA_BROKERS,
         consumer: { groupId: `integration-test-${Date.now()}` },
-        producer: { useSchemaRegistry: false },
+        schemaRegistry: { url: SCHEMA_REGISTRY_URL },
+        producer: { useSchemaRegistry: true },
         onlyTesting: false
-      });
-
-      const jsonProducer = new SchemaRegistryProducer();
-      await jsonProducer.emitWithSchema({
-        topic: testTopic,
-        data: jsonEvent,
-
-        schema: UserRegisteredSchema
       });
 
       await new Promise((resolve) => setTimeout(resolve, 4000));

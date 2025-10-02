@@ -103,7 +103,15 @@ This is the recommended approach for producing and consuming events.
 
 ### Producing Events
 
-Use the `SchemaRegistryProducer` to automatically handle schema registration, validation, and Avro encoding. Use your factory function to create the event payload.
+Use the `SchemaRegistryProducer` to automatically handle schema registration, validation, and encoding.
+
+#### Note on Singleton Behavior
+The `SchemaRegistryProducer` is a **singleton**. The first time you create an instance with `new SchemaRegistryProducer()`, it will establish a persistent connection to Kafka. Every subsequent call to `new SchemaRegistryProducer()` anywhere in your application will return the *exact same instance* and reuse that connection.
+
+You should create it once and share it or simply call `new SchemaRegistryProducer()` wherever you need it, knowing it's an efficient operation.
+
+#### Basic Usage
+Use your factory function to create the event payload. The `eventCode` and `schema` parameters are **required**.
 
 ```ts
 import { SchemaRegistryProducer } from '@comparaonline/event-streamer';
@@ -120,11 +128,26 @@ async function sendUserRegistration() {
 
   await producer.emitWithSchema({
     topic: 'users',
-    eventCode: 'UserRegistered', // Used to derive the subject name
+    eventCode: 'UserRegistered', // **Required.** Used to derive the subject name.
     data: eventData,
-    schema: UserRegisteredSchema
+    schema: UserRegisteredSchema  // **Required.** The Zod schema for validation.
   });
 }
+```
+
+#### Graceful Shutdown
+The singleton producer maintains an open connection to Kafka. In a long-running application (like a web server or a microservice), it's important to close this connection when the application is shutting down to prevent message loss.
+
+You can do this by calling the `disconnect` method.
+
+```ts
+// In your application's shutdown hook
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM signal received: closing Kafka producer');
+  const producer = new SchemaRegistryProducer(); // Gets the existing instance
+  await producer.disconnect();
+  process.exit(0);
+});
 ```
 
 ### Consuming Events
@@ -154,6 +177,53 @@ consumer.addFallback({
     console.warn('Received a message on the fallback handler:', data);
   }
 });
+
+consumer.start();
+```
+
+### Advanced Consumer Configuration
+
+#### Processing Strategies and Backpressure
+
+The `SchemaRegistryConsumerRouter` can process messages in two ways, controlled by the `strategy` option. This is critical for managing how your consumer handles high volumes of messages.
+
+- **`strategy: 'one-by-one'`**: This is the simplest strategy. The consumer will process one message to completion before fetching the next one. It's safe and predictable but offers no concurrency.
+
+- **`strategy: 'topic'` (Default)**: This strategy processes messages concurrently, with a separate queue for each topic. This provides much higher throughput but requires you to manage backpressure to avoid overwhelming your service with too many in-flight messages.
+
+To control memory usage and prevent your application from crashing under heavy load, you can set limits on the size of these in-memory queues.
+
+- **`maxMessagesPerTopic`**: A global limit for the maximum number of messages being processed concurrently for any single topic. If this limit is reached, the consumer will pause fetching new messages for that topic until some of the current messages are finished.
+- **`maxMessagesPerSpecificTopic`**: An object to override the global limit for specific, named topics.
+
+**Example Configuration:**
+
+```ts
+import { SchemaRegistryConsumerRouter } from '@comparaonline/event-streamer';
+
+const consumer = new SchemaRegistryConsumerRouter({
+  // Enable the concurrent topic strategy (this is the default)
+  strategy: 'topic',
+
+  // Set a global limit of 50 concurrent messages for any topic.
+  maxMessagesPerTopic: 50,
+
+  // Override the global limit for specific topics.
+  maxMessagesPerSpecificTopic: {
+    // This is a high-volume topic, so we use a smaller queue.
+    'real-time-logs': 20,
+    // This topic has lightweight messages, so we can handle more.
+    'user-clicks': 200,
+  },
+
+  // For new consumer groups, start reading from the beginning of the topic.
+  fromBeginning: true,
+});
+
+// Routes are added as normal
+consumer.add({ topic: 'real-time-logs', ... });
+consumer.add({ topic: 'user-clicks', ... });
+consumer.add({ topic: 'another-topic', ... }); // This will use the default limit of 50
 
 consumer.start();
 ```

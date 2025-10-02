@@ -72,15 +72,13 @@ export class SchemaRegistryProducer {
 
   async emitWithSchema<T extends BaseEvent>(
     output: SchemaRegistryOutput<T> | SchemaRegistryOutput<T>[],
-    overwriteHosts?: string | string[]
   ): Promise<EmitResponse[]> {
     await this.connect();
     const config = getConfig() as Config;
     const outputs = toArray(output);
 
     if (!this.schemaRegistryClient || !config.producer?.useSchemaRegistry) {
-      debug(Debug.INFO, 'Schema Registry not configured, falling back to JSON');
-      return this.emitAsJson(outputs, overwriteHosts);
+      throw new Error('Schema Registry is not configured. The SchemaRegistryProducer can only be used when schemaRegistry and producer.useSchemaRegistry are enabled in the config.');
     }
 
     const appName = config.appName ?? config.consumer?.groupId ?? process.env.HOSTNAME?.split('-')[0] ?? 'unknown';
@@ -151,31 +149,6 @@ export class SchemaRegistryProducer {
     );
 
     return this.sendMessages(messages.flat());
-  }
-
-  // Emit with legacy JSON format (backward compatibility)
-  async emitAsJson<T extends BaseEvent>(outputs: SchemaRegistryOutput<T>[], overwriteHosts?: string | string[]): Promise<EmitResponse[]> {
-    await this.connect();
-    const config = getConfig();
-    const appName = config.appName ?? config.consumer?.groupId ?? process.env.HOSTNAME?.split('-')[0] ?? 'unknown';
-
-    const legacyOutputs: Output[] = outputs.map(({ topic, data, eventCode }) => ({
-      topic,
-      eventName: eventCode,
-      data: toArray(data).map((item) => {
-        const baseEvent = createBaseEvent({
-          ...item,
-          code: stringToUpperCamelCase(eventCode ?? topic),
-          appName: item.appName ?? appName
-        });
-
-        return baseEvent;
-      })
-    }));
-
-    // Use existing legacy producer
-    const { emit } = await import('./legacy-producer');
-    return emit(legacyOutputs, overwriteHosts);
   }
 
   // Send messages using Kafka producer
