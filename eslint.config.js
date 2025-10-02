@@ -36,7 +36,7 @@ module.exports = [
     languageOptions: {
       parser: tsparser,
       parserOptions: {
-        project: './tsconfig.json',
+        project: './tsconfig.eslint.json',
         ecmaVersion: 2020,
         sourceType: 'module'
       }
