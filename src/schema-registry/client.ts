@@ -17,7 +17,9 @@ interface CachedSchema extends SchemaInfo {
 }
 
 export class SchemaRegistryClient {
-  private registry: SchemaRegistry;
+  public get aRegistry(): SchemaRegistry {
+    return this.registry;
+  }
   // Schema ID-based cache (immutable, no TTL)
   private schemaIdCache = new Map<number, CachedSchema>();
   // Subject-based cache (startup only, no TTL)

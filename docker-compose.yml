@@ -3,7 +3,7 @@ services:
     build:
       context: .
       target: build
-    command: 'yarn test'
+    command: 'pnpm test'
     depends_on:
       kafka:
         condition: service_healthy

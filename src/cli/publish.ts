@@ -104,7 +104,7 @@ async function loadSchemaFile(filePath: string): Promise<SchemaFile | null> {
   };
 }
 
-async function publishSchema(client: SchemaRegistryClient, subject: string, schema: z.ZodSchema<any>, options: PublishOptions): Promise<void> {
+async function publishSchema(client: SchemaRegistryClient, subject: string, schema: z.ZodSchema<unknown>, options: PublishOptions): Promise<void> {
   try {
     const jsonSchema = zodToJsonSchema(schema, {
       target: 'jsonSchema7',
@@ -134,8 +134,7 @@ async function publishSchema(client: SchemaRegistryClient, subject: string, sche
 }
 
 export async function registerSchemaToRegistry(client: SchemaRegistryClient, subject: string, schemaString: string): Promise<void> {
-  const registry = (client as any).registry;
-  await registry.register(
+  await client.aRegistry.register(
     {
       type: SchemaType.JSON,
       schema: schemaString,

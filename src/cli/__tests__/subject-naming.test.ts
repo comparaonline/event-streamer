@@ -120,12 +120,12 @@ describe('CLI-Producer Subject Naming Consistency', () => {
     // This test documents how the CLI should be used with the new --topic parameter
     const examples = [
       {
-        command: 'yarn cli publish --topic orders --events-dir ./schemas --registry-url http://localhost:8081',
+        command: 'pnpm cli publish --topic orders --events-dir ./schemas --registry-url http://localhost:8081',
         schemaFile: 'UserEventSchema',
         resultingSubject: 'orders-user-event'
       },
       {
-        command: 'yarn cli publish --topic users --events-dir ./schemas --registry-url http://localhost:8081',
+        command: 'pnpm cli publish --topic users --events-dir ./schemas --registry-url http://localhost:8081',
         schemaFile: 'UserEventSchema',
         resultingSubject: 'users-user-event'
       }

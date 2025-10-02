@@ -150,7 +150,11 @@ export class SchemaRegistryConsumerRouter {
       logLevel: config.kafkaJSLogs
     });
 
-    this.consumer = kafka.consumer({ groupId: config.consumer!.groupId! });
+    if (!config.consumer?.groupId) {
+      throw new Error('Missing configuration config.consumer.groupId for consumer');
+    }
+
+    this.consumer = kafka.consumer({ groupId: config.consumer.groupId });
     await this.consumer.connect();
 
     if (this.queueManager) {
@@ -202,7 +206,10 @@ export class SchemaRegistryConsumerRouter {
 
     // Decode without implicit validation; route-level flags decide
     try {
-      const decoded = await this.decoder!.decode<Input>(topic, partition, message);
+      if (!this.decoder) {
+        throw new Error('Message decoder not initialized');
+      }
+      const decoded = await this.decoder.decode<Input>(topic, partition, message);
       if (!decoded) return;
       parsedEvent = decoded.value as Input;
       metadata = decoded.metadata;
@@ -225,11 +232,14 @@ export class SchemaRegistryConsumerRouter {
     }
 
     for (const route of matchingRoutes) {
+      if (!this.validator) {
+        throw new Error('Validator not initialized');
+      }
       // SR validation (AJV) if enabled and SR message
-      await this.validator!.validateWithRegistry(schemaId, parsedEvent, !!route.validateWithRegistry && !!metadata.isSchemaRegistryMessage);
+      await this.validator.validateWithRegistry(schemaId, parsedEvent, !!route.validateWithRegistry && !!metadata.isSchemaRegistryMessage);
 
       // Business validation (Zod)
-      this.validator!.validateWithZod(route.schema as any, parsedEvent);
+      this.validator.validateWithZod(route.schema as any, parsedEvent);
 
       await route.handler(parsedEvent as any, metadata);
     }

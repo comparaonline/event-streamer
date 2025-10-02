@@ -70,9 +70,9 @@ await producer.emitWithSchema({
 
 ## CLI Commands
 
-- \`yarn event-streamer-cli publish\`: Publish schemas to registry
-- \`yarn event-streamer-cli validate <schema-file>\`: Validate a schema file
-- \`yarn event-streamer-cli generate-example <event-name>\`: Generate example schema
+- \`pnpm event-streamer-cli publish\`: Publish schemas to registry
+- \`pnpm event-streamer-cli validate <schema-file>\`: Validate a schema file
+- \`pnpm event-streamer-cli generate-example <event-name>\`: Generate example schema
 `;
 
 export async function initializeEventSchemas(_options: InitOptions): Promise<void> {

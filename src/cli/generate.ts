@@ -130,8 +130,8 @@ export async function generateExampleSchema(eventName: string, options: Generate
     // Provide usage hints
     console.log(`\n💡 Next steps:`);
     console.log(`   1. Edit ${fileName} to match your actual event structure`);
-    console.log(`   2. Validate the schema: yarn event-streamer-cli validate ${outputPath}`);
-    console.log(`   3. Publish to registry: yarn event-streamer-cli publish --events-dir ${options.outputDir}`);
+    console.log(`   2. Validate the schema: pnpm event-streamer-cli validate ${outputPath}`);
+    console.log(`   3. Publish to registry: pnpm event-streamer-cli publish --events-dir ${options.outputDir}`);
   } catch (error) {
     throw new Error(`Failed to generate schema for ${eventName}: ${error}`);
   }
