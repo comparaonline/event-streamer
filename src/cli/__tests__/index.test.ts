@@ -123,6 +123,8 @@ describe('CLI Index', () => {
         'http://localhost:8081',
         '--registry-auth',
         'test-user:test-pass',
+        '--topic',
+        'test-topic',
         '--dry-run'
       ];
 
@@ -132,8 +134,29 @@ describe('CLI Index', () => {
         eventsDir: '/test/events',
         registryUrl: 'http://localhost:8081',
         registryAuth: 'test-user:test-pass',
+        topic: 'test-topic',
         dryRun: true
       });
+    });
+
+    it('should exit with an error if publish is called without a topic', async () => {
+      const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      process.argv = [
+        'node',
+        'cli',
+        'publish',
+        '--events-dir',
+        '/test/events',
+        '--registry-url',
+        'http://localhost:8081',
+      ];
+
+      await program.parseAsync(process.argv);
+
+      expect(errorSpy).toHaveBeenCalled();
+      expect(exitSpy).toHaveBeenCalledWith(1);
     });
 
     it('should handle invalid commands gracefully', async () => {
