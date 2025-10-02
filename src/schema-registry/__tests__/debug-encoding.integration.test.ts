@@ -81,19 +81,13 @@ describe('Debug Schema Registry Encoding', () => {
     console.log('🔍 Testing user-registered-value subject:');
     console.log('Test data:', JSON.stringify(testData, null, 2));
 
-    try {
-      // Try to encode with the new subject format
-      // This test already uses the correct subject format
-      const encoded = await client.encode('user-registered-value', UserRegisteredSchema, testData);
-      console.log('✅ user-registered-value encoding successful! Buffer length:', encoded.length);
+    // This test asserts that encoding with a non-existent subject will fail.
+    // We expect exactly one assertion to be made.
+    expect.assertions(1);
 
-      expect(encoded).toBeInstanceOf(Buffer);
-    } catch (error) {
-      console.error('❌ user-registered-value encoding failed - this should show us the detailed error!');
-      // Force display by failing with detailed message
-            expect(error).toBeInstanceOf(Error);
-      expect((error as Error).message).toContain("Subject 'user-registered-value' not found");
-    }
+    await expect(
+      client.encode('user-registered-value', UserRegisteredSchema, testData)
+    ).rejects.toThrow("Subject 'user-registered-value' not found");
   });
 });
 
