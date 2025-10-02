@@ -232,14 +232,27 @@ consumer.start();
 
 ## Features
 
-### Dead Letter Queue (DLQ)
+### Error Handling Strategies
 
-Both the `SchemaRegistryConsumerRouter` and the legacy `ConsumerRouter` support a Dead Letter Queue for messages that fail processing. To enable it, provide an `errorStrategy` and a `deadLetterTopic` in the consumer configuration.
+Both the `SchemaRegistryConsumerRouter` and the legacy `ConsumerRouter` support strategies for handling messages that fail during processing. To enable a strategy, provide an `errorStrategy` in the consumer configuration.
+
+#### Dead Letter Queue (DLQ)
+If you want to isolate failing messages for later analysis, use the `DEAD_LETTER` strategy. This will catch any error from your handler and forward the original message, along with error details, to a specified `deadLetterTopic`.
 
 ```ts
 const consumer = new SchemaRegistryConsumerRouter({
   errorStrategy: 'DEAD_LETTER',
   deadLetterTopic: 'my-service-dlq'
+});
+```
+
+#### Ignore
+If you want the consumer to simply log the error and move on to the next message without stopping or forwarding, use the `IGNORE` strategy.
+
+```ts
+const consumer = new SchemaRegistryConsumerRouter({
+  errorStrategy: 'IGNORE'
+  // No deadLetterTopic is needed
 });
 ```
 
