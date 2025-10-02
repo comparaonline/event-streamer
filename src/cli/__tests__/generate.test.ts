@@ -94,7 +94,7 @@ describe('CLI Generate Command', () => {
       // Mock existing file
       mockFs.access.mockResolvedValue(undefined);
 
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation();
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation();
 
       await generateExampleSchema(eventName, options);
 

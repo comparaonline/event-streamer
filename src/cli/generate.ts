@@ -113,8 +113,8 @@ export async function generateExampleSchema(eventName: string, options: Generate
     // Check if file already exists
     try {
       await fs.access(outputPath);
-      console.log(`⚠️  File already exists: ${outputPath}`);
-      console.log(`   Use a different name or delete the existing file to regenerate.`);
+      console.warn(`⚠️  File already exists: ${outputPath}`);
+      console.warn(`   Use a different name or delete the existing file to regenerate.`);
       return;
     } catch {
       // File doesn't exist, continue
