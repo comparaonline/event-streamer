@@ -3,6 +3,10 @@
 import { Command } from 'commander';
 import { publishSchemas } from './publish';
 import { validateSchema } from './validate';
+import { setConfig } from '../config';
+
+// Initialize the event streamer config for the CLI
+setConfig({ host: 'cli' });
 
 const program = new Command();
 
