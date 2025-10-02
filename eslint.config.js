@@ -69,12 +69,13 @@ module.exports = [
     }
   },
 
-  // Jest test files configuration
+  // Test files configuration
   {
     files: ['**/*.test.{js,ts}', '**/__tests__/**/*.{js,ts}', 'src/test/**/*.{js,ts}'],
     languageOptions: {
       globals: {
-        // Jest globals
+        // Test globals (Jest & Vitest)
+        vi: 'readonly',
         describe: 'readonly',
         it: 'readonly',
         test: 'readonly',
@@ -85,44 +86,10 @@ module.exports = [
         afterEach: 'readonly',
         jest: 'readonly'
       }
-    }
-  },
-
-  // Vitest test files configuration
-  {
-    files: ['**/*.test.{js,ts}', '**/__tests__/**/*.{js,ts}', 'src/test/**/*.{js,ts}'],
-    languageOptions: {
-      globals: {
-        // Vitest globals
-        vi: 'readonly',
-        describe: 'readonly',
-        it: 'readonly',
-        test: 'readonly',
-        expect: 'readonly',
-        beforeAll: 'readonly',
-        beforeEach: 'readonly',
-        afterAll: 'readonly',
-        afterEach: 'readonly',
-      }
-    }
-  },
-
-  // Vitest test files configuration
-  {
-    files: ['**/*.test.{js,ts}', '**/__tests__/**/*.{js,ts}', 'src/test/**/*.{js,ts}'],
-    languageOptions: {
-      globals: {
-        // Vitest globals
-        vi: 'readonly',
-        describe: 'readonly',
-        it: 'readonly',
-        test: 'readonly',
-        expect: 'readonly',
-        beforeAll: 'readonly',
-        beforeEach: 'readonly',
-        afterAll: 'readonly',
-        afterEach: 'readonly',
-      }
+    },
+    rules: {
+      // Relax rule for 'any' in test files
+      '@typescript-eslint/no-explicit-any': 'off'
     }
   },
 
