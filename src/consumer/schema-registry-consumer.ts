@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Consumer, Kafka } from 'kafkajs';
+import { Consumer, Kafka, KafkaMessage } from 'kafkajs';
 import { SchemaRegistryClient } from '../schema-registry/client';
 import { getConfig } from '../config';
 import { Strategy } from '../interfaces';
@@ -70,7 +70,7 @@ export class SchemaRegistryConsumerRouter {
       };
 
       this.errorHandler = new ErrorHandler(errorConfig);
-      this.errorCoordinator = new ErrorCoordinator(this.errorHandler, this.consumerConfig.deadLetterTopic);
+      this.errorCoordinator = new ErrorCoordinator(this.errorHandler, this.consumerConfig.deadLetterTopic, this.schemaRegistryClient);
     }
   }
 
@@ -81,7 +81,7 @@ export class SchemaRegistryConsumerRouter {
 
   // Add fallback per topic
   addFallback<T = unknown>(config: { topic: string; handler: EventHandler<T> }): void {
-    this.routes.addFallback(config.topic, config.handler as EventHandler<any>);
+    this.routes.addFallback(config.topic, config.handler as EventHandler<unknown>);
   }
 
   async start(): Promise<void> {
@@ -195,7 +195,7 @@ export class SchemaRegistryConsumerRouter {
     });
   }
 
-  private async processSchemaRegistryMessage(topic: string, message: any, partition: number): Promise<void> {
+  private async processSchemaRegistryMessage(topic: string, message: KafkaMessage, partition: number): Promise<void> {
     if (!message.value) {
       return;
     }
@@ -239,16 +239,16 @@ export class SchemaRegistryConsumerRouter {
       await this.validator.validateWithRegistry(schemaId, parsedEvent, !!route.validateWithRegistry && !!metadata.isSchemaRegistryMessage);
 
       // Business validation (Zod)
-      this.validator.validateWithZod(route.schema as any, parsedEvent);
+      this.validator.validateWithZod(route.schema as z.ZodSchema<unknown>, parsedEvent);
 
-      await route.handler(parsedEvent as any, metadata);
+      await route.handler(parsedEvent as BaseEvent, metadata);
     }
   }
 
   /**
    * Handle processing errors using configured error strategy
    */
-  private async handleProcessingError(error: Error, topic: string, message: any, partition: number): Promise<void> {
+  private async handleProcessingError(error: Error, topic: string, message: KafkaMessage, partition: number): Promise<void> {
     await this.errorCoordinator?.handle(error, topic, message, partition);
   }
 

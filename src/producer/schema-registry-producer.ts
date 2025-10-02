@@ -26,7 +26,7 @@ let instance: SchemaRegistryProducer | null = null;
 
 export class SchemaRegistryProducer {
   private schemaRegistryClient?: SchemaRegistryClient;
-  private producer: Producer;
+  private producer!: Producer;
   private isConnected = false;
 
   constructor() {
@@ -35,11 +35,6 @@ export class SchemaRegistryProducer {
     }
 
     const config = getConfig();
-
-    if (config.schemaRegistry) {
-      this.schemaRegistryClient = new SchemaRegistryClient(config.schemaRegistry);
-    }
-
     const kafka = new Kafka({
       brokers: config.host.split(','),
       logLevel: config.kafkaJSLogs,
@@ -49,6 +44,10 @@ export class SchemaRegistryProducer {
       allowAutoTopicCreation: true,
       idempotent: config.producer?.idempotent ?? true,
     });
+
+    if (config.schemaRegistry) {
+      this.schemaRegistryClient = new SchemaRegistryClient(config.schemaRegistry);
+    }
 
     instance = this;
   }

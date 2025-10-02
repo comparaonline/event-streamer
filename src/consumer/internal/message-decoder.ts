@@ -1,11 +1,13 @@
 import { SchemaRegistryClient } from '../../schema-registry/client';
 import { getParsedJson } from '../../helpers';
 import { EventMetadata } from '../../schemas';
+import { KafkaMessage } from 'kafkajs';
 
 export interface DecodeResult<T = unknown> {
   value: T | null;
   metadata: EventMetadata;
   schemaId?: number;
+  error?: unknown;
 }
 
 function normalizeHeaders(headers: Record<string, unknown> | undefined): Record<string, string> {
@@ -19,8 +21,8 @@ function normalizeHeaders(headers: Record<string, unknown> | undefined): Record<
       } else if (typeof raw === 'string') {
         normalized[key] = raw;
       } else if (Array.isArray(raw)) {
-        normalized[key] = (raw as any[])
-          .map((h: any) => (Buffer.isBuffer(h) ? h.toString('utf8') : String(h)))
+        normalized[key] = (raw as unknown[])
+          .map((h: unknown) => (Buffer.isBuffer(h) ? h.toString('utf8') : String(h)))
           .join(',');
       } else {
         normalized[key] = String(raw);
@@ -39,7 +41,7 @@ export class MessageDecoder {
     this.client = client;
   }
 
-  async decode<T = unknown>(topic: string, partition: number, message: any): Promise<DecodeResult<T> | null> {
+  async decode<T extends object>(topic: string, partition: number, message: KafkaMessage): Promise<DecodeResult<T> | null> {
     if (!message?.value) {
       return null;
     }

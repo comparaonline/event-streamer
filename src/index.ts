@@ -2,7 +2,7 @@
 // Legacy exports for backward compatibility
 export { emit, clearEmittedEvents, getEmittedEvents, getParsedEmittedEvents } from './producer';
 export { setConfig } from './config';
-export { Config, Debug, Callback, Output, Route, Input } from './interfaces';
+export { Config, Callback, Output, Route, Input } from './interfaces';
 export { ConsumerRouter } from './consumer';
 
 // Schema Registry exports

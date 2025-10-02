@@ -1,17 +1,24 @@
 import { ErrorHandler } from '../../shared/error-handler';
 import { getParsedJson } from '../../helpers';
+import { KafkaMessage } from 'kafkajs';
 import { Input } from '../../interfaces';
 import { SchemaRegistryClient } from '../../schema-registry/client';
 import { SchemaRegistryProducer } from '../../producer/schema-registry-producer';
 import { DeadLetterQueueSchema } from '../../schemas';
 
 export class ErrorCoordinator {
-  constructor(
-    private readonly errorHandler: ErrorHandler | undefined,
-    private readonly deadLetterTopic: string | undefined
-  ) {}
+  private readonly errorHandler: ErrorHandler;
+  private readonly deadLetterTopic?: string;
+  private readonly schemaRegistryClient?: SchemaRegistryClient;
 
-  async handle(error: Error, topic: string, message: any, partition: number): Promise<void> {
+  constructor(errorHandler: ErrorHandler, deadLetterTopic?: string, schemaRegistryClient?: SchemaRegistryClient) {
+    this.errorHandler = errorHandler;
+    this.deadLetterTopic = deadLetterTopic;
+    this.schemaRegistryClient = schemaRegistryClient;
+  }
+
+
+  async handle(error: Error, topic: string, message: KafkaMessage, partition: number): Promise<void> {
     if (!this.errorHandler) {
       console.error('Message processing error (no error handler)', {
         topic,
@@ -22,32 +29,34 @@ export class ErrorCoordinator {
       return;
     }
 
-    let originalCode = 'UnknownEvent';
     let originalPayload = message.value;
+    let parsedPayload: Input | null = null;
 
+    // Try to decode SR messages to get original payload
     try {
-      if (SchemaRegistryClient.isSchemaRegistryEncoded(message.value)) {
-        originalCode = topic;
+      if (message.value && SchemaRegistryClient.isSchemaRegistryEncoded(message.value)) {
+        if (this.schemaRegistryClient) {
+          const { value } = await this.schemaRegistryClient.decodeAndValidate(message.value);
+          originalPayload = value as Buffer | null;
+        }
       } else {
-        const parsed = getParsedJson<Input>(message.value);
-        if (parsed?.code) originalCode = parsed.code;
-        originalPayload = parsed;
+        // For plain JSON, the value is the payload
+        parsedPayload = getParsedJson<Input>(message.value);
+        originalPayload = parsedPayload as Buffer | null;
       }
-    } catch {
-      originalCode = topic;
+    } catch (_decodeError) {
+      // Ignore decode error, proceed with raw payload
     }
 
-    const context = {
+    const result = this.errorHandler.handleError(error, {
       topic,
       partition,
       offset: message.offset,
       timestamp: message.timestamp,
-      originalCode,
+      originalCode: (parsedPayload || ({} as Input)).code,
       originalPayload,
-      retryCount: 0,
-    };
-
-    const result = this.errorHandler.handleError(error, context);
+      retryCount: 0 // TODO: Implement retry tracking
+    });
     if (result.deadLetterEvent && this.deadLetterTopic) {
       try {
         const producer = new SchemaRegistryProducer();

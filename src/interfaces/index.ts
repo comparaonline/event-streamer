@@ -49,7 +49,7 @@ export interface Config {
 
 interface OutputData {
   createdAt?: string;
-  [keys: string]: any;
+  [keys: string]: unknown;
 }
 
 export interface Output {
@@ -63,10 +63,10 @@ export interface Input {
   code?: string;
 }
 
-export type Callback<T extends Input> = (input: T, emit: (message: Output) => Promise<any>) => Promise<void> | void;
+export type Callback<T extends Input> = (input: T, emit: (message: Output) => Promise<unknown>) => Promise<void> | void;
 
 export interface Route {
   topic: string;
   eventName?: string;
-  callback: Callback<any>;
+  callback: Callback<Input>;
 }

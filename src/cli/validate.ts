@@ -96,7 +96,7 @@ export async function validateSchema(schemaFilePath: string, options: ValidateOp
   console.log(`✅ All schemas in ${path.basename(schemaFilePath)} are valid`);
 }
 
-async function validateBaseEventCompliance(schema: z.ZodSchema<any>): Promise<void> {
+async function validateBaseEventCompliance(schema: z.ZodSchema<unknown>): Promise<void> {
   // Create a test object that should pass BaseEventSchema validation
   const baseEventData = {
     id: 'test-id',
@@ -132,15 +132,15 @@ async function validateBaseEventCompliance(schema: z.ZodSchema<any>): Promise<vo
   }
 }
 
-function validateSchemaStructure(schema: z.ZodSchema<any>, schemaName: string): void {
+function validateSchemaStructure(schema: z.ZodSchema<unknown>, schemaName: string): void {
   // Check naming convention
   if (!schemaName.endsWith('Schema')) {
     console.warn(`  ⚠️  Schema name '${schemaName}' should end with 'Schema' by convention`);
   }
 
   // Check if schema is an object schema (most events should be)
-  const def = (schema as any)._def;
-  if (def && def.typeName !== 'ZodObject') {
+  const def = (schema as z.ZodSchema<unknown>)._def;
+  if (def && (def as { typeName: string }).typeName !== 'ZodObject') {
     console.warn(`  ⚠️  Schema '${schemaName}' is not an object schema. Most event schemas should be object schemas.`);
   }
 
