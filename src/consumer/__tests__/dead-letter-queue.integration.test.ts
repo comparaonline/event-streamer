@@ -7,6 +7,7 @@ import { SchemaRegistryProducer } from '../../producer/schema-registry-producer'
 import { DeadLetterQueueSchema } from '../../schemas/dead-letter-queue';
 import { SchemaRegistryClient } from '../../schema-registry/client';
 import { SchemaRegistryEventSchema } from '../../schemas';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
 const TEST_TIMEOUT = 90000000; // 30s
 
@@ -83,8 +84,7 @@ describe('Dead Letter Queue Integration', () => {
 
     // Register schemas
     const srClient = new SchemaRegistryClient({ url: SCHEMA_REGISTRY_URL });
-    const { zodToJsonSchema } = await import('zod-to-json-schema');
-    const registry = (srClient as any).registry;
+    const registry = srClient.registry;
     
     const subject = srClient.getSubjectFromTopicAndEventCode(mainTopic, eventCode);
     const jsonSchema = zodToJsonSchema(mergedSchema as any, { target: 'jsonSchema7' });

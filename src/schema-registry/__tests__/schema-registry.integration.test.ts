@@ -52,7 +52,7 @@ describe('Schema Registry Integration Tests', () => {
     uniqueEventCode = `UserRegistered-${timestamp}`;
     try {
       const { zodToJsonSchema } = await import('zod-to-json-schema');
-      const registry = (client as any).registry;
+      const registry = client.registry;
 
       // Register schema with topic-based subject
       const userRegisteredSubject = client.getSubjectFromTopicAndEventCode('users', uniqueEventCode);
@@ -182,7 +182,7 @@ describe('Schema Registry Integration Tests', () => {
       // Ensure schema is registered for this topic/event subject
       try {
         const { zodToJsonSchema } = await import('zod-to-json-schema');
-        const registry = (client as any).registry;
+        const registry = client.registry;
         const subject = client.getSubjectFromTopicAndEventCode(testTopic, uniqueEventCode);
         const jsonSchema = zodToJsonSchema(UserRegisteredSchema, { target: 'jsonSchema7' });
         await registry.register({ type: 'JSON', schema: JSON.stringify(jsonSchema) }, { subject });
@@ -243,7 +243,7 @@ describe('Schema Registry Integration Tests', () => {
       // Ensure schema is registered for this topic/event subject
       try {
         const { zodToJsonSchema } = await import('zod-to-json-schema');
-        const registry = (client as any).registry;
+        const registry = client.registry;
         const subject = client.getSubjectFromTopicAndEventCode(testTopic, uniqueEventCode);
         const jsonSchema = zodToJsonSchema(UserRegisteredSchema, { target: 'jsonSchema7' });
         await registry.register({ type: 'JSON', schema: JSON.stringify(jsonSchema) }, { subject });
@@ -333,7 +333,7 @@ describe('Schema Registry Integration Tests', () => {
       // Register a test schema first with topic-based naming
       try {
         const { zodToJsonSchema } = await import('zod-to-json-schema');
-        const registry = (client as any).registry;
+        const registry = client.registry;
         const testValidationSubject = client.getSubjectFromTopicAndEventCode('test', 'TestValidation');
         const testValidationJsonSchema = zodToJsonSchema(UserRegisteredSchema, { target: 'jsonSchema7' });
         await registry.register({ type: 'JSON', schema: JSON.stringify(testValidationJsonSchema) }, { subject: testValidationSubject });
@@ -346,5 +346,3 @@ describe('Schema Registry Integration Tests', () => {
     });
   });
 });
-
-

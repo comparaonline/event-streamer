@@ -54,7 +54,7 @@ describe('Simple Schema Registry Integration Test', () => {
       const { zodToJsonSchema } = await import('zod-to-json-schema');
       const jsonSchema = zodToJsonSchema(UserRegisteredSchemaRegistrySchema, { target: 'jsonSchema7' });
 
-      const registry = (client as any).registry;
+      const registry = client.registry;
       const registrationResult = await registry.register({ type: 'JSON', schema: JSON.stringify(jsonSchema) }, { subject: expectedSubject });
 
       const schemaId = typeof registrationResult === 'object' ? registrationResult.id : registrationResult;
@@ -131,5 +131,3 @@ describe('Simple Schema Registry Integration Test', () => {
     console.log('✅ Simple integration test completed successfully');
   }, 30000);
 });
-
-

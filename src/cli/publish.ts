@@ -134,7 +134,7 @@ async function publishSchema(client: SchemaRegistryClient, subject: string, sche
 }
 
 export async function registerSchemaToRegistry(client: SchemaRegistryClient, subject: string, schemaString: string): Promise<void> {
-  await client.aRegistry.register(
+  await client.registry.register(
     {
       type: SchemaType.JSON,
       schema: schemaString,

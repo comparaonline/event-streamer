@@ -37,7 +37,7 @@ describe('Schema Evolution and Compatibility Tests', () => {
     // Register schemas used in tests with topic-based subjects to match new naming
     try {
       const { zodToJsonSchema } = await import('zod-to-json-schema');
-      const registry = (client as any).registry;
+      const registry = client.registry;
 
       // Register schemas with topic-based subjects
       const userSubject = client.getSubjectFromTopicAndEventCode(`users-${testRunId}`, 'User');
@@ -201,7 +201,7 @@ describe('Schema Evolution and Compatibility Tests', () => {
       // Register schema for Event type first
       try {
         const { zodToJsonSchema } = await import('zod-to-json-schema');
-        const registry = (client as any).registry;
+        const registry = client.registry;
         const eventSubject = client.getSubjectFromTopicAndEventCode(`events-${testRunId}`, 'Event');
 
         // Create a simple schema for this test
@@ -255,7 +255,7 @@ describe('Schema Evolution and Compatibility Tests', () => {
 
       // Register schema for Message type first
       const { zodToJsonSchema } = await import('zod-to-json-schema');
-      const registry = (client as any).registry;
+      const registry = client.registry;
       
       const messageJsonSchema = zodToJsonSchema(MessageV2Schema, { target: 'jsonSchema7' });
       await registry.register({ type: 'JSON', schema: JSON.stringify(messageJsonSchema) }, { subject: messageSubject });
@@ -322,7 +322,7 @@ describe('Schema Evolution and Compatibility Tests', () => {
         
         // Register schema version i (evolving schema content)
         const { zodToJsonSchema } = await import('zod-to-json-schema');
-        const registry = (client as any).registry;
+        const registry = client.registry;
         
         const versionedItemJsonSchema = zodToJsonSchema(VersionedItemVSchema, { target: 'jsonSchema7' });
         await registry.register({ type: 'JSON', schema: JSON.stringify(versionedItemJsonSchema) }, { subject: versionedItemSubject });
@@ -359,5 +359,3 @@ describe('Schema Evolution and Compatibility Tests', () => {
     }, 25000);
   });
 });
-
-

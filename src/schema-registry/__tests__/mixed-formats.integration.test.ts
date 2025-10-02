@@ -53,7 +53,7 @@ describe('Mixed Format and Multiple Event Type Tests', () => {
       try {
         // Register schemas using direct Schema Registry API with topic-based subjects
         const { zodToJsonSchema } = await import('zod-to-json-schema');
-        const registry = (client as any).registry;
+        const registry = client.registry;
 
         const userEventSubject = client.getSubjectFromTopicAndEventCode(testTopic, 'UserEvent');
         const userEventJsonSchema = zodToJsonSchema(UserEventSchema, { target: 'jsonSchema7' });
@@ -200,7 +200,7 @@ describe('Mixed Format and Multiple Event Type Tests', () => {
       console.log(`📋 Registering schemas for routing test topic: ${testTopic}`);
       try {
         const { zodToJsonSchema } = await import('zod-to-json-schema');
-        const registry = (client as any).registry;
+        const registry = client.registry;
 
         const userEventSubject = client.getSubjectFromTopicAndEventCode(testTopic, 'UserEvent');
         const userEventJsonSchema = zodToJsonSchema(UserEventSchema, { target: 'jsonSchema7' });
@@ -317,7 +317,7 @@ describe('Mixed Format and Multiple Event Type Tests', () => {
       console.log(`📋 Registering schema for mixed format test topic: ${testTopic}`);
       try {
         const { zodToJsonSchema } = await import('zod-to-json-schema');
-        const registry = (client as any).registry;
+        const registry = client.registry;
 
         const userEventSubject = client.getSubjectFromTopicAndEventCode(testTopic, 'UserEvent');
         const userEventJsonSchema = zodToJsonSchema(UserEventSchema, { target: 'jsonSchema7' });
@@ -505,5 +505,3 @@ describe('Mixed Format and Multiple Event Type Tests', () => {
     }, 25000);
   });
 });
-
-
