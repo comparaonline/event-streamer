@@ -1,14 +1,14 @@
 import { SchemaRegistry, SchemaType } from '@kafkajs/confluent-schema-registry';
 import { z } from 'zod';
 import { SchemaRegistryConfig } from '../schemas';
-import Ajv, { ValidateFunction } from 'ajv';
+import Ajv, { ValidateFunction, ErrorObject } from 'ajv';
 import { createAjvInstance } from '../utils/ajv';
 
 interface SchemaInfo {
   id: number;
   version: number;
   subject: string;
-  schema: any; // Raw schema from registry
+  schema: unknown; // Raw schema from registry
 }
 
 interface CachedSchema extends SchemaInfo {
@@ -17,9 +17,7 @@ interface CachedSchema extends SchemaInfo {
 }
 
 export class SchemaRegistryClient {
-  public get aRegistry(): SchemaRegistry {
-    return this.registry;
-  }
+  public registry: SchemaRegistry;
   // Schema ID-based cache (immutable, no TTL)
   private schemaIdCache = new Map<number, CachedSchema>();
   // Subject-based cache (startup only, no TTL)
@@ -33,7 +31,7 @@ export class SchemaRegistryClient {
     // Initialize AJV for JSON schema validation
     this.ajv = createAjvInstance();
 
-    const registryOptions: any = {
+    const registryOptions: { host: string; auth?: { username: string; password: string } } = {
       host: config.url
     };
 
@@ -59,7 +57,7 @@ export class SchemaRegistryClient {
   
 
   // Producer method: Look up schema ID and encode data.
-  async encode(subject: string, schema: z.ZodSchema<any>, data: unknown): Promise<Buffer> {
+  async encode(subject: string, schema: z.ZodSchema<unknown>, data: unknown): Promise<Buffer> {
     try {
       // 1. Convert Zod schema to a canonical JSON schema string.
       const { zodToJsonSchema } = await import('zod-to-json-schema');
@@ -135,7 +133,7 @@ export class SchemaRegistryClient {
     value: unknown;
     schemaId: number;
     valid?: boolean;
-    validationErrors?: any[];
+    validationErrors?: ErrorObject[];
   }> {
     try {
       // Check if buffer has Schema Registry magic byte
@@ -174,7 +172,7 @@ export class SchemaRegistryClient {
    * Validate a decoded value against a schema by ID using the cached validator.
    * Returns { valid, errors }. If no validator is available, returns valid: true.
    */
-  async validateValue(schemaId: number, value: unknown): Promise<{ valid: boolean; errors: any[] }> {
+  async validateValue(schemaId: number, value: unknown): Promise<{ valid: boolean; errors: ErrorObject[] }> {
     try {
       const cachedSchema = await this.getSchemaForConsumer(schemaId);
       if (!cachedSchema.validator) {
@@ -185,7 +183,7 @@ export class SchemaRegistryClient {
       return { valid: !!isValid, errors: isValid ? [] : cachedSchema.validator.errors || [] };
     } catch (error) {
       // Consider validation inconclusive as a schema error
-      return { valid: false, errors: [{ message: String(error) }] };
+      return { valid: false, errors: [{ message: String(error) } as ErrorObject] };
     }
   }
 
@@ -220,41 +218,6 @@ export class SchemaRegistryClient {
     // Format: {topic}-{event-code} to avoid cross-topic collisions (no -value suffix)
     // Use same kebab-case logic as CLI and preserve existing hyphenation in eventCode
     return `${this.toKebabCase(topic)}-${this.toKebabCase(eventCode)}`;
-  }
-
-  // Register schema for testing purposes (clean naming)
-  async registerSchema(eventName: string, schema: any): Promise<number> {
-    try {
-      // Convert event name to kebab-case subject (no confusing -value suffix)
-      const subject = `${this.toKebabCase(eventName)}`;
-
-      // Convert Zod schema to JSON schema (flat structure for Schema Registry)
-      const { zodToJsonSchema } = await import('zod-to-json-schema');
-      const { SchemaRegistryEventSchema } = await import('../schemas');
-      // Merge business schema with internal SR envelope to include `source`
-      const mergedSchema =
-        schema && typeof (schema as any).merge === 'function' ? (SchemaRegistryEventSchema as any).merge(schema as any) : SchemaRegistryEventSchema;
-
-      const jsonSchema = zodToJsonSchema(mergedSchema as any, {
-        target: 'jsonSchema7'
-      });
-
-      // Register with Schema Registry
-      const registrationResult = await this.registry.register(
-        {
-          type: SchemaType.JSON,
-          schema: JSON.stringify(jsonSchema)
-        },
-        { subject }
-      );
-
-      // Extract schema ID from result
-      const schemaId = typeof registrationResult === 'object' ? registrationResult.id : registrationResult;
-
-      return schemaId as number;
-    } catch (error) {
-      throw new Error(`Failed to register schema for event ${eventName}: ${error}`);
-    }
   }
 
   // Helper method to convert to kebab-case (following MVP pattern)
