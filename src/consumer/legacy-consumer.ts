@@ -61,14 +61,14 @@ export class ConsumerRouter {
     }
   }
 
-  public add(topic: string, handler: Callback<unknown>): void;
-  public add(topics: string[], handler: Callback<unknown>): void;
-  public add(topic: string, eventName: string, handler: Callback<unknown>): void;
-  public add(topic: string, eventNames: string[], handler: Callback<unknown>): void;
-  public add(topics: string[], eventNames: string[], handler: Callback<unknown>): void;
-  public add(topics: string[], eventNames: string, handler: Callback<unknown>): void;
+  public add(topic: string, handler: Callback<Input>): void;
+  public add(topics: string[], handler: Callback<Input>): void;
+  public add(topic: string, eventName: string, handler: Callback<Input>): void;
+  public add(topic: string, eventNames: string[], handler: Callback<Input>): void;
+  public add(topics: string[], eventNames: string[], handler: Callback<Input>): void;
+  public add(topics: string[], eventNames: string, handler: Callback<Input>): void;
   public add(route: Route): void;
-  public add(param1: string | string[] | Route, param2?: string | string[] | Callback<unknown>, handler?: Callback<unknown>): void {
+  public add(param1: string | string[] | Route, param2?: string | string[] | Callback<Input>, handler?: Callback<Input>): void {
     const isRoute = typeof param1 === 'object' && !Array.isArray(param1);
     const topics = isRoute ? [param1.topic] : Array.isArray(param1) ? param1 : [param1];
     const eventNames = isRoute

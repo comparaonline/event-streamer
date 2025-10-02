@@ -182,7 +182,7 @@ export async function emit(
         output: {
           topic: param1,
           eventName: typeof param2 === 'string' ? param2 : undefined,
-          data: (typeof param2 === 'string' ? param3 : param2) || {},
+          data: (typeof param2 === 'string' ? param3 : param2) || {} as any,
         }
       };
     }

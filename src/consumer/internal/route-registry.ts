@@ -42,7 +42,7 @@ export class RouteRegistry {
   }
 
   addFallback<T = unknown>(topic: string, handler: EventHandler<T>): void {
-    this.fallbackByTopic.set(topic, handler as EventHandler<any>);
+    this.fallbackByTopic.set(topic, handler as EventHandler<unknown>);
   }
 
   getRoutes(topic: string, eventCode?: string): Route[] {
