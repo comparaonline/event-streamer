@@ -295,6 +295,23 @@ const consumer = new SchemaRegistryConsumerRouter({
 });
 ```
 
+**Requirements**
+- You must configure `schemaRegistry` and set `producer.useSchemaRegistry: true` in `setConfig`.
+- The consumer will now fail fast if these settings are missing when `errorStrategy: 'DEAD_LETTER'` is enabled.
+
+Example configuration:
+```ts
+import { setConfig } from '@comparaonline/event-streamer';
+
+setConfig({
+  host: 'kafka:9092',
+  appName: 'my-service',
+  consumer: { groupId: 'my-group' },
+  schemaRegistry: { url: 'http://schema-registry:8081' },
+  producer: { useSchemaRegistry: true }
+});
+```
+
 #### Ignore
 If you want the consumer to simply log the error and move on to the next message without stopping or forwarding, use the `IGNORE` strategy.
 
