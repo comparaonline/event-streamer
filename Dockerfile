@@ -1,4 +1,4 @@
-FROM node:14.17.0-alpine3.13 as build
+FROM node:18.18.0-alpine as build
 WORKDIR /code
 RUN apk --no-cache add ca-certificates \
   lz4-dev \
@@ -9,9 +9,9 @@ RUN apk --no-cache add ca-certificates \
   make \
   g++ \
   python3
-COPY package.json yarn.lock ./
-RUN yarn install
+COPY package.json pnpm-lock.yaml ./
+RUN corepack enable && corepack prepare pnpm@10.22.0 --activate && pnpm install --frozen-lockfile
 COPY tsconfig.json  ./
 
 COPY src/ ./src
-RUN yarn build
+RUN pnpm build
