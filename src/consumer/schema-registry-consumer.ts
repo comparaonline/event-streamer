@@ -3,6 +3,7 @@ import { Consumer, Kafka, KafkaMessage } from 'kafkajs';
 import { SchemaRegistryClient } from '../schema-registry/client';
 import { getConfig } from '../config';
 import { Strategy } from '../interfaces';
+import { DEFAULT_CONFIG } from '../constants';
 import { BaseEvent, EventHandler, EventMetadata } from '../schemas';
 import { Input } from '../interfaces';
 import { QueueManager, QueueConfig } from '../shared/queue-manager';
@@ -51,6 +52,17 @@ export class SchemaRegistryConsumerRouter {
    */
   private _initializeDependencies(): void {
     const config = getConfig();
+
+    // Enforce DLQ requirements early: requires Schema Registry configured and SR producer enabled
+    if (this.consumerConfig.errorStrategy === 'DEAD_LETTER') {
+      const hasSchemaRegistry = !!config.schemaRegistry;
+      const hasSrProducer = !!config.producer?.useSchemaRegistry;
+      if (!hasSchemaRegistry || !hasSrProducer) {
+        throw new Error(
+          "DEAD_LETTER errorStrategy requires Schema Registry (config.schemaRegistry) and producer.useSchemaRegistry=true"
+        );
+      }
+    }
 
     if (config.schemaRegistry) {
       this.schemaRegistryClient = new SchemaRegistryClient(config.schemaRegistry);
@@ -127,11 +139,14 @@ export class SchemaRegistryConsumerRouter {
    */
   private _initializeQueueManager(): void {
     const config = getConfig();
-    const strategy = this.consumerConfig.strategy || config.consumer?.strategy || 'topic';
+    const strategy = this.consumerConfig.strategy || config.consumer?.strategy || DEFAULT_CONFIG.strategy;
 
     if (strategy === 'topic') {
       const queueConfig: QueueConfig = {
-        maxMessagesPerTopic: this.consumerConfig.maxMessagesPerTopic || config.consumer?.maxMessagesPerTopic || 10,
+        maxMessagesPerTopic:
+          this.consumerConfig.maxMessagesPerTopic ??
+          config.consumer?.maxMessagesPerTopic ??
+          DEFAULT_CONFIG.maxMessagesPerTopic,
         maxMessagesPerSpecificTopic: this.consumerConfig.maxMessagesPerSpecificTopic || config.consumer?.maxMessagesPerSpecificTopic
       };
 
@@ -172,7 +187,7 @@ export class SchemaRegistryConsumerRouter {
    */
   private async _runMessageProcessingLoop(): Promise<void> {
     const config = getConfig();
-    const processingStrategy = this.consumerConfig.strategy || config.consumer?.strategy || 'topic';
+    const processingStrategy = this.consumerConfig.strategy || config.consumer?.strategy || DEFAULT_CONFIG.strategy;
 
     await this.consumer?.run({
       eachMessage: async ({ topic, message, partition }) => {
