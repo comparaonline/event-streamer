@@ -1,5 +1,7 @@
 services:
   app:
+    profiles:
+      - app
     build:
       context: .
       target: build
