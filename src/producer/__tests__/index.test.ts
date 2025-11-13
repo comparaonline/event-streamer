@@ -1,4 +1,5 @@
 import { CompressionTypes, Partitioners } from 'kafkajs';
+import { vi } from 'vitest';
 import { clearEmittedEvents, closeAll, emit, getEmittedEvents, getParsedEmittedEvents, getProducer } from '..';
 import { setConfig } from '../../config';
 import { handlerToCall } from '../../test/helpers';
@@ -34,8 +35,8 @@ describe('producer', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         const eventName = 'EventCode';
         const testDate = '2022-12-09 00:00:00Z';
@@ -87,8 +88,8 @@ describe('producer', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         const eventName = 'TopicA';
 
@@ -124,8 +125,8 @@ describe('producer', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         const eventName = 'EventCode';
 
@@ -181,8 +182,8 @@ describe('producer', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         // act
         await emit([
@@ -244,8 +245,8 @@ describe('producer', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         // act
         await emit('topic-a', {
@@ -279,8 +280,8 @@ describe('producer', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         // act
         await emit('topic-a', [
@@ -327,8 +328,8 @@ describe('producer', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         // act
         await emit('topic-a', 'event-name-a', {
@@ -369,10 +370,12 @@ describe('producer', () => {
           }
         });
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         // act
+        const prevHostname = process.env.HOSTNAME;
+        process.env.HOSTNAME = appName;
         await emit('topic-a', 'event-name-a', [
           {
             id: 'topic-a-1'
@@ -407,6 +410,7 @@ describe('producer', () => {
         });
 
         expect(disconnectSpy).not.toHaveBeenCalled();
+        process.env.HOSTNAME = prevHostname;
         sendSpy.mockClear();
       },
       TEST_TIMEOUT
@@ -417,8 +421,8 @@ describe('producer', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         // act
         await emit({

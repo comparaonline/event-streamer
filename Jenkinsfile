@@ -11,7 +11,7 @@ pipeline {
     stage('Prepare') {
       steps {
         nvm(env.NODE_VERSION) {
-          sh 'yarn install'
+          sh 'pnpm install'
         }
       }
     }
@@ -24,7 +24,7 @@ pipeline {
       }
       steps {
         nvm(env.NODE_VERSION) {
-          sh 'yarn build'
+          sh 'pnpm build'
         }
       }
     }
