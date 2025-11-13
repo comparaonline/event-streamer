@@ -10,9 +10,9 @@ This library is not intended to consume two different clusters at the same time,
 
 ## Installation
 
-yarn:
+pnpm:
 ```
-$ yarn add @comparaonline/event-streamer
+$ pnpm add @comparaonline/event-streamer
 ```
 
 ## Initialization
@@ -434,7 +434,7 @@ describe('Testing some handlers', () => {
 
 ### Node version
 
-You need node version greater than or equal to v14.17.0. A good choice for Dockerfile is `node:14.17.0-alpine3.13` at least than you already want to go with `node:16.13-alpine3.15`
+You need Node.js version greater than or equal to v18.18.0. A good choice for Dockerfile is `node:18-alpine`.
 
 #### Known issues after update node
 
