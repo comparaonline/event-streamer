@@ -1,3 +1,13 @@
+# Build artifacts
+build/
+
+# Coverage
+coverage/
+
+# OS/editor junk
+.DS_Store
+.vscode/
+
 # Generated vitest build artifacts
 /vitest.config.js
 /vitest.config.d.ts

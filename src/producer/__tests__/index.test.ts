@@ -534,6 +534,9 @@ describe('producer', () => {
         onlyTesting: true
       });
     });
+    beforeEach(() => {
+      MockDate.set('2022-12-08T00:00:00.000Z');
+    });
 
     it('should emit pushing the event to the array', async () => {
       // arrange
