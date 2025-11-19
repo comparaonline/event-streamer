@@ -11,7 +11,7 @@ pipeline {
     stage('Prepare') {
       steps {
         nvm(env.NODE_VERSION) {
-          sh 'pnpm install'
+          sh 'corepack enable && corepack prepare pnpm@10.22.0 --activate && pnpm --version && pnpm install --frozen-lockfile'
         }
       }
     }
@@ -24,7 +24,7 @@ pipeline {
       }
       steps {
         nvm(env.NODE_VERSION) {
-          sh 'pnpm build'
+          sh 'corepack enable && corepack prepare pnpm@10.22.0 --activate && pnpm build'
         }
       }
     }
@@ -55,7 +55,7 @@ pipeline {
 
 def published_version() {
   return sh (
-      script: 'npm view $(jq -r .name < package.json) version',
+      script: 'corepack enable && corepack prepare pnpm@10.22.0 --activate && pnpm view $(jq -r .name < package.json) version',
       returnStdout: true
   ).trim()
 }
@@ -72,7 +72,7 @@ def new_version() {
 }
 
 def publish() {
-  sh 'npm publish'
+  sh 'corepack enable && corepack prepare pnpm@10.22.0 --activate && pnpm publish'
   sh "git tag -a 'v${package_version()}' -m 'npm version v${package_version()}'"
   sh "git push origin 'v${package_version()}'"
 }
