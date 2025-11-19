@@ -72,7 +72,8 @@ def new_version() {
 }
 
 def publish() {
-  sh 'pnpm publish'
+  sh 'git status --porcelain || true'
+  sh 'pnpm publish --no-git-checks'
   sh "git tag -a 'v${package_version()}' -m 'npm version v${package_version()}'"
   sh "git push origin 'v${package_version()}'"
 }
