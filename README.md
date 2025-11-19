@@ -2,478 +2,408 @@
 
 ## Description
 
-Event Streamer is a library for connect micro services based on kafka event communication.
+Event Streamer is a library for connecting microservices using Kafka, with first-class support for Confluent Schema Registry.
 
-This is a wrap of [kafka-js](https://github.com/tulios/kafkajs) simplifying connection, errors and topic with subject (event name, event code).
-
-This library is not intended to consume two different clusters at the same time, but you can produce in two or more clusters at the same time.
+This is a wrapper around [kafka-js](https://github.com/tulios/kafkajs) and [@kafkajs/confluent-schema-registry](https://github.com/kafkajs/confluent-schema-registry), simplifying connections, error handling, and schema management.
 
 ## Installation
 
-yarn:
-```
-$ yarn add @comparaonline/event-streamer
+```bash
+pnpm add @comparaonline/event-streamer
 ```
 
 ## Initialization
 
-Before use it, it should be initialized calling the method `setConfig`
+Before using the library, you must initialize it with `setConfig`. This function sets up a **global, singleton-like configuration object** that all library components (producers, consumers, etc.) will access internally.
 
-### Basic producer configuration
+**It is crucial to call this function once at your application's entry point**, before any other library features are used.
 
-With this it will be enough to produce any message
+### How It Works
+When you call `setConfig`, the configuration is stored in a private, module-level variable. Library components like `SchemaRegistryProducer` or `SchemaRegistryConsumerRouter` don't need you to pass the configuration to their constructors; instead, they call an internal `getConfig()` function to retrieve the settings you provided. This design simplifies usage by avoiding the need to pass configuration objects throughout your codebase.
 
 ```ts
-import { setConfig } from '@comparaonline/events-streamer'
+// In your application's main entry file (e.g., index.ts)
+import { setConfig } from '@comparaonline/event-streamer';
 
 setConfig({
-  host: 'kafka:9092'
-})
+  host: 'kafka:9092', // Kafka broker addresses
+  consumer: {
+    groupId: 'my-consumer-group'
+  },
+  schemaRegistry: {
+    url: 'http://schema-registry:8081'
+  }
+});
+
+// Now you can import and use producers/consumers anywhere else in your app
+// without needing to configure them again.
 ```
 
-### Basic consumer configuration
+### Configuration Options
 
-The only difference if you also need to consume events is that consumer group id is **required**
+| Key              | Type                                              | Description                                                                                             | Default                  |
+| ---------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `host`           | `string`                                          | **Required.** Comma-separated list of Kafka broker hosts.                                               | -                        |
+| `appName`        | `string`                                          | The name of your application, used for logging and metadata.                                            | `unknown`                |
+| `consumer`       | `object`                                          | Consumer-specific settings. `groupId` is required to run a consumer.                                    | -                        |
+| `producer`       | `object`                                          | Producer-specific settings.                                                                             | -                        |
+| `schemaRegistry` | `object`                                          | Schema Registry settings. `url` is required to use the Schema Registry producer/consumer.               | -                        |
+| `onlyTesting`    | `boolean`                                         | Set to `true` in a test environment to disable real Kafka connections and enable mock functionalities. | `false`                  |
+
+
+---
+
+## CLI for Schema Management
+
+The library includes a CLI for managing your Zod schemas with the Schema Registry.
+
+### 1. Define Your Schemas
+
+Create schema definition files (e.g., `./events/user-registered.schema.ts`). Schemas must be defined with `zod` and extend the `BaseEventSchema` to ensure they have the required baseline properties. It's a best practice to include a factory function to easily create valid event objects.
 
 ```ts
-import { setConfig } from '@comparaonline/events-streamer'
+// ./events/user-registered.schema.ts
+import { z } from 'zod';
+import { BaseEventSchema, createBaseEvent } from '@comparaonline/event-streamer';
+
+// Define the schema for your event
+export const UserRegisteredSchema = BaseEventSchema.extend({
+  userId: z.string().uuid(),
+  email: z.string().email(),
+});
+
+// Export the inferred type for type safety
+export type UserRegistered = z.infer<typeof UserRegisteredSchema>;
+
+// Create a factory function to build the event
+export function createUserRegistered(data: Partial<UserRegistered>): UserRegistered {
+  return {
+    ...createBaseEvent({ code: 'UserRegistered' }), // Provides createdAt
+    appName: 'my-service-name',
+    ...data,
+  } as UserRegistered;
+}
+```
+
+### Schema Organization Best Practices
+
+While you can place all your schema files in a single directory, we recommend organizing them by **topic**. This approach scales better and keeps related event schemas grouped together.
+
+A recommended structure looks like this:
+
+```
+src/
+└── events/
+    ├── users/
+    │   ├── user-registered.schema.ts
+    │   └── user-updated.schema.ts
+    └── orders/
+        ├── order-created.schema.ts
+        └── order-shipped.schema.ts
+```
+
+With this structure, you can easily publish all schemas for a specific topic:
+
+```bash
+# Publish all schemas related to the 'users' topic
+pnpm event-streamer-cli publish --events-dir ./src/events/users --topic users ...
+
+# Or publish all schemas for all topics at once
+pnpm event-streamer-cli publish --events-dir ./src/events --topic <default-topic> ...
+```
+
+The CLI's default file discovery (`**/*.schema.ts`) is designed to work perfectly with this nested structure.
+
+### 2. CLI Commands
+
+- **`init`**: Scaffolds a new event schema structure in your project by creating a `./src/events` directory with an example schema and a README.
+  - **Usage**: `pnpm event-streamer-cli init`
+
+- **`generate-example <event-code>`**: Creates a new example schema file to get you started.
+  - **Usage**: `pnpm event-streamer-cli generate-example user-created`
+
+- **`validate <schema-file-path>`**: Validates a single Zod schema file to ensure it's correctly structured.
+  - **Usage**: `pnpm event-streamer-cli validate ./events/user-registered.schema.ts`
+
+- **`publish`**: Publishes all schemas from a directory to the Schema Registry.
+  - **Usage**: `pnpm event-streamer-cli publish --events-dir ./events --registry-url http://localhost:8081 --topic <topic-name>`
+  - **Discovery by Default**: By default, the CLI looks for files matching `**/*.schema.{ts,js,mjs,cjs}` and ignores test/fixture folders and `index.*` files.
+  - **Subject Naming**: Schema subjects are created as `<topic>-<event-code>`, where `event-code` is the kebab-cased name of the exported Zod schema variable (e.g., `UserRegisteredSchema` becomes `user-registered`).
+  - **Options**:
+    - `--topic <name>`: **Required.** The topic name used to derive the schema subject.
+    - `--registry-auth <user:pass>`: For Schema Registry instances that require basic authentication.
+    - `--dry-run`: Simulates the publish process without making any actual changes.
+    - `--force`: Forces the registration of a new schema version even if the schema has not changed.
+  - **Advanced Options**:
+    | Flag                  | Description                                                                  | Default                               |
+    | --------------------- | ---------------------------------------------------------------------------- | ------------------------------------- |
+    | `--include <globs...>`  | Override the default file search patterns.                                   | `**/*.schema.{ts,js,mjs,cjs}`         |
+    | `--exclude <globs...>`  | Add glob patterns to exclude files.                                          | (several, e.g., `**/__tests__/**`)    |
+    | `--allow-index`       | Allow `index.ts` or `index.js` files to be processed.                        | `false`                               |
+    | `--concurrency <n>`   | The number of schemas to publish in parallel.                                | `4`                                   |
+    | `--verbose`           | Enable detailed logging for debugging.                                       | `false`                               |
+    | `--bail`              | Stop the publishing process on the first file that fails.                    | `false`                               |
+
+---
+
+## Modern Usage (Schema Registry)
+
+This is the recommended approach for producing and consuming events.
+
+### Producing Events
+
+Use the `SchemaRegistryProducer` to automatically handle schema registration, validation, and encoding.
+
+#### Note on Singleton Behavior
+The `SchemaRegistryProducer` is a **singleton**. The first time you create an instance with `new SchemaRegistryProducer()`, it will establish a persistent connection to Kafka. Every subsequent call to `new SchemaRegistryProducer()` anywhere in your application will return the *exact same instance* and reuse that connection.
+
+You should create it once and share it or simply call `new SchemaRegistryProducer()` wherever you need it, knowing it's an efficient operation.
+
+#### Basic Usage
+Use your factory function to create the event payload. The `eventCode` and `schema` parameters are **required**.
+
+```ts
+import { SchemaRegistryProducer } from '@comparaonline/event-streamer';
+import { UserRegisteredSchema, createUserRegistered } from './events/user-registered.schema';
+
+const producer = new SchemaRegistryProducer();
+
+async function sendUserRegistration() {
+  // Use the factory function to create a complete and valid event
+  const eventData = createUserRegistered({
+    userId: 'some-uuid-v4',
+    email: 'test@example.com',
+  });
+
+  await producer.emitWithSchema({
+    topic: 'users',
+    eventCode: 'UserRegistered', // **Required.** Used to derive the subject name.
+    data: eventData,
+    schema: UserRegisteredSchema  // **Required.** The Zod schema for validation.
+  });
+}
+```
+
+#### Graceful Shutdown
+The singleton producer maintains an open connection to Kafka. In a long-running application (like a web server or a microservice), it's important to close this connection when the application is shutting down to prevent message loss.
+
+You can do this by calling the `disconnect` method.
+
+```ts
+// In your application's shutdown hook
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM signal received: closing Kafka producer');
+  const producer = new SchemaRegistryProducer(); // Gets the existing instance
+  await producer.disconnect();
+  process.exit(0);
+});
+```
+
+### Consuming Events
+
+Use the `SchemaRegistryConsumerRouter` to handle both Schema Registry-encoded messages and legacy JSON messages gracefully.
+
+```ts
+import { SchemaRegistryConsumerRouter } from '@comparaonline/event-streamer';
+import { UserRegisteredSchema, UserRegistered } from './events/user-registered.schema';
+
+const consumer = new SchemaRegistryConsumerRouter();
+
+// Handler for valid messages (Schema Registry or JSON)
+consumer.add({
+  topic: 'users',
+  eventCode: 'UserRegistered',
+  schema: UserRegisteredSchema,
+  handler: (data: UserRegistered, metadata) => {
+    console.log('Received a valid UserRegistered event:', data);
+  }
+});
+
+// Fallback handler for all other messages on the topic
+consumer.addFallback({
+  topic: 'users',
+  handler: (data, metadata) => {
+    console.warn('Received a message on the fallback handler:', data);
+  }
+});
+
+consumer.start();
+```
+
+### Advanced Consumer Configuration
+
+#### Processing Strategies and Backpressure
+
+The `SchemaRegistryConsumerRouter` can process messages in two ways, controlled by the `strategy` option. This is critical for managing how your consumer handles high volumes of messages.
+
+- **`strategy: 'one-by-one'`**: This is the simplest strategy. The consumer will process one message to completion before fetching the next one. It's safe and predictable but offers no concurrency.
+
+- **`strategy: 'topic'` (Default)**: This strategy processes messages concurrently, with a separate queue for each topic. This provides much higher throughput but requires you to manage backpressure to avoid overwhelming your service with too many in-flight messages.
+
+To control memory usage and prevent your application from crashing under heavy load, you can set limits on the size of these in-memory queues.
+
+- **`maxMessagesPerTopic`**: A global limit for the maximum number of messages being processed concurrently for any single topic. If this limit is reached, the consumer will pause fetching new messages for that topic until some of the current messages are finished.
+- **`maxMessagesPerSpecificTopic`**: An object to override the global limit for specific, named topics.
+
+**Example Configuration:**
+
+```ts
+import { SchemaRegistryConsumerRouter } from '@comparaonline/event-streamer';
+
+const consumer = new SchemaRegistryConsumerRouter({
+  // Enable the concurrent topic strategy (this is the default)
+  strategy: 'topic',
+
+  // Set a global limit of 50 concurrent messages for any topic.
+  maxMessagesPerTopic: 50,
+
+  // Override the global limit for specific topics.
+  maxMessagesPerSpecificTopic: {
+    // This is a high-volume topic, so we use a smaller queue.
+    'real-time-logs': 20,
+    // This topic has lightweight messages, so we can handle more.
+    'user-clicks': 200,
+  },
+
+  // For new consumer groups, start reading from the beginning of the topic.
+  fromBeginning: true,
+});
+
+// Routes are added as normal
+consumer.add({ topic: 'real-time-logs', ... });
+consumer.add({ topic: 'user-clicks', ... });
+consumer.add({ topic: 'another-topic', ... }); // This will use the default limit of 50
+
+consumer.start();
+```
+
+---
+
+## Features
+
+### Error Handling Strategies
+
+Both the `SchemaRegistryConsumerRouter` and the legacy `ConsumerRouter` support strategies for handling messages that fail during processing. To enable a strategy, provide an `errorStrategy` in the consumer configuration.
+
+#### Dead Letter Queue (DLQ)
+If you want to isolate failing messages for later analysis, use the `DEAD_LETTER` strategy. This will catch any error from your handler and forward the original message, along with error details, to a specified `deadLetterTopic`.
+
+```ts
+const consumer = new SchemaRegistryConsumerRouter({
+  errorStrategy: 'DEAD_LETTER',
+  deadLetterTopic: 'my-service-dlq'
+});
+```
+
+**Requirements**
+- You must configure `schemaRegistry` and set `producer.useSchemaRegistry: true` in `setConfig`.
+- The consumer will now fail fast if these settings are missing when `errorStrategy: 'DEAD_LETTER'` is enabled.
+
+Example configuration:
+```ts
+import { setConfig } from '@comparaonline/event-streamer';
 
 setConfig({
   host: 'kafka:9092',
-  consumer: {
-    groupId: 'my-group-id'
-  }
-})
+  appName: 'my-service',
+  consumer: { groupId: 'my-group' },
+  schemaRegistry: { url: 'http://schema-registry:8081' },
+  producer: { useSchemaRegistry: true }
+});
 ```
 
-### Full configuration
-
-| Prop | Type | Description | Use |
-| --- | --- | --- | --- |
-| host | string | Kafka broker, it also can be separated using colons (Eg: `kafka-broker-1:9092,kafka-broker-2:9092`) | **required** |
-| producer | Object | Object | *optional* |
-| producer.additionalHosts | string[] | Additional hosts to send a message. This is useful if you need to send information to two or more different clusters | *optional* |
-| producer.connectionTTL | number | Time in ms that the connection will be keep open after last message was sent | *optional* <br/> default: 5000 |
-| producer.retryOptions | RetryOptions (Object) | kafka-node retry options: retries, factor, minTimeout, maxTimeout and randomize | *optional* |
-| producer.compressionType | CompressionTypes (KafkaJS) | Set compression type. Only None and GZIP are available without any additional implementation | *optional* <br/> default: CompressionTypes.NONE |
-| producer.idempotent | boolean | Set message to only be sent once. **EXPERIMENTAL** | *optional*  <br/> default: false |
-| producer.partitioners | DefaultPartitioner/LegacyPartitioner | Set how message will be sended to each partition | *optional* <br/> default: LegacyPartitioner |
-| consumer | Object | Object | *required to start consumer* |
-| consumer.groupId | string | Kafka group id | **required** |
-| consumer.strategy | Strategy ('topic'/'one-by-one') | Chose if you want to create topic queues or process all the messages in a single queue. <br/> *topic*: each topic will have an exclusive queue and fetch messages from kafka based on queue size. When queue is full it will stop fetching for this specific topic and resume it when some handler ends. **Lag can be caused if queue size is too small** <br/>  *one-by-one*: all the message will be handle in a single queue and it will need to wait previous message handler to finish before start to process a new message | *optional* <br/> default: 'topic'
-| consumer.maxMessagesPerTopic | number/'unlimited' | Set global queue size | *optional* <br/> default: 20 |
-| consumer.maxMessagesPerSpecificTopic | Object (key: string, value: maxMessagesPerTopic) | Set specific topic queue size. You can also use 'unlimited' for a specific topic | *optional* <br/> default: empty object |
-| debug | false or Debug | Increase library logging based on Debug level | *optional* default: false |
-| kafkaJSLogs | kafkajs.logLevel | Set kafkajs logs for connection, commits and streamings | *optional* default: kafkajs.logLevel.NOTHING |
-| onlyTesting | boolean | Avoid kafka server communication, instead of send/consume messages it will be enable extra methods for unit testing | *optional* <br/> default: false
-
-## Usage
-
-### Event subject
-
-Event subject, event code or event name is intended to allow send multiple messages into the same topic but handling them in different ways.
-
-*Produced* messages will be delivered as JSON string with an extra property called 'code'. This `code` will be the event subject. Subject will be always passed to UpperCamelCase replacing `-_ ` and transforming the first character after each of them into upper case. Eg:
-
-* `my-event-name`
-* `my event name`
-* `my_event_name`
-* `myEventName`
-
-All this will be transformed to `MyEventName`
-
-If a subject is not provided then the topic will be transformed to UpperCamelCase and sended as subject.
-
-*Consumed* messages with invalid JSON will be ignored. If the messages is a valid JSON but without `code` property it will be only handled by global listeners.
-
-### Producing
-
-Event streamer will create and close kafka client on demand to avoid keeping open connections, this connection will be reused until TTL is reached (TTL is renewed after each execution).
-Produced events will be delivered the `data` object into a single topic as JSON string with the corresponding subject. It will also add `appName` and `createdAt` properties
-
-#### App name
-
-`appName` is a first-level property with sender name. `event-streamer` has this options to set appName
-1. Sending `appName` property on messages
-2. Perform `event-streamer` initialization with `appName` property
-3. Read `consumerGroupId` from `event-streamer` initialization and use it as `appName`
-4. Read `process.env.HOSTNAME`. This is automatically setup on K8S deployment
-5. Set `unknown` string
-
-#### Message date
-
-every message should have a property `createdAt`, it is message creation date on ISO UTC format. `event-streamer` add this property automatically
-
-#### Single event
+#### Ignore
+If you want the consumer to simply log the error and move on to the next message without stopping or forwarding, use the `IGNORE` strategy.
 
 ```ts
-import { emit } from '@comparaonline/event-streamer'
-
-// Remember to call setConfig before use this method
-
-async function main () {
-  await emit({
-    topic: 'my-topic',
-    eventName: 'my-event-name',
-    data: { firstName: 'John' }
-  })
-  
-  // Topic: my-topic Message: { "firstName": "John", "code": "MyEventName", "createdAt": "2024-03-07 18:41:54Z", "appName": "test" }
-
-}
+const consumer = new SchemaRegistryConsumerRouter({
+  errorStrategy: 'IGNORE'
+  // No deadLetterTopic is needed
+});
 ```
 
-#### Single event with alternative syntax
+---
 
-```ts
-import { emit } from '@comparaonline/event-streamer'
+## Running Tests
 
-async function main () {
-  await emit('my-topic', 'my-event-name', { firstName: 'John' })
-  // Topic: my-topic Message: { "firstName": "John", "code": "MyEventName", "createdAt": "2024-03-07 18:41:54Z", "appName": "test" }
-
-  await emit('my-topic', { firstName: 'John' })
-  // Topic: my-topic Message: { "firstName": "John", "code": "MyTopic", "createdAt": "2024-03-07 18:41:54Z", "appName": "test" }
-}
-```
-
-#### Two events to the same topic
-
-```ts
-import { emit } from '@comparaonline/event-streamer'
-
-async function main () {
-  await emit({
-    topic: 'my-topic',
-    eventName: 'my-event-name',
-    data: [{ firstName: 'John' }, { firstName: 'Jane' }]
-  })
-  
-  // Topic: my-topic Message: { "firstName": "John", "code": "MyEventName", "createdAt": "2024-03-07 18:41:54Z", "appName": "test" }
-  // Topic: my-topic Message: { "firstName": "Jane", "code": "MyEventName", "createdAt": "2024-03-07 18:41:54Z", "appName": "test" }
-
-}
-```
-
-#### Two events to two different topics
-
-```ts
-import { emit } from '@comparaonline/event-streamer'
-
-async function main () {
-  await emit(
-    [
-      {
-        topic: 'my-topic-a',
-        eventName: 'my-event-name',
-        data: { firstName: 'John' }
-      },
-      {
-        topic: 'my-topic-b',
-        eventName: 'my-event-name',
-        data: { firstName: 'Jane' }
-      }
-    ]
-  )
-  
-  // Topic: my-topic-a Message: { "firstName": "John", "code": "MyEventName", "createdAt": "2024-03-07 18:41:54Z", "appName": "test" }
-  // Topic: my-topic-b Message: { "firstName": "Jane", "code": "MyEventName", "createdAt": "2024-03-07 18:41:54Z", "appName": "test" }
-}
-```
-
-#### Single event without subject
-
-```ts
-import { emit } from '@comparaonline/event-streamer'
-
-async function main () {
-  await emit({
-    topic: 'my-topic',
-    data: { firstName: 'John' }
-  })
-  
-  // Topic: my-topic Message: { "firstName": "John", "code": "MyTopic", "createdAt": "2024-03-07 18:41:54Z", "appName": "test" }
-}
-```
-
-#### Single event to a different host/cluster
-
-```ts
-import { emit, setConfig } from '@comparaonline/event-streamer'
-
-setConfig({
-  host: 'kafka-gpc:9092',
-  producer: {
-    additionalHosts: ['kafka-aws:9092']
-  }
-})
-
-async function main () {
-  await emit({
-    topic: 'my-topic',
-    data: { firstName: 'John' }
-  }, 'kafka-azure:9092')
-  
-  // Cluster: kafka-azure:9092
-  // Topic: my-topic Message: { "firstName": "John", "code": "MyTopic" }
-}
-```
-
-#### Not allowed by subject
-
-```ts
-import { emit } from '@comparaonline/event-streamer'
-
-async function main () {
-  await emit({
-    topic: 'my-topic',
-    data: { firstName: 'John', code: 'Code' }
-  }) // Throw Error: 'Reserved object keyword "code" inside data'
-}
-```
-
-```ts
-import { emit } from '@comparaonline/event-streamer'
-
-async function main () {
-  await emit({
-    topic: 'my-topic',
-    data: { firstName: 'John' },
-    eventName: ''
-  }) // Throw Error: 'Invalid message code'
-}
-```
-
-### Consuming
-
-You will need at least 1 topic to listen. It's important to know size of messages that will be fetched because this will determine how many messages will be processed at the same time. Eg:
-
-| Avg message | fetchSizeInMB | Concurrent actions |
-| --- | --- | --- |
-| 200KB | 0.5 | 2 |
-| 300KB | 0.5 | 1 |
-| 200KB | 3 (default) | 14/15 |
-| 600KB | 0.5 | consumer stuck |
-
-Data object delivered to the handler (first parameter) will be an object that includes `code` property
-
-Emit function delivered to the handler (second parameter) is the same `emit` function used to produce events, but you won't need to import it
-
-```ts
-import { ConsumerRouter } from '@comparaonline/event-streamer'
-
-// Remember to call setConfig with a groupId
-
-async function main () {
-  const consumer = new ConsumerRouter()
-
-  // This handler will be executed with every message from 'topic-a', even if they don't have 'code' property
-  consumer.add('topic-a', (data, emit) => { console.log(1) })
-
-  // This handler will be executed only with messages from 'topic-b' with property 'code' equal to 'EventNameB'
-  consumer.add('topic-b', 'event-name-b', (data, emit) => { console.log(2) })
-
-  // This handler will be executed with message from 'topic-c' with property 'code' equal to 'EventNameC1' or 'EventNameC2'
-  consumer.add('topic-c', ['event-name-c-1', 'event-name-c-2'], (data, emit) => { console.log(3) }) 
-
-  // This handler will be executed with every message from 'topic-d' or 'topic-e'
-  consumer.add(['topic-d', 'topic-e'], (data, emit) => { console.log(4) })
-
-  // This handler will be executed with messages from 'topic-e' or 'topic-f' with property 'code' equal to 'MyEventName'
-  consumer.add(['topic-e', 'topic-f'], 'my-event-name', (data, emit) => { console.log(5) })
-
-  // This handler will be executed with messages from 'topic-g' and 'topic-h' with property 'code' equal to 'MyEventName1' or 'MyEventName2'
-  consumer.add(['topic-g', 'topic-h'], ['my-event-name-1', 'my-event-name-2'], (data, emit) => { console.log(6) })
-
-  // Alternative syntax 
-
-  consumer.add({
-    topic: 'topic-i',
-    eventName: 'my-event-name-i', // this is optional
-    callback: (data, emit) => { console.log(6) }
-  })
-  
-  await consumer.start()
-}
-```
-
-#### Input / Output example
-
-| topic | code | log |
-| --- | --- | --- |
-| topic-a | *undefined* | 1 |
-| topic-a | 'TopicA' | 1 |
-| topic-a | 'MyEventName' | 1 |
-| topic-b | 'EventNameA' | --- |
-| topic-b | 'EventNameB' | 2 |
-| topic-b | 'TopicB' | --- |
-| topic-c | EventNameC1 | 3 |
-| topic-c | EventNameC2 | 3 |
-| topic-c | EventNameC3 | --- |
-| topic-d | *undefined* | 4 |
-| topic-d | 'TopicD' | 4 |
-| topic-d | 'MyEventName' | 4 |
-| topic-e | *undefined* | 4 |
-| topic-e | 'TopicE' | 4 |
-| topic-e | 'MyEventName' | 4, 5 |
-| topic-f | *undefined* | --- |
-| topic-f | 'TopicF' | --- |
-| topic-f | 'MyEventName' | 5 |
-| topic-g | *undefined* | --- |
-| topic-g | 'TopicG' | --- |
-| topic-g | 'MyEventName1' | 6 |
-| topic-g | 'MyEventName2' | 6 |
-| topic-h | *undefined* | --- |
-| topic-h | 'TopicH' | --- |
-| topic-h | 'MyEventName1' | 6 |
-| topic-h | 'MyEventName2' | 6 |
-
-
-## Testing
-
-When you need to perform unit/integration tests but you are not intended to connect with a real kafka server then, you can simply use it offline.
-
-To do this call `setConfig` with `onlyTesting` on **true** on your jest setup. This will be enable you to use extra methods
+### Prerequisites
+- Docker and Docker Compose
 
 ### Setup
 
+The integration tests require live Kafka, Zookeeper, and Schema Registry instances. A `docker-compose.yml` file is provided to easily spin up the necessary services.
+
+1.  **Start the services:**
+    ```sh
+    docker-compose up -d
+    ```
+
+2.  **Run the tests:**
+    - **Unit tests:** `pnpm test`
+    - **Integration tests:** `pnpm test:integration`
+    - **All tests:** `pnpm test:all`
+
+3.  **Stop the services:**
+    ```sh
+    docker-compose down
+    ```
+
+### Testing in Your Application
+
+When running tests for your own application, set `onlyTesting: true` in your configuration. This prevents real Kafka connections and enables mock capabilities.
+
 ```ts
-// src/test/setup/event-streamer.ts
-import { setConfig } from '@comparaonline/event-streamer'
+// In your jest.setup.js or test file
+import { setConfig } from '@comparaonline/event-streamer';
 
 setConfig({
-  host: 'any-host',
-  consumer: {
-    groupId: 'fake-group-id'
-  },
+  host: 'fake-kafka:9092',
+  consumer: { groupId: 'fake-group-id' },
+  schemaRegistry: { url: 'http://fake-registry:8081' },
   onlyTesting: true
-})
+});
 ```
 
-### Event server
+---
 
-```ts
-// src/event-server/index.ts
-import { ConsumerRouter } from '@comparaonline/event-streamer'
-import { application } from '../application'
+## Legacy Usage (Deprecated)
 
-// Remember to call setConfig with a groupId
+<details>
+  <summary>Click to expand for legacy usage details.</summary>
+  
+  The `ConsumerRouter` and global `emit` function are still available for backward compatibility but are considered deprecated. They do not support schema registry integration.
 
-export const consumer = new ConsumerRouter()
-consumer.add('topic-a', 'event-name-a', async (data, emit) => { 
+  ### Legacy Producer
+
+  ```ts
+  import { emit } from '@comparaonline/event-streamer';
+
+  // Note: The legacy emit function still uses `eventName` for backward compatibility.
   await emit({
-    topic: 'topic-b',
-    data: {
-      message: 'Event received'
-    }
-  })
-})
+    topic: 'my-topic',
+    eventName: 'my-event-name',
+    data: { firstName: 'John' }
+  });
+  ```
 
-application.onStart(async () => {
-  await consumer.start()
-})
-```
+  ### Legacy Consumer
 
-### Service
+  ```ts
+  import { ConsumerRouter } from '@comparaonline/event-streamer';
 
-```ts
-// src/services/my-service/__tests__/index.test.ts
-import { consumer } from '../../../event-server'
-import { getEmittedEvents, clearEmittedEvents, getParsedEmittedEvents } from '@comparaonline/event-server'
+  const consumer = new ConsumerRouter();
 
-describe('Testing some handlers', () => {
-  beforeEach(() => {
-    clearEmittedEvents()
+  consumer.add('topic-a', 'eventName', (data, emit) => { 
+    console.log('Handler for topic-a and eventName');
   });
 
-  describe('Testing EventNameA', () => {
-    it('Should emit event into topic b', async () => {
-      await consumer.input({
-        data: { someData: true },
-        topic: 'a',
-        eventName: 'event-name-a'
-      })
+  await consumer.start();
+  ```
+</details>
 
-      const events = getEmittedEvents()
+---
 
-      expect(events[0]).toMatchObject({
-        topic: 'topic-b',
-        messages: [
-          JSON.stringify({
-            message: 'Event received',
-            code: 'TopicB'
-          })
-        ]
-      })
-    })
+## TODO
 
-    it('Should emit event into topic c with parsed event', async () => {
-      await consumer.input({
-        data: { someData: true },
-        topic: 'a',
-        eventName: 'event-name-a'
-      })
+- [ ] Refactor the `src/test` and `src/local-tests` directories into a unified `tests` directory with `utils` and `manual` subdirectories for better organization.
 
-      const events = getEmittedEvents()
-
-      expect(events[0]).toMatchObject({
-        topic: 'topic-b',
-        eventName: 'TopicB',
-        data: {
-          message: 'Event received',
-          code: 'TopicB'
-        }
-      })
-    })
-  })
-})
-
-```
-
-## Migration to version +8.0.0
-
-### Node version
-
-You need node version greater than or equal to v14.17.0. A good choice for Dockerfile is `node:14.17.0-alpine3.13` at least than you already want to go with `node:16.13-alpine3.15`
-
-#### Known issues after update node
-
-* `pg`: if you are using a previous version from node v13 with pg v7.X.X then it will not run anymore. The easiest way to fix it is with `yarn add pg@8.0.3`
-* `python`: in your docker file change `python` to `python3`
-
-### Topics and subjects
-
-#### Listeners
-
-Previous versions read all the topics and performs actions from every event not mattering the topic. Now you need to link topic/event/handler
-
-```ts
-// Option A: you know where the event came from
-consumer.add('topic-a', 'my-event-name', myHandler)
-
-// Option B: you don't know where the event came from
-consumer.add(['topic-a', 'topic-b'], 'my-event-name', myHandler)
-
-// Option C: you know where the event came from but there are two input events with the same action
-consumer.add('topic-a', ['my-event-name-a', 'my-event-name-b'], myHandler)
-
-// Option D: you don't know where the event came from but there are two input events with the same action
-consumer.add(['topic-a', 'topic-b'], ['my-event-name-a', 'my-event-name-b'], myHandler)
-```
-
-#### Events subjects
-
-Previous event-streamer version uses class name as event subject. Now you need to specify them, no matter what the event subject will be automatically converted to upper camel case 
-
-#### Tips
-
-* You can transform your events folder into simple TS interfaces
-* Create a kafka service folder with all the emits events
-
-### Migration PRs
-
-[Flux comparador sync](https://github.com/comparaonline/flux-comparador-sync/pull/53/files)
-
-[Results connector](https://github.com/comparaonline/results-connector/pull/67/files)
-
-[Quoteapp CICL](https://github.com/comparaonline/quoteapp-cicl/pull/127/files)

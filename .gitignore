@@ -4,3 +4,10 @@ coverage
 build
 .vscode
 .editorconfig
+.idea/*
+.claude
+CLAUDE.md
+examples
+yarn.lock
+package-lock.json
+temp-test-data/

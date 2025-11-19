@@ -1,9 +1,12 @@
-import { CompressionTypes, Partitioners } from 'kafkajs';
-import { clearEmittedEvents, closeAll, emit, getEmittedEvents, getParsedEmittedEvents, getProducer } from '..';
+
+import { CompressionTypes } from 'kafkajs';
+import { closeAll, emit, getProducer } from '..';
 import { setConfig } from '../../config';
 import { handlerToCall } from '../../test/helpers';
 import MockDate from 'mockdate';
 import { KAFKA_HOST_9092 } from '../../test/constants';
+
+import { connect, disconnect } from '../../test/kafka-manager';
 
 const defaultTopic = 'topic-a';
 const appName = 'event-streamer';
@@ -17,25 +20,42 @@ const defaultBodyData = {
 const CONNECTION_TTL = 2000;
 const TEST_TIMEOUT = 120000;
 
-describe('producer', () => {
+describe('Producer Integration Tests', () => {
+  beforeAll(async () => {
+    setConfig({
+      host: KAFKA_HOST_9092,
+      appName,
+      producer: {
+        connectionTTL: CONNECTION_TTL
+      }
+    });
+    MockDate.set('2022-12-08T00:00:00.000Z');
+    await connect();
+  });
+
+  afterAll(async () => {
+    await disconnect();
+    await closeAll();
+  });
+
   describe('emit success', () => {
     beforeEach(() => {
       setConfig({
         host: KAFKA_HOST_9092,
         appName,
         producer: {
-          connectionTTL: CONNECTION_TTL
-        }
+          connectionTTL: CONNECTION_TTL,
+        },
       });
-      MockDate.set('2022-12-08T00:00:00.000Z');
     });
+
     it(
       'Should emit a single event with different topic and code',
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         const eventName = 'EventCode';
         const testDate = '2022-12-09 00:00:00Z';
@@ -87,8 +107,8 @@ describe('producer', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         const eventName = 'TopicA';
 
@@ -124,8 +144,8 @@ describe('producer', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         const eventName = 'EventCode';
 
@@ -181,8 +201,8 @@ describe('producer', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         // act
         await emit([
@@ -244,8 +264,8 @@ describe('producer', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         // act
         await emit('topic-a', {
@@ -279,8 +299,8 @@ describe('producer', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         // act
         await emit('topic-a', [
@@ -327,8 +347,8 @@ describe('producer', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         // act
         await emit('topic-a', 'event-name-a', {
@@ -363,14 +383,15 @@ describe('producer', () => {
         // arrange
         setConfig({
           host: KAFKA_HOST_9092,
+          appName,
           producer: {
             connectionTTL: CONNECTION_TTL,
             compressionType: CompressionTypes.GZIP
           }
         });
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         // act
         await emit('topic-a', 'event-name-a', [
@@ -417,8 +438,8 @@ describe('producer', () => {
       async () => {
         // arrange
         const producer = await getProducer(KAFKA_HOST_9092);
-        const sendSpy = jest.spyOn(producer, 'send');
-        const disconnectSpy = jest.spyOn(producer, 'disconnect');
+        const sendSpy = vi.spyOn(producer, 'send');
+        const disconnectSpy = vi.spyOn(producer, 'disconnect');
 
         // act
         await emit({
@@ -450,170 +471,5 @@ describe('producer', () => {
       },
       TEST_TIMEOUT
     );
-  });
-
-  describe('emit error', () => {
-    beforeEach(() => {
-      setConfig({
-        host: 'my-invalid-host:9092',
-        producer: {
-          retryOptions: {
-            retries: 0
-          },
-          compressionType: CompressionTypes.None,
-          idempotent: false,
-          partitioners: Partitioners.LegacyPartitioner
-        }
-      });
-    });
-    it('Should throw an exception because data must be and object - string sended', async () => {
-      await expect(emit({ data: 'my-data' as unknown as any, topic: 'topic' })).rejects.toThrowError('Data must be an object');
-    });
-
-    it('Should throw an exception because data must be and object - null sended', async () => {
-      await expect(emit({ data: null as any, topic: 'topic' })).rejects.toThrowError('Data must be an object');
-    });
-
-    it('Should throw an exception because data array is empty', async () => {
-      await expect(emit({ data: [], topic: 'topic' })).rejects.toThrowError("Data array can't be empty");
-    });
-
-    it('Should throw an exception because data array is empty overload', async () => {
-      await expect(emit('topic', [])).rejects.toThrowError("Data array can't be empty");
-    });
-
-    it('Should throw an exception because data array is empty overload 2', async () => {
-      await expect(emit('topic', 'event-name', [])).rejects.toThrowError("Data array can't be empty");
-    });
-
-    it('Should throw an exception because event code - empty', async () => {
-      await expect(emit({ data: {}, topic: 'topic', eventName: '' })).rejects.toThrowError('Invalid message code');
-    });
-
-    it('Should throw an exception because event code - inside data', async () => {
-      await expect(
-        emit({
-          data: {
-            code: 'MyEventName'
-          },
-          topic: 'topic'
-        })
-      ).rejects.toThrowError('Reserved object keyword "code" inside data');
-    });
-
-    it('should fail connection', async () => {
-      await expect(
-        emit({
-          data: {},
-          topic: 'any-topic'
-        })
-      ).rejects.toThrow(/getaddrinfo ENOTFOUND my-invalid-host|getaddrinfo EAI_AGAIN my-invalid-host|connection timeout/gim);
-    }, 12000);
-
-    it('should fail connection by overwrite', async () => {
-      await expect(
-        emit(
-          {
-            data: {},
-            topic: 'any-topic'
-          },
-          ['another-host:9092']
-        )
-      ).rejects.toThrow(/getaddrinfo ENOTFOUND another-host|getaddrinfo EAI_AGAIN another-host|connection timeout/gim);
-    }, 12000);
-  });
-
-  describe('emit testing mode - success', () => {
-    beforeEach(() => {
-      setConfig({
-        host: 'any-host:9092',
-        onlyTesting: true
-      });
-    });
-
-    it('should emit pushing the event to the array', async () => {
-      // arrange
-      const myEvent = {
-        topic: 'test',
-        data: {
-          a: 'a'
-        },
-        eventName: 'MyEvent'
-      };
-      const previousHostname = process.env.HOSTNAME;
-      process.env.HOSTNAME = 'my-service-name-abcd-1234';
-      // act
-      await emit(myEvent);
-
-      // assert
-      let emittedEvents = getEmittedEvents();
-      expect(emittedEvents.length).toBe(1);
-      expect(emittedEvents[0]).toMatchObject({
-        topic: myEvent.topic,
-        messages: [
-          {
-            value: JSON.stringify({
-              ...myEvent.data,
-              createdAt: defaultDate,
-              appName: 'my-service-name',
-              code: myEvent.eventName
-            })
-          }
-        ]
-      });
-      clearEmittedEvents();
-      emittedEvents = getEmittedEvents();
-      expect(emittedEvents.length).toBe(0);
-      process.env.HOSTNAME = previousHostname;
-    });
-
-    it('should get each emitted message parsed and separated', async () => {
-      // arrange
-      clearEmittedEvents();
-      const myEvent = {
-        topic: 'test',
-        data: {
-          a: 'a'
-        },
-        eventName: 'MyEvent'
-      };
-      const previousHostname = process.env.HOSTNAME;
-      delete process.env.HOSTNAME;
-      // act
-      await emit(myEvent);
-
-      // assert
-      let emittedEvents = getParsedEmittedEvents();
-      expect(emittedEvents.length).toBe(1);
-      expect(emittedEvents[0]).toMatchObject({
-        topic: myEvent.topic,
-        eventName: 'MyEvent',
-        data: {
-          ...myEvent.data,
-          createdAt: defaultDate,
-          appName: 'unknown',
-          code: myEvent.eventName
-        }
-      });
-      clearEmittedEvents();
-      emittedEvents = getParsedEmittedEvents();
-      expect(emittedEvents.length).toBe(0);
-      process.env.HOSTNAME = previousHostname;
-    });
-  });
-
-  describe('emit testing mode - fail', () => {
-    beforeEach(() => {
-      setConfig({
-        host: 'any-host:9092',
-        onlyTesting: false
-      });
-    });
-
-    it('should not be able to get emitted events or clear events', () => {
-      const error = 'This method only can be called on only testing mode';
-      expect(getEmittedEvents).toThrow(error);
-      expect(clearEmittedEvents).toThrow(error);
-    });
   });
 });

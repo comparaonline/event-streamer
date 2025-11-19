@@ -12,12 +12,24 @@
       "./node_modules/@types"
     ],
     "types": [
-      "node",
-      "jest"
+      "node"
     ],
     "esModuleInterop": true,
     "inlineSourceMap": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
-  }
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "build",
+    "node_modules",
+    "examples",
+    "src/**/__tests__",
+    "src/local-tests",
+    "src/test",
+    "**/*.test.ts",
+    "**/*.integration.test.ts"
+  ]
 }

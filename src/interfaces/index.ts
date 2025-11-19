@@ -1,15 +1,5 @@
 import { CompressionTypes, logLevel, RetryOptions, DefaultPartitioner, LegacyPartitioner } from 'kafkajs';
 
-export enum Debug {
-  NONE = 6,
-  TRACE = 0,
-  DEBUG = 1,
-  INFO = 2,
-  WARN = 3,
-  ERROR = 4,
-  FATAL = 5
-}
-
 export type Unlimited = 'unlimited';
 export type Strategy = 'topic' | 'one-by-one';
 
@@ -27,6 +17,8 @@ export interface Config {
     /** EXPERIMENTAL: default false */
     idempotent?: boolean;
     partitioners?: DefaultPartitioner | LegacyPartitioner;
+    /** Enable Schema Registry for new events. Default: false */
+    useSchemaRegistry?: boolean;
   };
   /** This is required if you want to create a consumer */
   consumer?: {
@@ -38,15 +30,26 @@ export interface Config {
     /** Object with topic-name as key and number of messages to be processed as value */
     maxMessagesPerSpecificTopic?: Record<string, number | Unlimited>;
   };
-  debug?: false | Debug;
+  /** Schema Registry configuration - services provide credentials */
+  schemaRegistry?: {
+    url: string;
+    auth?: {
+      username: string;
+      password: string;
+    };
+  };
   kafkaJSLogs?: logLevel;
   /** set to true if you want to avoid connecting to kafka and make some functionalities available */
   onlyTesting?: boolean;
+  /** Enable runtime deprecation warnings for legacy APIs. Default: false */
+  showDeprecationWarnings?: boolean;
 }
+
+
 
 interface OutputData {
   createdAt?: string;
-  [keys: string]: any;
+  [keys: string]: unknown;
 }
 
 export interface Output {
@@ -60,10 +63,10 @@ export interface Input {
   code?: string;
 }
 
-export type Callback<T extends Input> = (input: T, emit: (message: Output) => Promise<any>) => Promise<void> | void;
+export type Callback<T extends Input> = (input: T, emit: (message: Output) => Promise<unknown>) => Promise<void> | void;
 
 export interface Route {
   topic: string;
   eventName?: string;
-  callback: Callback<any>;
+  callback: Callback<Input>;
 }

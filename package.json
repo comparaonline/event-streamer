@@ -1,6 +1,6 @@
 {
   "name": "@comparaonline/event-streamer",
-  "version": "8.2.7",
+  "version": "9.0.0-alpha.0",
   "description": "Simple event-streaming framework",
   "repository": "comparaonline/event-streamer",
   "author": {
@@ -11,18 +11,25 @@
   "contributors": [],
   "license": "MIT",
   "engines": {
-    "node": ">=14.17.0"
+    "node": ">=18.18.0"
   },
   "keywords": [
     "comparaonline",
     "microservice",
-    "kafka"
+    "kafka",
+    "schema-registry",
+    "confluent",
+    "zod",
+    "events"
   ],
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "files": [
     "build"
   ],
+  "bin": {
+    "event-streamer-cli": "build/cli/index.js"
+  },
   "private": false,
   "publishConfig": {
     "access": "public"
@@ -30,33 +37,48 @@
   "scripts": {
     "build": "tsc",
     "lint": "eslint src --fix",
-    "test": "jest --runInBand --forceExit",
-    "pretest": "yarn lint",
+    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:integration": "vitest run \"src/**/*.integration.test.ts\"",
+    "test:all": "vitest run",
+    "coverage": "vitest run --coverage",
+    "test:cli": "vitest run \"src/cli/__tests__/**/*.test.ts\"",
+    "pretest": "pnpm lint",
     "test-consumer": "ts-node src/local-tests/consumer.ts",
-    "test-producer": "ts-node src/local-tests/producer.ts"
+    "test-producer": "ts-node src/local-tests/producer.ts",
+    "docker:up": "docker compose up -d --wait zookeeper kafka schema-registry kafka-ui",
+    "docker:down": "docker compose down",
+    "docker:test": "pnpm run docker:up && pnpm run test && pnpm run docker:down",
+    "docker:test:integration": "pnpm run docker:up && pnpm run test:integration && pnpm run docker:down",
+    "docker:test:all": "pnpm run docker:up && pnpm run test && pnpm run test:integration && pnpm run docker:down",
+    "cli:publish": "node build/cli/index.js publish",
+    "cli:validate": "node build/cli/index.js validate",
+    "cli:init": "node build/cli/index.js init"
   },
   "dependencies": {
-    "kafkajs": "^2.1.0"
+    "@kafkajs/confluent-schema-registry": "^3.9.0",
+    "ajv": "^7.2.4",
+    "ajv-formats": "^1.6.1",
+    "commander": "^14.0.1",
+    "fast-glob": "^3.3.3",
+    "jiti": "^2.6.1",
+    "kafkajs": "^2.2.4",
+    "p-limit": "^7.1.1",
+    "zod": "^3.25.76",
+    "zod-to-json-schema": "^3.24.6"
   },
   "devDependencies": {
-    "@comparaonline/test-helpers": "^1.1.0",
-    "@types/jest": "^27.0.2",
-    "@types/node": "^16.11.10",
-    "@types/uuid": "^8.3.4",
-    "@typescript-eslint/eslint-plugin": "^5.1.0",
-    "@typescript-eslint/parser": "^5.1.0",
-    "eslint": "8.2.0",
-    "eslint-config-airbnb-base": "^15.0.0",
-    "eslint-config-prettier": "^8.3.0",
-    "eslint-plugin-import": "^2.25.2",
-    "eslint-plugin-prettier": "^4.0.0",
-    "jest": "^27.3.1",
+    "@types/node": "^24.5.2",
+    "@typescript-eslint/eslint-plugin": "^8.44.1",
+    "@typescript-eslint/parser": "^8.44.1",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9.36.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-prettier": "^5.5.4",
     "mockdate": "^3.0.5",
-    "nock-utils": "^0.2.1",
-    "nodemon": "^3.0.2",
-    "prettier": "^2.4.1",
-    "ts-jest": "^27.0.7",
-    "ts-node": "^10.4.0",
-    "typescript": "^4.4.4"
+    "prettier": "^3.6.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
   }
 }
