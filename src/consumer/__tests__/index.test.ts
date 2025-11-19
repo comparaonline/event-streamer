@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
+import { vi } from 'vitest';
 import { ConsumerRouter } from '..';
 import { setConfig } from '../../config';
 import { emit } from '../../producer';
@@ -35,7 +36,7 @@ function getIncrementalId(): number {
 describe('consumer', () => {
   describe('Consume online mode', () => {
     beforeEach(() => {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       MockDate.set('2022-12-08T00:00:00.000Z');
     });
 
@@ -43,7 +44,7 @@ describe('consumer', () => {
       'Receive a single message without event code',
       async () => {
         // arrange
-        const handler = jest.fn();
+        const handler = vi.fn();
         const id = getIncrementalId();
         const topic = `my-random-topic-${id}`;
         setConfig(generateConfig({ strategy: 'one-by-one' }));
@@ -86,9 +87,9 @@ describe('consumer', () => {
       'Receive two of three message by event code',
       async () => {
         // arrange
-        const handlerA = jest.fn();
-        const handlerB = jest.fn();
-        const handlerC = jest.fn();
+        const handlerA = vi.fn();
+        const handlerB = vi.fn();
+        const handlerC = vi.fn();
         const id = getIncrementalId();
         const topic = `my-random-topic-${id}`;
         setConfig(generateConfig({ strategy: 'topic', maxMessagesPerTopic: 10 }));
@@ -136,9 +137,9 @@ describe('consumer', () => {
       'Receive a message on multi topics',
       async () => {
         // arrange
-        const handlerA = jest.fn();
-        const handlerB = jest.fn();
-        const handlerC = jest.fn();
+        const handlerA = vi.fn();
+        const handlerB = vi.fn();
+        const handlerC = vi.fn();
 
         const topicA = `my-random-topic-${getIncrementalId()}`;
         const topicB = `my-random-topic-${getIncrementalId()}`;
@@ -217,7 +218,7 @@ describe('consumer', () => {
       'Receive a single message but wont process it',
       async () => {
         // arrange
-        const handler = jest.fn();
+        const handler = vi.fn();
         const id = getIncrementalId();
         const topic = `my-random-topic-${id}`;
         setConfig(
@@ -252,7 +253,7 @@ describe('consumer', () => {
         // arrange
         setConfig(generateConfig({ maxMessagesPerTopic: 1 }));
         const consumer = new ConsumerRouter();
-        const handler = jest.fn();
+        const handler = vi.fn();
         const id = getIncrementalId();
         const topic = `my-random-topic-${id}`;
         await createTopic(topic);
@@ -261,8 +262,8 @@ describe('consumer', () => {
         consumer.add(topic, handler);
         await consumer.start();
 
-        const pauseSpy = jest.spyOn(consumer['consumer']!, 'pause');
-        const resumeSpy = jest.spyOn(consumer['consumer']!, 'resume');
+        const pauseSpy = vi.spyOn(consumer['consumer']!, 'pause');
+        const resumeSpy = vi.spyOn(consumer['consumer']!, 'resume');
 
         for (let i = 0; i < 100; i++) {
           await emit({
@@ -288,7 +289,7 @@ describe('consumer', () => {
       async () => {
         // arrange
         setConfig(generateConfig({}));
-        const handler = jest.fn();
+        const handler = vi.fn();
         const id = getIncrementalId();
         const topic = `my-random-topic-${id}`;
 
@@ -299,7 +300,7 @@ describe('consumer', () => {
         consumer.add(topic, handler);
         await consumer.start();
 
-        const disconnectSpy = jest.spyOn(consumer['consumer']!, 'disconnect');
+        const disconnectSpy = vi.spyOn(consumer['consumer']!, 'disconnect');
 
         await consumer.stop();
 
@@ -433,9 +434,9 @@ describe('consumer', () => {
       // arrange
       const consumer = new ConsumerRouter();
 
-      const handlerA = jest.fn();
-      const handlerB = jest.fn();
-      const handlerC = jest.fn();
+      const handlerA = vi.fn();
+      const handlerB = vi.fn();
+      const handlerC = vi.fn();
 
       consumer.add('topic-a', handlerA);
       consumer.add('topic-b', 'EventB', handlerB);

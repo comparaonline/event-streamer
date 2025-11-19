@@ -1,6 +1,20 @@
-node_modules
-coverage
+# Build artifacts
+build/
+
+# Coverage
+coverage/
+
+# OS/editor junk
 .DS_Store
-build
-.vscode
-.editorconfig
+.vscode/
+
+# Generated vitest build artifacts
+/vitest.config.js
+/vitest.config.d.ts
+/vitest.setup.js
+/vitest.setup.d.ts
+
+# Package managers
+node_modules/
+yarn.lock
+package-lock.json
