@@ -42,6 +42,8 @@ export interface Config {
   kafkaJSLogs?: logLevel;
   /** set to true if you want to avoid connecting to kafka and make some functionalities available */
   onlyTesting?: boolean;
+  /** Enable runtime deprecation warnings for legacy APIs. Default: false */
+  showDeprecationWarnings?: boolean;
 }
 
 interface OutputData {
