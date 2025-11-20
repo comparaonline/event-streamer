@@ -66,6 +66,24 @@ setConfig({
 | debug | false or Debug | Increase library logging based on Debug level | *optional* default: false |
 | kafkaJSLogs | kafkajs.logLevel | Set kafkajs logs for connection, commits and streamings | *optional* default: kafkajs.logLevel.NOTHING |
 | onlyTesting | boolean | Avoid kafka server communication, instead of send/consume messages it will be enable extra methods for unit testing | *optional* <br/> default: false
+| showDeprecationWarnings | boolean | Enable runtime deprecation warnings for legacy APIs (`emit`, `ConsumerRouter`) | *optional* <br/> default: false
+
+### Deprecation warnings (legacy APIs)
+
+Legacy producer/consumer have been moved under the hood and are marked as deprecated to ease future migration. To surface runtime warnings without changing behavior, opt in via `showDeprecationWarnings`.
+
+```ts
+import { setConfig } from '@comparaonline/events-streamer'
+
+setConfig({
+  host: 'kafka:9092',
+  showDeprecationWarnings: true
+})
+
+// Using legacy APIs like emit() or new ConsumerRouter() will log:
+// [DEPRECATION WARNING] emit() is deprecated. Use SchemaRegistryProducer.emitWithSchema() for Schema Registry support.
+// [DEPRECATION WARNING] ConsumerRouter is deprecated. Use SchemaRegistryConsumerRouter for Schema Registry support.
+```
 
 ## Usage
 
