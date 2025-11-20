@@ -19,7 +19,7 @@ $ pnpm add @comparaonline/event-streamer
 
 Before use it, it should be initialized calling the method `setConfig`
 
-### Basic producer configuration
+### Basic producer uration
 
 With this it will be enough to produce any message
 
@@ -66,19 +66,17 @@ setConfig({
 | debug | false or Debug | Increase library logging based on Debug level | *optional* default: false |
 | kafkaJSLogs | kafkajs.logLevel | Set kafkajs logs for connection, commits and streamings | *optional* default: kafkajs.logLevel.NOTHING |
 | onlyTesting | boolean | Avoid kafka server communication, instead of send/consume messages it will be enable extra methods for unit testing | *optional* <br/> default: false
-| showDeprecationWarnings | boolean | Enable runtime deprecation warnings for legacy APIs (`emit`, `ConsumerRouter`) | *optional* <br/> default: false
+| showDeprecationWarnings | boolean | Enable runtime deprecation warnings for legacy APIs (`emit`, `ConsumerRouter`) | *optional* <br/> default: true
 
 ### Deprecation warnings (legacy APIs)
 
-Legacy producer/consumer have been moved under the hood and are marked as deprecated to ease future migration. To surface runtime warnings without changing behavior, opt in via `showDeprecationWarnings`.
+Legacy producer/consumer have been moved under the hood and are marked as deprecated to ease future migration. Warnings are enabled by default and can be overridden via `showDeprecationWarnings`.
 
 ```ts
 import { setConfig } from '@comparaonline/events-streamer'
 
-setConfig({
-  host: 'kafka:9092',
-  showDeprecationWarnings: true
-})
+setConfig({ host: 'kafka:9092' }) // Warnings on by default
+setConfig({ host: 'kafka:9092', showDeprecationWarnings: false }) // Silence warnings
 
 // Using legacy APIs like emit() or new ConsumerRouter() will log:
 // [DEPRECATION WARNING] emit() is deprecated. Use SchemaRegistryProducer.emitWithSchema() for Schema Registry support.

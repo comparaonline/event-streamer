@@ -8,7 +8,8 @@ import { DEFAULT_CONFIG } from '../constants';
 function warnDeprecation(message: string): void {
   try {
     const cfg = getConfig();
-    if (cfg.showDeprecationWarnings) {
+    const shouldWarn = (cfg.showDeprecationWarnings ?? true) === true;
+    if (shouldWarn) {
       // eslint-disable-next-line no-console
       console.warn(`[DEPRECATION WARNING] ${message}`);
     }
