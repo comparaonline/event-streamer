@@ -19,7 +19,7 @@ $ pnpm add @comparaonline/event-streamer
 
 Before use it, it should be initialized calling the method `setConfig`
 
-### Basic producer uration
+### Basic producer configuration
 
 With this it will be enough to produce any message
 
