@@ -18,6 +18,8 @@ export interface Config {
   appName?: string;
   /** Only set this if you need change producer configuration */
   producer?: {
+    /** Opt-in: use Schema Registry-based producer. Default false */
+    useSchemaRegistry?: boolean;
     /** Connection keep alive after send messages to reuse it. Default 5000 ms */
     connectionTTL?: number;
     additionalHosts?: string[];
@@ -44,6 +46,14 @@ export interface Config {
   onlyTesting?: boolean;
   /** Enable runtime deprecation warnings for legacy APIs. Default: false */
   showDeprecationWarnings?: boolean;
+  /** Schema Registry configuration (required when using SR producer/consumer) */
+  schemaRegistry?: {
+    url: string;
+    auth?: {
+      username: string;
+      password: string;
+    };
+  };
 }
 
 interface OutputData {

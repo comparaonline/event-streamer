@@ -48,3 +48,19 @@ export function validateTestingConfig(): void {
     throw new Error('This method only can be called on only testing mode');
   }
 }
+
+export function toKebabCase(input: string): string {
+  if (!input) return '';
+  return input
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2') // split camelCase
+    .replace(/[_\s]+/g, '-') // spaces/underscores to hyphen
+    .replace(/-+/g, '-') // collapse multiple hyphens
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, ''); // remove non-url-safe chars
+}
+
+export function getSubjectName(topic: string, schemaName: string): string {
+  const topicKebab = toKebabCase(topic);
+  const nameKebab = toKebabCase(schemaName);
+  return `${topicKebab}-${nameKebab}`;
+}
