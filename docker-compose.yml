@@ -16,14 +16,22 @@ services:
       - '.:/code'
       - /code/node_modules
   kafkas:
-    image: spotify/kafka
+    image: bitnami/kafka:3.7
     hostname: kafka
-    expose:
-      - "9092"
-      - "2181"
     ports:
-      - '9092:9092'
-      - '2181:2181'
+      - '9092:9092'   # external listener for host
+      - '29092:29092' # internal listener for containers
+    environment:
+      - KAFKA_ENABLE_KRAFT=yes
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:29093
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:29092,CONTROLLER://:29093,EXTERNAL://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:29092,EXTERNAL://localhost:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
   schema-registry:
     image: confluentinc/cp-schema-registry:7.6.0
     hostname: schema-registry
@@ -31,7 +39,7 @@ services:
     ports:
       - '8081:8081'
     environment:
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'PLAINTEXT://kafka:9092'
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'PLAINTEXT://kafka:29092'
       SCHEMA_REGISTRY_HOST_NAME: 'schema-registry'
       SCHEMA_REGISTRY_LISTENERS: 'http://0.0.0.0:8081'
     depends_on:
