@@ -7,8 +7,7 @@ export class SchemaRegistryConsumerRouter {
 
   constructor() {
     const cfg = getConfig();
-    if (cfg.producer?.useSchemaRegistry !== true && !cfg.schemaRegistry?.url) {
-      // Not configured, but keep legacy unaffected. Throw only when instantiated.
+    if (!cfg.schemaRegistry?.url) {
       throw new Error('SchemaRegistryConsumerRouter requires config.schemaRegistry.url');
     }
   }

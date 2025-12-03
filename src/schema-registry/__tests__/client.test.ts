@@ -7,9 +7,7 @@ describe('SchemaRegistryClient', () => {
       host: 'localhost:9092',
       onlyTesting: true
     });
-    expect(() => new SchemaRegistryClient()).toThrow(
-      'Schema Registry not configured. Please set config.schemaRegistry.url'
-    );
+    expect(() => new SchemaRegistryClient()).toThrow('Schema Registry not configured. Please set config.schemaRegistry.url');
   });
 
   it('encodes and decodes with JSON fallback', async () => {
@@ -22,4 +20,3 @@ describe('SchemaRegistryClient', () => {
     expect(decoded).toMatchObject({ subject, payload });
   });
 });
-

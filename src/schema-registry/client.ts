@@ -37,7 +37,7 @@ export class SchemaRegistryClient {
     try {
       const str = buffer.toString('utf-8');
       const parsed = JSON.parse(str);
-      return parsed?.payload ?? parsed;
+      return parsed; // return full object { subject, payload }
     } catch (err) {
       throw new Error(`Failed to decode SR message: ${(err as Error).message}`);
     }
