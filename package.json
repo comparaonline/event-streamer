@@ -32,7 +32,7 @@
     "lint": "eslint src --fix",
     "pretest": "pnpm lint",
     "test": "vitest --run",
-    "test:unit": "vitest run src/helpers/__tests__/*.test.ts src/config/__tests__/*.test.ts src/schema-registry/__tests__/*.test.ts",
+    "test:unit": "vitest run --exclude \"src/**/*.integration.test.ts\" \"src/**/__tests__/**/*.test.ts\"",                                                                                                                                                                                                                   ,│
     "test:integration": "vitest run \"src/**/*.integration.test.ts\"",
     "coverage": "vitest --coverage",
     "docker:up": "docker compose up -d --wait kafkas schema-registry",

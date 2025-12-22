@@ -16,7 +16,7 @@ services:
       - '.:/code'
       - /code/node_modules
   kafkas:
-    image: bitnami/kafka:3.7
+    image: bitnami/kafka:3.7.0
     hostname: kafka
     ports:
       - '9092:9092'   # external listener for host

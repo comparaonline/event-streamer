@@ -19,4 +19,9 @@ describe('SchemaRegistryClient', () => {
     const decoded = await client.decode(buf);
     expect(decoded).toMatchObject({ subject, payload });
   });
+
+  it('throws on invalid JSON in fallback decode', async () => {
+    const client = new SchemaRegistryClient({ url: 'http://localhost:8081' });
+    await expect(client.decode(Buffer.from('{'))).rejects.toThrow('Failed to decode SR message');
+  });
 });
