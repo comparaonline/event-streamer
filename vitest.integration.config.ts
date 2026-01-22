@@ -5,16 +5,15 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     setupFiles: ['./vitest.setup.ts'],
-    // By default, Vitest includes all spec/test files.
-    // We only need to exclude the integration tests for the default run.
+    include: [
+      'src/**/*.integration.test.ts',
+      'src/consumer/__tests__/index.test.ts',
+      'src/producer/__tests__/index.test.ts',
+    ],
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
       '**/build/**',
-      'src/**/*.integration.test.ts',
-      // Exclude legacy online tests from unit runs; covered by docker:test or test:integration
-      'src/consumer/__tests__/index.test.ts',
-      'src/producer/__tests__/index.test.ts',
     ],
     coverage: {
       reporter: ['text', 'json', 'html'],
@@ -30,8 +29,8 @@ export default defineConfig({
         'src/interfaces',
         'src/types',
         '**/*.test.ts',
-        '**/*.integration.test.ts',
       ],
     },
   },
 });
+

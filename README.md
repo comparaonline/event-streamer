@@ -446,6 +446,37 @@ describe('Testing some handlers', () => {
 
 ```
 
+### Running tests
+
+Unit-only (fast, no Docker required):
+
+```bash
+pnpm run test:unit
+```
+
+Full suite with local infrastructure:
+
+```bash
+# Start Kafka + Schema Registry, run all tests, then tear down
+pnpm run docker:test
+```
+
+Integration tests only (will be populated in PR3 using `*.integration.test.ts`):
+
+```bash
+pnpm run docker:test:integration
+```
+
+Manual alternative:
+
+```bash
+docker compose up -d --wait kafkas schema-registry
+pnpm test
+docker compose down
+```
+
+See `migration_plan.md` for background and PR3 plans to split unit vs. integration tests by filename.
+
 ## Migration to version +8.0.0
 
 ### Node version
