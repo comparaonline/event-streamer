@@ -37,6 +37,12 @@ export interface Config {
     maxMessagesPerTopic?: number | Unlimited;
     /** Object with topic-name as key and number of messages to be processed as value */
     maxMessagesPerSpecificTopic?: Record<string, number | Unlimited>;
+    /**
+     * How long stop() waits for the messages already in flight to finish before disconnecting
+     * anyway. Keep it below the pod's remaining terminationGracePeriodSeconds, otherwise the
+     * SIGKILL arrives first and the wait buys nothing. Default 10000 ms
+     */
+    shutdownTimeoutMs?: number;
   };
   debug?: false | Debug;
   kafkaJSLogs?: logLevel;

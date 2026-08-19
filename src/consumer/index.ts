@@ -1,7 +1,7 @@
 import { Consumer, EachMessagePayload, Kafka } from 'kafkajs';
 import { getConfig } from '../config';
 import { DEFAULT_CONFIG } from '../constants';
-import { debug, getParsedJson, stringToUpperCamelCase, validateTestingConfig } from '../helpers';
+import { debug, getParsedJson, settlesWithin, stringToUpperCamelCase, validateTestingConfig } from '../helpers';
 import { Input, Callback, Debug, Output, Route, Strategy } from '../interfaces';
 import { emit } from '../producer';
 
@@ -16,6 +16,8 @@ export class ConsumerRouter {
   private routes: Route[] = [];
   private consumer: Consumer | null = null;
   private queues: Queues = {};
+  private stopping: Promise<void> | null = null;
+  private shutdownTimeoutMs: number = DEFAULT_CONFIG.shutdownTimeoutMs;
 
   public add(topic: string, handler: Callback<any>): void;
   public add(topics: string[], handler: Callback<any>): void;
@@ -62,8 +64,46 @@ export class ConsumerRouter {
   }
 
   public async stop(): Promise<void> {
-    if (this.consumer != null) {
-      await this.consumer.disconnect();
+    const consumer = this.consumer;
+    if (consumer == null) {
+      return;
+    }
+    // Kubernetes can deliver more than one SIGTERM. The second one must wait for the shutdown
+    // already in progress instead of racing it to disconnect() while handlers are still writing.
+    if (this.stopping == null) {
+      this.stopping = this.shutdown(consumer);
+    }
+    return this.stopping;
+  }
+
+  private async shutdown(consumer: Consumer): Promise<void> {
+    // Stop fetching before draining. Under the default 'topic' strategy eachMessage returns as soon
+    // as the message is queued, so kafkajs would keep delivering -- and committing the offsets of --
+    // new messages into the queues while we await the ones already in flight, and the drain would
+    // never catch up. consumer.stop() halts the fetch loop and leaves the group; the connection
+    // stays up so the handlers still running can finish their work.
+    await consumer.stop();
+    await this.drainQueues();
+    await consumer.disconnect();
+  }
+
+  private pendingMessages(): Promise<void>[] {
+    // Each promise removes itself from its queue once it settles, so what is left here is exactly
+    // the work whose offset is already committed but whose handler has not finished yet.
+    return Object.values(this.queues).flatMap((queue) => queue.promises);
+  }
+
+  private async drainQueues(): Promise<void> {
+    const pending = this.pendingMessages();
+    if (pending.length === 0) {
+      return;
+    }
+    debug(Debug.INFO, 'Draining', pending.length, 'in-flight messages before disconnecting');
+    const drained = await settlesWithin(Promise.all(pending), this.shutdownTimeoutMs);
+    if (!drained) {
+      // Nothing left to do for these: their offsets were committed when they were queued, so Kafka
+      // will not redeliver them. Log it loudly -- this is the silent loss becoming visible.
+      debug(Debug.ERROR, 'Shutdown timed out after', this.shutdownTimeoutMs, 'ms, discarding', this.pendingMessages().length, 'in-flight messages');
     }
   }
 
@@ -129,6 +169,7 @@ export class ConsumerRouter {
       const topics = this.routes.map((route) => route.topic).filter((value, index, array) => array.indexOf(value) === index);
 
       this.consumer = kafka.consumer({ groupId });
+      this.stopping = null;
       await this.consumer.connect();
       debug(Debug.DEBUG, 'Consumer connected');
       await this.consumer.subscribe({ topics });
@@ -138,6 +179,8 @@ export class ConsumerRouter {
       const maxMessagesPerTopic = config.consumer.maxMessagesPerTopic ?? DEFAULT_CONFIG.maxMessagesPerTopic;
 
       const strategy: Strategy = config.consumer.strategy ?? DEFAULT_CONFIG.strategy;
+
+      this.shutdownTimeoutMs = config.consumer.shutdownTimeoutMs ?? DEFAULT_CONFIG.shutdownTimeoutMs;
 
       await this.consumer.run({
         eachMessage: async ({ topic, message }: EachMessagePayload) => {

@@ -1,4 +1,4 @@
-import { getParsedJson, stringToUpperCamelCase, toArray, validateTestingConfig } from '..';
+import { getParsedJson, settlesWithin, stringToUpperCamelCase, toArray, validateTestingConfig } from '..';
 import { setConfig } from '../../config';
 
 describe('Helpers', () => {
@@ -61,6 +61,21 @@ describe('Helpers', () => {
 
       // assert
       expect(validateTestingConfig()).toBe(undefined);
+    });
+  });
+
+  describe('settlesWithin', () => {
+    it('Should return true when the promise resolves first', async () => {
+      expect(await settlesWithin(Promise.resolve('done'), 5000)).toBe(true);
+    });
+
+    it('Should return true when the promise rejects first', async () => {
+      // A rejected handler is finished work: the caller only asks whether anything is still pending.
+      expect(await settlesWithin(Promise.reject(new Error('handler failed')), 5000)).toBe(true);
+    });
+
+    it('Should return false when the timeout elapses first', async () => {
+      expect(await settlesWithin(new Promise(() => undefined), 50)).toBe(false);
     });
   });
 });

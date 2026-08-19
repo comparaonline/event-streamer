@@ -9,11 +9,14 @@ import MockDate from 'mockdate';
 import { KAFKA_HOST_9092 } from '../../test/constants';
 
 const TEST_TIMEOUT = 240000;
+// Long enough that a drain which waited for it would be unmistakable in the elapsed time.
+const HANDLER_LONGER_THAN_SHUTDOWN = 60000;
 
 interface Params {
   strategy?: Strategy;
   maxMessagesPerTopic?: number | Unlimited;
   maxMessagesPerSpecificTopic?: Record<string, number | Unlimited>;
+  shutdownTimeoutMs?: number;
 }
 
 function generateConfig(params: Params): Config {
@@ -418,6 +421,122 @@ describe('consumer', () => {
       },
       TEST_TIMEOUT
     );
+
+    it(
+      'Waits for the handlers already running before disconnecting',
+      async () => {
+        // arrange
+        const topic = `my-random-topic-${getIncrementalId()}`;
+        setConfig(generateConfig({ strategy: 'topic' }));
+
+        await createTopic(topic);
+
+        const started = jest.fn();
+        let finished = false;
+        const handler = async (): Promise<void> => {
+          started();
+          await sleep(2000);
+          finished = true;
+        };
+
+        // act
+        const consumer = new ConsumerRouter();
+        consumer.add(topic, handler);
+
+        await consumer.start();
+
+        await emit({ data: { prop: 'a' }, topic });
+        await handlerToCall(started);
+
+        // The offset was committed the moment the message was queued, so Kafka will not redeliver
+        // it: whatever this handler has not written by the time we disconnect is lost for good.
+        expect(finished).toBe(false);
+
+        await consumer.stop();
+
+        // assert
+        expect(finished).toBe(true);
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Shares a single shutdown between concurrent stop() calls',
+      async () => {
+        // arrange
+        const topic = `my-random-topic-${getIncrementalId()}`;
+        setConfig(generateConfig({ strategy: 'topic' }));
+
+        await createTopic(topic);
+
+        const started = jest.fn();
+        let finished = false;
+        const handler = async (): Promise<void> => {
+          started();
+          await sleep(2000);
+          finished = true;
+        };
+
+        // act
+        const consumer = new ConsumerRouter();
+        consumer.add(topic, handler);
+
+        await consumer.start();
+
+        await emit({ data: { prop: 'a' }, topic });
+        await handlerToCall(started);
+
+        // Kubernetes can send SIGTERM more than once; the second one must not disconnect underneath
+        // the drain the first one is still waiting on.
+        await Promise.all([consumer.stop(), consumer.stop()]);
+
+        // assert
+        expect(finished).toBe(true);
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Gives up on a handler that outlives shutdownTimeoutMs',
+      async () => {
+        // arrange
+        const topic = `my-random-topic-${getIncrementalId()}`;
+        setConfig(generateConfig({ strategy: 'topic', shutdownTimeoutMs: 1000 }));
+
+        await createTopic(topic);
+
+        const started = jest.fn();
+        let finished = false;
+        const handler = async (): Promise<void> => {
+          started();
+          await sleep(HANDLER_LONGER_THAN_SHUTDOWN);
+          finished = true;
+        };
+
+        // act
+        const consumer = new ConsumerRouter();
+        consumer.add(topic, handler);
+
+        await consumer.start();
+
+        await emit({ data: { prop: 'a' }, topic });
+        await handlerToCall(started);
+
+        // MockDate freezes Date, so measure with the monotonic clock instead.
+        const startedAt = process.hrtime.bigint();
+        await consumer.stop();
+        const elapsedMs = Number((process.hrtime.bigint() - startedAt) / BigInt(1e6));
+
+        // assert: the drain waits, but not for this handler -- the pod finishes shutting down on its
+        // own terms instead of hanging until Kubernetes SIGKILLs it. The elapsed time also covers
+        // kafkajs leaving the consumer group, which is why the bound is the handler's own duration
+        // and not the deadline itself; settlesWithin's unit tests pin the deadline exactly.
+        expect(finished).toBe(false);
+        expect(elapsedMs).toBeGreaterThanOrEqual(1000);
+        expect(elapsedMs).toBeLessThan(HANDLER_LONGER_THAN_SHUTDOWN);
+      },
+      TEST_TIMEOUT
+    );
   });
 
   describe('Consume testing mode', () => {
@@ -485,6 +604,9 @@ describe('consumer', () => {
         emit
       );
       expect(handlerC).not.toHaveBeenCalled();
+
+      // There is no consumer to drain or disconnect in testing mode.
+      await expect(consumer.stop()).resolves.toBeUndefined();
     });
 
     it('Should not work offline - no routes', async () => {
