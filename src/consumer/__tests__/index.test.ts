@@ -423,6 +423,37 @@ describe('consumer', () => {
     );
 
     it(
+      'Swallows a handler that rejects, and the message is never redelivered',
+      async () => {
+        // arrange
+        const topic = `my-random-topic-${getIncrementalId()}`;
+        setConfig(generateConfig({ strategy: 'topic' }));
+
+        await createTopic(topic);
+
+        const handler = jest.fn().mockRejectedValue(new Error('handler failed'));
+
+        // act
+        const consumer = new ConsumerRouter();
+        consumer.add(topic, handler);
+
+        await consumer.start();
+
+        await emit({ data: { prop: 'a' }, topic });
+        await handlerToCall(handler);
+        await sleep(2000);
+
+        // assert: the error is logged and dropped so one bad message cannot stall the partition, but
+        // the offset was already committed -- no retry, no dead letter. Draining on shutdown does not
+        // cover this path, which is why the README calls it out next to it.
+        expect(handler).toHaveBeenCalledTimes(1);
+
+        await consumer.stop();
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
       'Waits for the handlers already running before disconnecting',
       async () => {
         // arrange
