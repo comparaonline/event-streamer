@@ -20,6 +20,7 @@ pipeline {
         anyOf {
           branch "master"
           branch "release"
+          branch "support/8.x"
         }
       }
       steps {
@@ -37,11 +38,25 @@ pipeline {
     stage('Publish') {
       when {
         allOf {
-          branch 'master'
+          anyOf {
+            branch 'master'
+            branch 'support/8.x'
+          }
           expression { return new_version() }
         }
       }
-      steps { publish() }
+      steps {
+        script {
+          // The 8.x line is maintenance-only: every patch that reaches npm from here is confirmed by
+          // a human first. master keeps publishing unattended, as it always has.
+          if (env.BRANCH_NAME == 'support/8.x') {
+            timeout(time: 20, unit: 'MINUTES') {
+              input message: "Publish ${package_version()} to npm from ${env.BRANCH_NAME}?", ok: 'Publish'
+            }
+          }
+        }
+        publish()
+      }
     }
   }
 }
