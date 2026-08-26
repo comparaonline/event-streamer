@@ -72,6 +72,13 @@ pipeline {
       }
     }
   }
+  post { 
+    always { 
+      script {
+        jenkinsNotification()
+      }
+    }
+  }
 }
 
 def package_name() {
