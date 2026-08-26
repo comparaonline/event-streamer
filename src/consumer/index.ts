@@ -1,7 +1,7 @@
 import { Consumer, EachMessagePayload, Kafka } from 'kafkajs';
 import { getConfig } from '../config';
 import { DEFAULT_CONFIG } from '../constants';
-import { debug, getParsedJson, settlesWithin, stringToUpperCamelCase, validateTestingConfig } from '../helpers';
+import { debug, getParsedJson, reportDataLoss, settlesWithin, stringToUpperCamelCase, validateTestingConfig } from '../helpers';
 import { Input, Callback, Debug, Output, Route, Strategy } from '../interfaces';
 import { emit } from '../producer';
 
@@ -70,13 +70,35 @@ export class ConsumerRouter {
     }
     // Kubernetes can deliver more than one SIGTERM. The second one must wait for the shutdown
     // already in progress instead of racing it to disconnect() while handlers are still writing.
+    // Clearing it once it settles keeps a failed shutdown retryable -- kafkajs rethrows from both
+    // stop() and disconnect(), and a caller that catches and retries must be able to actually drain
+    // on the retry instead of getting the first failure's promise back forever.
     if (this.stopping == null) {
-      this.stopping = this.shutdown(consumer);
+      this.stopping = this.shutdown(consumer).finally(() => {
+        this.stopping = null;
+      });
     }
     return this.stopping;
   }
 
   private async shutdown(consumer: Consumer): Promise<void> {
+    // The deadline covers the whole sequence, not just the drain: consumer.stop() leaves the group
+    // and disconnect() closes the cluster, both network round trips under kafkajs' retry policy, and
+    // an unreachable broker is one of the reasons a pod gets drained in the first place. Bounding
+    // only the drain would leave the pod hanging until the SIGKILL, which is what this exists to
+    // prevent.
+    const work = this.drainAndDisconnect(consumer);
+    const finished = await settlesWithin(work, this.shutdownTimeoutMs);
+    if (!finished) {
+      // Their offsets were committed when they were queued, so Kafka will not redeliver them.
+      reportDataLoss('Shutdown timed out after', this.shutdownTimeoutMs, 'ms, discarding', this.pendingMessages().length, 'in-flight messages');
+      return;
+    }
+    // Already settled: this only surfaces a failed stop()/disconnect() to the caller.
+    await work;
+  }
+
+  private async drainAndDisconnect(consumer: Consumer): Promise<void> {
     // Stop fetching before draining. Under the default 'topic' strategy eachMessage returns as soon
     // as the message is queued, so kafkajs would keep delivering -- and committing the offsets of --
     // new messages into the queues while we await the ones already in flight, and the drain would
@@ -115,12 +137,10 @@ export class ConsumerRouter {
       return;
     }
     debug(Debug.INFO, 'Draining', pending.length, 'in-flight messages before disconnecting');
-    const drained = await settlesWithin(Promise.all(pending), this.shutdownTimeoutMs);
-    if (!drained) {
-      // Nothing left to do for these: their offsets were committed when they were queued, so Kafka
-      // will not redeliver them. Log it loudly -- this is the silent loss becoming visible.
-      debug(Debug.ERROR, 'Shutdown timed out after', this.shutdownTimeoutMs, 'ms, discarding', this.pendingMessages().length, 'in-flight messages');
-    }
+    // Wait for every message to settle, not for the first failure: Promise.all would resolve on a
+    // rejection and disconnect while its siblings were still writing, and it would look like a
+    // clean drain because no deadline was hit.
+    await Promise.all(pending.map((message) => message.catch(() => undefined)));
   }
 
   private async processMessage(topic: string, content: Input): Promise<void> {
@@ -223,14 +243,18 @@ export class ConsumerRouter {
               const queue = this.processMessage(topic, content);
               topicQueue.promises.push(queue);
 
-              queue.then(() => {
+              const onSettled = (): void => {
                 topicQueue.promises.splice(topicQueue.promises.indexOf(queue), 1);
                 if (topicQueue.status === 'paused') {
                   debug(Debug.INFO, 'Resuming topic', topic);
                   this.resumeTopic(topic);
                   topicQueue.status = 'alive';
                 }
-              });
+              };
+              // On settle, not on fulfil: a promise left in the queue inflates the backpressure
+              // count forever, and now that this queue is what shutdown drains, it would stall every
+              // later drain too.
+              queue.then(onSettled, onSettled);
             } else {
               debug(Debug.DEBUG, 'Committing without content');
             }

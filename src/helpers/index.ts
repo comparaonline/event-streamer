@@ -43,6 +43,15 @@ export async function settlesWithin(promise: Promise<unknown>, ms: number): Prom
   }
 }
 
+/**
+ * Reports something the library lost. This deliberately bypasses debug(): DEFAULT_CONFIG sets no
+ * debug level, so for any app that has not opted into library logging debug() prints nothing -- and
+ * a shutdown that drops in-flight messages would be exactly as silent as the bug it is reporting.
+ */
+export function reportDataLoss(...args: unknown[]): void {
+  console.error('[event-streamer]', ...args);
+}
+
 /* istanbul ignore next */
 export function debug(level: Debug, ...args: any[]): void {
   const configLevel = getConfig().debug;
