@@ -111,7 +111,8 @@ def publish() {
   // published last, with no semver check, so an unqualified publish here would point every consumer
   // installing without a range back at 8.x from whatever master last released. Version ranges are
   // resolved by version, not by tag, so '^8.x' consumers still pick this up.
-  def tag = env.BRANCH_NAME == 'support/8.x' ? '8.x' : 'latest'
+  // '8x', not '8.x': npm rejects any tag name that parses as a valid semver range, and '8.x' is one.
+  def tag = env.BRANCH_NAME == 'support/8.x' ? '8x' : 'latest'
   sh "npm publish --tag ${tag}"
   sh "git tag -a 'v${package_version()}' -m 'npm version v${package_version()}'"
   sh "git push origin 'v${package_version()}'"
