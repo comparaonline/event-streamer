@@ -63,6 +63,7 @@ setConfig({
 | consumer.strategy | Strategy ('topic'/'one-by-one') | Chose if you want to create topic queues or process all the messages in a single queue. <br/> *topic*: each topic will have an exclusive queue and fetch messages from kafka based on queue size. When queue is full it will stop fetching for this specific topic and resume it when some handler ends. **Lag can be caused if queue size is too small** <br/>  *one-by-one*: all the message will be handle in a single queue and it will need to wait previous message handler to finish before start to process a new message | *optional* <br/> default: 'topic'
 | consumer.maxMessagesPerTopic | number/'unlimited' | Set global queue size | *optional* <br/> default: 20 |
 | consumer.maxMessagesPerSpecificTopic | Object (key: string, value: maxMessagesPerTopic) | Set specific topic queue size. You can also use 'unlimited' for a specific topic | *optional* <br/> default: empty object |
+| consumer.shutdownTimeoutMs | number | How long `stop()` waits for the messages already in flight to finish before disconnecting anyway. Keep it below the pod's remaining `terminationGracePeriodSeconds`, otherwise the SIGKILL arrives first and the wait buys nothing | *optional* <br/> default: 10000 |
 | debug | false or Debug | Increase library logging based on Debug level | *optional* default: false |
 | kafkaJSLogs | kafkajs.logLevel | Set kafkajs logs for connection, commits and streamings | *optional* default: kafkajs.logLevel.NOTHING |
 | onlyTesting | boolean | Avoid kafka server communication, instead of send/consume messages it will be enable extra methods for unit testing | *optional* <br/> default: false
@@ -296,6 +297,67 @@ async function main () {
   await consumer.start()
 }
 ```
+
+#### Shutting down
+
+`stop()` is what makes a restart safe, so call it from the app's SIGTERM/SIGINT handler and **await it**
+before tearing down anything a handler needs — the database connection above all.
+
+```ts
+const consumer = new ConsumerRouter()
+// ... add routes, then start()
+
+process.on('SIGTERM', async () => {
+  await consumer.stop()   // stops fetching, drains handlers still running, then disconnects
+  await database.destroy()
+  process.exit(0)
+})
+```
+
+It runs in three steps: stop fetching, drain, disconnect. The drain matters because of how the default
+`'topic'` strategy commits: a message's offset is committed as soon as the message is queued, not when
+its handler finishes. A handler still writing when the process dies therefore leaves Kafka believing
+the message was handled — no redelivery, no dead letter, no error. Draining before the disconnect is
+what closes that window.
+
+The whole sequence is bounded by `consumer.shutdownTimeoutMs` (default 10s) — not just the drain.
+Leaving the consumer group and disconnecting are network round trips under kafkajs' retry policy, and
+an unreachable broker is one of the reasons a pod gets drained in the first place, so bounding only
+the drain would still let the pod hang until the SIGKILL.
+
+If the deadline expires, the library prints
+
+```
+[event-streamer] Shutdown timed out after <ms> ms, discarding <n> in-flight messages
+```
+
+and stops waiting. Those `n` messages are lost and this line is the only trace they existed, so it is
+worth an alert. It goes to `console.error` directly rather than through `debug()`: `debug` has no
+default level, so anything routed through it is invisible to every app that has not opted into
+library logging — which would make a shutdown that drops messages exactly as silent as the bug this
+drain exists to fix.
+
+Calling `stop()` twice is safe: the second call waits for the shutdown already in progress instead of
+disconnecting underneath it, which is what happens when Kubernetes sends more than one SIGTERM.
+
+Three limits worth knowing.
+
+The drain cannot help if the process is killed outright (`SIGKILL`, an uncaught exception that reaches
+`process.exit`), because nothing gets to run — an app that wants coverage there needs its own crash
+handler calling `stop()`.
+
+A handler that *throws* still loses its message: `processMessage` swallows the error so one bad
+message cannot stall a partition, and the offset is already committed. Use `strategy: 'one-by-one'`
+when a topic cannot afford either.
+
+And the drain deliberately runs *after* leaving the consumer group, which opens a window where two
+instances process the same partition. Halting the fetch has to come first — otherwise new messages
+keep arriving and committing while you drain, and the drain never catches up — but the consequence is
+that the partitions are reassigned immediately, and the replacement resumes from a committed offset
+that is already *ahead* of what this instance is still draining. For up to `shutdownTimeoutMs` the
+later messages may be applied before the earlier ones. This window used to be negligible because the
+process exited almost at once; it is now deliberate. If your handlers are order-sensitive and not
+idempotent — payments are the usual case — size `shutdownTimeoutMs` with that in mind.
 
 #### Input / Output example
 

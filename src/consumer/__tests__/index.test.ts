@@ -9,11 +9,16 @@ import MockDate from 'mockdate';
 import { KAFKA_HOST_9092 } from '../../test/constants';
 
 const TEST_TIMEOUT = 240000;
+// Long enough that a drain which waited for it would be unmistakable in the elapsed time.
+const HANDLER_LONGER_THAN_SHUTDOWN = 60000;
+// Comfortably past the group-leave round trip (~5s against a local broker).
+const GROUP_LEAVE_OUTLASTING_HANDLER = 10000;
 
 interface Params {
   strategy?: Strategy;
   maxMessagesPerTopic?: number | Unlimited;
   maxMessagesPerSpecificTopic?: Record<string, number | Unlimited>;
+  shutdownTimeoutMs?: number;
 }
 
 function generateConfig(params: Params): Config {
@@ -418,6 +423,265 @@ describe('consumer', () => {
       },
       TEST_TIMEOUT
     );
+
+    it(
+      'Swallows a handler that rejects, and the message is never redelivered',
+      async () => {
+        // arrange
+        const topic = `my-random-topic-${getIncrementalId()}`;
+        setConfig(generateConfig({ strategy: 'topic' }));
+
+        await createTopic(topic);
+
+        const handler = jest.fn().mockRejectedValue(new Error('handler failed'));
+
+        // act
+        const consumer = new ConsumerRouter();
+        consumer.add(topic, handler);
+
+        await consumer.start();
+
+        await emit({ data: { prop: 'a' }, topic });
+        await handlerToCall(handler);
+        await sleep(2000);
+
+        // assert: the error is logged and dropped so one bad message cannot stall the partition, but
+        // the offset was already committed -- no retry, no dead letter. Draining on shutdown does not
+        // cover this path, which is why the README calls it out next to it.
+        expect(handler).toHaveBeenCalledTimes(1);
+
+        await consumer.stop();
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Waits for the handlers already running before disconnecting',
+      async () => {
+        // arrange
+        const topic = `my-random-topic-${getIncrementalId()}`;
+        setConfig(generateConfig({ strategy: 'topic' }));
+
+        await createTopic(topic);
+
+        const started = jest.fn();
+        let finished = false;
+        const handler = async (): Promise<void> => {
+          started();
+          await sleep(2000);
+          finished = true;
+        };
+
+        // act
+        const consumer = new ConsumerRouter();
+        consumer.add(topic, handler);
+
+        await consumer.start();
+
+        await emit({ data: { prop: 'a' }, topic });
+        await handlerToCall(started);
+
+        // The offset was committed the moment the message was queued, so Kafka will not redeliver
+        // it: whatever this handler has not written by the time we disconnect is lost for good.
+        expect(finished).toBe(false);
+
+        await consumer.stop();
+
+        // assert
+        expect(finished).toBe(true);
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Shares a single shutdown between concurrent stop() calls',
+      async () => {
+        // arrange
+        const topic = `my-random-topic-${getIncrementalId()}`;
+        setConfig(generateConfig({ strategy: 'topic' }));
+
+        await createTopic(topic);
+
+        const started = jest.fn();
+        let finished = false;
+        const handler = async (): Promise<void> => {
+          started();
+          await sleep(2000);
+          finished = true;
+        };
+
+        // act
+        const consumer = new ConsumerRouter();
+        consumer.add(topic, handler);
+
+        await consumer.start();
+
+        await emit({ data: { prop: 'a' }, topic });
+        await handlerToCall(started);
+
+        // Kubernetes can send SIGTERM more than once; the second one must not disconnect underneath
+        // the drain the first one is still waiting on.
+        await Promise.all([consumer.stop(), consumer.stop()]);
+
+        // assert
+        expect(finished).toBe(true);
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Survives a paused topic finishing its drain during shutdown',
+      async () => {
+        // arrange
+        const topic = `my-random-topic-${getIncrementalId()}`;
+        // The topic pauses as soon as a second message is queued, so the drain below is guaranteed
+        // to run with the queue in 'paused' state -- the state whose completion callback resumes it.
+        setConfig(generateConfig({ strategy: 'topic', maxMessagesPerTopic: 2, shutdownTimeoutMs: 30000 }));
+
+        await createTopic(topic);
+
+        const started = jest.fn();
+        let finished = 0;
+        const handler = async (): Promise<void> => {
+          started();
+          // Longer than kafkajs' group-leave: consumer.stop() only nulls its consumer group once
+          // leave() returns, so a handler that settles before that resumes the topic harmlessly.
+          // The window this guards is the one where the handler is still running afterwards.
+          await sleep(GROUP_LEAVE_OUTLASTING_HANDLER);
+          finished += 1;
+        };
+
+        // act
+        const consumer = new ConsumerRouter();
+        consumer.add(topic, handler);
+
+        await consumer.start();
+
+        await emit([
+          { data: { prop: 'a' }, topic },
+          { data: { prop: 'b' }, topic }
+        ]);
+        while (started.mock.calls.length < 2) {
+          await sleep(100);
+        }
+
+        const resume = jest.spyOn((consumer as any).consumer, 'resume');
+        const resumesBeforeShutdown = resume.mock.calls.length;
+
+        await consumer.stop();
+
+        // assert: kafkajs nulls its consumer group inside stop(), and resume() throws when it is
+        // null. The unguarded version calls it from the completion callback of every handler that
+        // outlives the group-leave, and the throw lands in a floating promise -- an unhandled
+        // rejection that kills the process mid-drain, destroying the very messages it is draining.
+        // Without the guard this test fails on that error, not on the assertions below.
+        expect(resume.mock.calls.length).toBe(resumesBeforeShutdown);
+        expect(finished).toBe(2);
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Gives up on a handler that outlives shutdownTimeoutMs',
+      async () => {
+        // arrange
+        const topic = `my-random-topic-${getIncrementalId()}`;
+        setConfig(generateConfig({ strategy: 'topic', shutdownTimeoutMs: 1000 }));
+
+        await createTopic(topic);
+
+        const started = jest.fn();
+        let finished = false;
+        const handler = async (): Promise<void> => {
+          started();
+          await sleep(HANDLER_LONGER_THAN_SHUTDOWN);
+          finished = true;
+        };
+
+        // act
+        const consumer = new ConsumerRouter();
+        consumer.add(topic, handler);
+
+        await consumer.start();
+
+        await emit({ data: { prop: 'a' }, topic });
+        await handlerToCall(started);
+
+        const reported = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+        // MockDate freezes Date, so measure with the monotonic clock instead.
+        const startedAt = process.hrtime.bigint();
+        await consumer.stop();
+        const elapsedMs = Number((process.hrtime.bigint() - startedAt) / BigInt(1e6));
+
+        // The discarded messages are gone for good, so this line is the only record they existed.
+        expect(reported).toHaveBeenCalledWith('[event-streamer]', 'Shutdown timed out after', 1000, 'ms, discarding', 1, 'in-flight messages');
+        reported.mockRestore();
+
+        // assert: the drain waits, but not for this handler -- the pod finishes shutting down on its
+        // own terms instead of hanging until Kubernetes SIGKILLs it. The elapsed time also covers
+        // kafkajs leaving the consumer group, which is why the bound is the handler's own duration
+        // and not the deadline itself; settlesWithin's unit tests pin the deadline exactly.
+        expect(finished).toBe(false);
+        expect(elapsedMs).toBeGreaterThanOrEqual(1000);
+        expect(elapsedMs).toBeLessThan(HANDLER_LONGER_THAN_SHUTDOWN);
+      },
+      TEST_TIMEOUT
+    );
+  });
+
+  describe('Shutdown edge cases', () => {
+    beforeEach(() => {
+      setConfig({ host: KAFKA_HOST_9092, consumer: { groupId: 'my-group-id' } });
+    });
+
+    it('Retries the shutdown when a previous stop() failed', async () => {
+      // arrange
+      const consumer = new ConsumerRouter();
+      const kafkaConsumer = {
+        stop: jest.fn().mockRejectedValueOnce(new Error('leave failed')).mockResolvedValue(undefined),
+        disconnect: jest.fn().mockResolvedValue(undefined)
+      };
+      (consumer as any).consumer = kafkaConsumer;
+
+      // act & assert: a SIGTERM handler that catches and retries has to be able to actually drain on
+      // the retry, instead of getting the first failure's promise handed back to it forever.
+      await expect(consumer.stop()).rejects.toThrow('leave failed');
+      await expect(consumer.stop()).resolves.toBeUndefined();
+
+      expect(kafkaConsumer.stop).toHaveBeenCalledTimes(2);
+      expect(kafkaConsumer.disconnect).toHaveBeenCalledTimes(1);
+    });
+
+    it('Drains the remaining messages when one of them rejects', async () => {
+      // arrange
+      let slowFinished = false;
+      const rejecting = new Promise<void>((_resolve, reject) => {
+        setTimeout(() => reject(new Error('handler failed')), 50);
+      });
+      const slow = new Promise<void>((resolve) => {
+        setTimeout(() => {
+          slowFinished = true;
+          resolve();
+        }, 250);
+      });
+
+      const consumer = new ConsumerRouter();
+      const kafkaConsumer = {
+        stop: jest.fn().mockResolvedValue(undefined),
+        disconnect: jest.fn().mockResolvedValue(undefined)
+      };
+      (consumer as any).consumer = kafkaConsumer;
+      (consumer as any).queues = { 'topic-x': { status: 'alive', promises: [rejecting, slow] } };
+
+      // act
+      await consumer.stop();
+
+      // assert: Promise.all would have settled on the rejection at 50ms and disconnected while the
+      // sibling was still writing -- with no deadline hit, so it would have looked like a clean drain.
+      expect(slowFinished).toBe(true);
+      expect(kafkaConsumer.disconnect).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Consume testing mode', () => {
@@ -485,6 +749,9 @@ describe('consumer', () => {
         emit
       );
       expect(handlerC).not.toHaveBeenCalled();
+
+      // There is no consumer to drain or disconnect in testing mode.
+      await expect(consumer.stop()).resolves.toBeUndefined();
     });
 
     it('Should not work offline - no routes', async () => {

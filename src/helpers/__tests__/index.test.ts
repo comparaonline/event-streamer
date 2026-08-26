@@ -1,4 +1,4 @@
-import { getParsedJson, stringToUpperCamelCase, toArray, validateTestingConfig } from '..';
+import { getParsedJson, reportDataLoss, settlesWithin, stringToUpperCamelCase, toArray, validateTestingConfig } from '..';
 import { setConfig } from '../../config';
 
 describe('Helpers', () => {
@@ -61,6 +61,35 @@ describe('Helpers', () => {
 
       // assert
       expect(validateTestingConfig()).toBe(undefined);
+    });
+  });
+
+  describe('reportDataLoss', () => {
+    it('Should print even with library logging turned off', () => {
+      // The whole point: DEFAULT_CONFIG sets no debug level, so debug() would print nothing here and
+      // the message about discarded messages would be as silent as the loss it reports.
+      setConfig({ host: 'localhost', debug: false });
+      const error = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      reportDataLoss('discarding', 3, 'in-flight messages');
+
+      expect(error).toHaveBeenCalledWith('[event-streamer]', 'discarding', 3, 'in-flight messages');
+      error.mockRestore();
+    });
+  });
+
+  describe('settlesWithin', () => {
+    it('Should return true when the promise resolves first', async () => {
+      expect(await settlesWithin(Promise.resolve('done'), 5000)).toBe(true);
+    });
+
+    it('Should return true when the promise rejects first', async () => {
+      // A rejected handler is finished work: the caller only asks whether anything is still pending.
+      expect(await settlesWithin(Promise.reject(new Error('handler failed')), 5000)).toBe(true);
+    });
+
+    it('Should return false when the timeout elapses first', async () => {
+      expect(await settlesWithin(new Promise(() => undefined), 50)).toBe(false);
     });
   });
 });

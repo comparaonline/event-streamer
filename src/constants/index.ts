@@ -6,6 +6,7 @@ interface Default {
   onlyTesting: boolean;
   connectionTTL: number;
   strategy: Strategy;
+  shutdownTimeoutMs: number;
   kafkaJSLogs: logLevel;
   compressionType: CompressionTypes;
   producerIdempotent: boolean;
@@ -17,6 +18,7 @@ export const DEFAULT_CONFIG: Default = {
   onlyTesting: false,
   connectionTTL: 5000,
   strategy: 'topic',
+  shutdownTimeoutMs: 10000,
   kafkaJSLogs: logLevel.NOTHING,
   compressionType: CompressionTypes.None,
   producerIdempotent: false,
