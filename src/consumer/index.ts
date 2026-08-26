@@ -87,6 +87,22 @@ export class ConsumerRouter {
     await consumer.disconnect();
   }
 
+  private resumeTopic(topic: string): void {
+    // Never while shutting down: kafkajs' stop() nulls its consumer group, and resume() throws
+    // KafkaJSNonRetriableError when it is null. This runs from a queue completion callback, which
+    // during the drain means the throw lands in a floating promise -- an unhandled rejection that
+    // kills the process on Node >= 15, taking with it the very messages the drain is waiting for.
+    if (this.consumer == null || this.stopping != null) {
+      return;
+    }
+    try {
+      this.consumer.resume([{ topic }]);
+    } catch (e) {
+      /* istanbul ignore next */
+      debug(Debug.ERROR, e);
+    }
+  }
+
   private pendingMessages(): Promise<void>[] {
     // Each promise removes itself from its queue once it settles, so what is left here is exactly
     // the work whose offset is already committed but whose handler has not finished yet.
@@ -211,9 +227,7 @@ export class ConsumerRouter {
                 topicQueue.promises.splice(topicQueue.promises.indexOf(queue), 1);
                 if (topicQueue.status === 'paused') {
                   debug(Debug.INFO, 'Resuming topic', topic);
-                  if (this.consumer != null) {
-                    this.consumer.resume([{ topic }]);
-                  }
+                  this.resumeTopic(topic);
                   topicQueue.status = 'alive';
                 }
               });

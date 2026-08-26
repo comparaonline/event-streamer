@@ -11,6 +11,8 @@ import { KAFKA_HOST_9092 } from '../../test/constants';
 const TEST_TIMEOUT = 240000;
 // Long enough that a drain which waited for it would be unmistakable in the elapsed time.
 const HANDLER_LONGER_THAN_SHUTDOWN = 60000;
+// Comfortably past the group-leave round trip (~5s against a local broker).
+const GROUP_LEAVE_OUTLASTING_HANDLER = 10000;
 
 interface Params {
   strategy?: Strategy;
@@ -523,6 +525,58 @@ describe('consumer', () => {
 
         // assert
         expect(finished).toBe(true);
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Survives a paused topic finishing its drain during shutdown',
+      async () => {
+        // arrange
+        const topic = `my-random-topic-${getIncrementalId()}`;
+        // The topic pauses as soon as a second message is queued, so the drain below is guaranteed
+        // to run with the queue in 'paused' state -- the state whose completion callback resumes it.
+        setConfig(generateConfig({ strategy: 'topic', maxMessagesPerTopic: 2, shutdownTimeoutMs: 30000 }));
+
+        await createTopic(topic);
+
+        const started = jest.fn();
+        let finished = 0;
+        const handler = async (): Promise<void> => {
+          started();
+          // Longer than kafkajs' group-leave: consumer.stop() only nulls its consumer group once
+          // leave() returns, so a handler that settles before that resumes the topic harmlessly.
+          // The window this guards is the one where the handler is still running afterwards.
+          await sleep(GROUP_LEAVE_OUTLASTING_HANDLER);
+          finished += 1;
+        };
+
+        // act
+        const consumer = new ConsumerRouter();
+        consumer.add(topic, handler);
+
+        await consumer.start();
+
+        await emit([
+          { data: { prop: 'a' }, topic },
+          { data: { prop: 'b' }, topic }
+        ]);
+        while (started.mock.calls.length < 2) {
+          await sleep(100);
+        }
+
+        const resume = jest.spyOn((consumer as any).consumer, 'resume');
+        const resumesBeforeShutdown = resume.mock.calls.length;
+
+        await consumer.stop();
+
+        // assert: kafkajs nulls its consumer group inside stop(), and resume() throws when it is
+        // null. The unguarded version calls it from the completion callback of every handler that
+        // outlives the group-leave, and the throw lands in a floating promise -- an unhandled
+        // rejection that kills the process mid-drain, destroying the very messages it is draining.
+        // Without the guard this test fails on that error, not on the assertions below.
+        expect(resume.mock.calls.length).toBe(resumesBeforeShutdown);
+        expect(finished).toBe(2);
       },
       TEST_TIMEOUT
     );
