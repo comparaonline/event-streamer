@@ -60,7 +60,7 @@ setConfig({
 | producer.partitioners | DefaultPartitioner/LegacyPartitioner | Set how message will be sended to each partition | *optional* <br/> default: LegacyPartitioner |
 | consumer | Object | Object | *required to start consumer* |
 | consumer.groupId | string | Kafka group id | **required** |
-| consumer.strategy | Strategy ('topic'/'one-by-one') | Chose if you want to create topic queues or process all the messages in a single queue. <br/> *topic*: each topic will have an exclusive queue and fetch messages from kafka based on queue size. When queue is full it will stop fetching for this specific topic and resume it when some handler ends. **Lag can be caused if queue size is too small** <br/>  *one-by-one*: all the message will be handle in a single queue and it will need to wait previous message handler to finish before start to process a new message | *optional* <br/> default: 'topic'
+| consumer.strategy | Strategy ('topic'/'one-by-one'/'at-least-once') | Chose if you want to create topic queues or process all the messages in a single queue. <br/> *topic*: each topic will have an exclusive queue and fetch messages from kafka based on queue size. When queue is full it will stop fetching for this specific topic and resume it when some handler ends. **Lag can be caused if queue size is too small** <br/>  *one-by-one*: all the message will be handle in a single queue and it will need to wait previous message handler to finish before start to process a new message <br/> *at-least-once*: same concurrency as *topic*, but the offset only advances over messages whose handler finished, so anything still running when the process dies comes back instead of being lost. Handlers must tolerate a repeat | *optional* <br/> default: 'topic'
 | consumer.maxMessagesPerTopic | number/'unlimited' | Set global queue size | *optional* <br/> default: 20 |
 | consumer.maxMessagesPerSpecificTopic | Object (key: string, value: maxMessagesPerTopic) | Set specific topic queue size. You can also use 'unlimited' for a specific topic | *optional* <br/> default: empty object |
 | consumer.shutdownTimeoutMs | number | How long `stop()` waits for the messages already in flight to finish before disconnecting anyway. Keep it below the pod's remaining `terminationGracePeriodSeconds`, otherwise the SIGKILL arrives first and the wait buys nothing | *optional* <br/> default: 10000 |
@@ -296,6 +296,42 @@ async function main () {
   
   await consumer.start()
 }
+```
+
+#### Choosing a strategy: what happens to a message when the process dies
+
+The strategies differ in concurrency, but the difference that shows up in production is **when the
+offset advances** — because that is what decides whether an interrupted message comes back.
+
+| Strategy | Concurrency | Offset advances | A handler killed mid-write |
+| --- | --- | --- | --- |
+| `'topic'` (default) | up to `maxMessagesPerTopic` | when the message is **queued** | **lost**: Kafka already considers it delivered |
+| `'one-by-one'` | one at a time | after the handler returns | redelivered |
+| `'at-least-once'` | up to `maxMessagesPerTopic` | over the **completed prefix** of the batch | redelivered |
+
+`'topic'` commits before the work happens. The drain below narrows the window, but a handler that
+outlives it — a slow write, an unreachable broker, a `SIGKILL` — still takes its message with it, with
+no error and no retry.
+
+`'at-least-once'` keeps the concurrency and moves the offset only over messages whose handler actually
+finished, stopping at the first one still running: resolving past it would tell Kafka that one is done
+too. Measured on a local broker, 20 handlers of 500ms take ~510ms under both `'topic'` and
+`'at-least-once'`, and ~10s under `'one-by-one'`.
+
+**The trade is duplicates.** A message whose handler was interrupted comes back on the next start, and
+so does any message *behind* it that had already finished — the offset could not advance past the gap.
+Handlers must be safe to run twice: check whether the work is already done and return, rather than
+assuming a first delivery. If yours cannot, `'topic'` is not the safer option — it is the one that
+loses the message silently instead.
+
+```ts
+setConfig({
+  host: 'kafka:9092',
+  consumer: {
+    groupId: 'my-service',
+    strategy: 'at-least-once'
+  }
+});
 ```
 
 #### Shutting down

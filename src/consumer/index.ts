@@ -1,8 +1,8 @@
-import { Consumer, EachMessagePayload, Kafka } from 'kafkajs';
+import { Consumer, EachBatchPayload, EachMessagePayload, Kafka } from 'kafkajs';
 import { getConfig } from '../config';
 import { DEFAULT_CONFIG } from '../constants';
 import { debug, getParsedJson, reportDataLoss, settlesWithin, stringToUpperCamelCase, validateTestingConfig } from '../helpers';
-import { Input, Callback, Debug, Output, Route, Strategy } from '../interfaces';
+import { Input, Callback, Debug, Output, Route, Strategy, Unlimited } from '../interfaces';
 import { emit } from '../producer';
 
 interface Queue {
@@ -143,6 +143,108 @@ export class ConsumerRouter {
     await Promise.all(pending.map((message) => message.catch(() => undefined)));
   }
 
+  /**
+   * Concurrency like the 'topic' strategy, but the offset only advances over messages whose handler
+   * actually finished. kafkajs commits the offsets we resolve, so resolving strictly the completed
+   * prefix of the batch is what keeps a half-processed message uncommitted: if the process dies now,
+   * Kafka redelivers it instead of considering it handled. Handlers must therefore tolerate seeing a
+   * message twice -- that is the trade this strategy makes, and the reason it is opt-in.
+   */
+  /**
+   * Runs a consumer-group call that stops being valid the moment a rebalance or a shutdown takes the
+   * group away. Swallowing the failure is the point: it must not abort a drain, and the offsets of
+   * unfinished work stay unresolved regardless, which is the guarantee that actually matters.
+   */
+  private async ignoringGroupErrors(action: () => Promise<void>): Promise<void> {
+    try {
+      await action();
+    } catch (e) {
+      debug(Debug.DEBUG, e);
+    }
+  }
+
+  private async runAtLeastOnce(consumer: Consumer, maxMessagesPerTopic: number | Unlimited): Promise<void> {
+    const config = getConfig();
+
+    await consumer.run({
+      eachBatchAutoResolve: false,
+      eachBatch: async ({ batch, resolveOffset, heartbeat, commitOffsetsIfNecessary, isRunning, isStale }: EachBatchPayload) => {
+        const topic = batch.topic;
+        /* istanbul ignore next */
+        const limit = config.consumer?.maxMessagesPerSpecificTopic?.[topic] ?? maxMessagesPerTopic;
+        const inFlight = new Set<Promise<void>>();
+        const tracked: Array<{ offset: string; settled: boolean }> = [];
+        // One function for both arms of the settle: a rejected handler is finished work, and leaving
+        // it in the set would stall the backpressure slot and every later prefix advance.
+        const settled = (): undefined => undefined;
+
+        // Stops at the first message still running: an offset resolved past it would tell Kafka that
+        // message is done too, which is exactly the bug this strategy exists to avoid.
+        const resolveCompletedPrefix = (): void => {
+          while (tracked.length > 0 && tracked[0].settled) {
+            resolveOffset(tracked[0].offset);
+            tracked.shift();
+          }
+        };
+
+        // Both of these talk to a consumer group that a rebalance or a shutdown can take away
+        // mid-batch, and they throw when it is gone. Neither failure should abort the drain: the
+        // offsets of unfinished work stay unresolved either way, which is the guarantee that matters.
+        const beat = async (): Promise<void> => await this.ignoringGroupErrors(heartbeat);
+        const commit = async (): Promise<void> => await this.ignoringGroupErrors(commitOffsetsIfNecessary);
+
+        for (const message of batch.messages) {
+          if (!isRunning() || isStale()) {
+            break;
+          }
+
+          const entry = { offset: message.offset, settled: false };
+          tracked.push(entry);
+
+          const content = getParsedJson<Input>(message.value);
+          if (content == null) {
+            debug(Debug.DEBUG, 'Committing without content');
+            entry.settled = true;
+            resolveCompletedPrefix();
+            continue;
+          }
+
+          while (limit !== 'unlimited' && inFlight.size >= limit) {
+            await Promise.race(inFlight);
+            resolveCompletedPrefix();
+            await beat();
+          }
+
+          debug(Debug.DEBUG, 'Message offset', message.offset);
+          // Settled either way: a rejected handler is finished work, and leaving it in the set would
+          // stall both the backpressure slot and every later prefix advance.
+          const work = this.processMessage(topic, content).then(settled, settled);
+          inFlight.add(work);
+          void work.then(() => {
+            entry.settled = true;
+            inFlight.delete(work);
+          });
+
+          resolveCompletedPrefix();
+          await beat();
+        }
+
+        // Drains what is still running, including during a shutdown: kafkajs' stop() waits for this
+        // callback to return, so this is where the wait happens for this strategy. Committing as the
+        // prefix advances means work that did finish is not replayed on the next start.
+        while (inFlight.size > 0) {
+          await Promise.race(inFlight);
+          resolveCompletedPrefix();
+          await commit();
+          await beat();
+        }
+
+        resolveCompletedPrefix();
+        await commit();
+      }
+    });
+  }
+
   private async processMessage(topic: string, content: Input): Promise<void> {
     return Promise.all(
       this.routes
@@ -217,6 +319,11 @@ export class ConsumerRouter {
       const strategy: Strategy = config.consumer.strategy ?? DEFAULT_CONFIG.strategy;
 
       this.shutdownTimeoutMs = config.consumer.shutdownTimeoutMs ?? DEFAULT_CONFIG.shutdownTimeoutMs;
+
+      if (strategy === 'at-least-once') {
+        await this.runAtLeastOnce(this.consumer, maxMessagesPerTopic);
+        return;
+      }
 
       await this.consumer.run({
         eachMessage: async ({ topic, message }: EachMessagePayload) => {

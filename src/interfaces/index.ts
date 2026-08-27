@@ -11,7 +11,7 @@ export enum Debug {
 }
 
 export type Unlimited = 'unlimited';
-export type Strategy = 'topic' | 'one-by-one';
+export type Strategy = 'topic' | 'one-by-one' | 'at-least-once';
 
 export interface Config {
   host: string;
@@ -31,7 +31,22 @@ export interface Config {
   /** This is required if you want to create a consumer */
   consumer?: {
     groupId: string;
-    /** Chose if you want to create topic queues or process all the messages in a single queue 1 by 1. Default topic  */
+    /**
+     * How messages are dispatched, and -- the part that matters on a restart -- when their offset is
+     * allowed to advance.
+     *
+     * 'topic': concurrent per topic, but the offset advances as soon as a message is queued. A handler
+     * killed mid-write takes its message with it, because Kafka already considers it delivered.
+     *
+     * 'one-by-one': one message at a time, offset advances after the handler returns. Safe, and as slow
+     * as the handler.
+     *
+     * 'at-least-once': concurrent like 'topic', with the offset advancing only over messages whose
+     * handler actually finished. Anything still running when the process dies is redelivered instead of
+     * lost, so handlers must tolerate seeing a message twice.
+     *
+     * Default topic
+     */
     strategy?: Strategy;
     /** How many messages will be processed at the same time in a single topic. Default 20 */
     maxMessagesPerTopic?: number | Unlimited;

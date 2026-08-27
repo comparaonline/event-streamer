@@ -49,3 +49,16 @@ export async function sendRawMessage(topicName: string, content: null | string |
     }))
   });
 }
+
+export async function committedOffset(groupId: string, topicName: string): Promise<string> {
+  const config = getConfig();
+  const client = new Kafka({
+    brokers: config.host.split(','),
+    logLevel: config.kafkaJSLogs
+  });
+  const admin = client.admin();
+  await admin.connect();
+  const offsets = await admin.fetchOffsets({ groupId, topics: [topicName] });
+  await admin.disconnect();
+  return offsets[0].partitions[0].offset;
+}
