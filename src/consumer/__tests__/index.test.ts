@@ -2,7 +2,7 @@
 import { ConsumerRouter } from '..';
 import { setConfig } from '../../config';
 import { emit } from '../../producer';
-import { createTopic, handlerToCall, sendRawMessage, sleep } from '../../test/helpers';
+import { committedOffset, createTopic, handlerToCall, sendRawMessage, sleep } from '../../test/helpers';
 import { stringToUpperCamelCase } from '../../helpers';
 import { Config, Strategy, Unlimited } from '../../interfaces';
 import MockDate from 'mockdate';
@@ -15,6 +15,7 @@ const HANDLER_LONGER_THAN_SHUTDOWN = 60000;
 const GROUP_LEAVE_OUTLASTING_HANDLER = 10000;
 
 interface Params {
+  groupId?: string;
   strategy?: Strategy;
   maxMessagesPerTopic?: number | Unlimited;
   maxMessagesPerSpecificTopic?: Record<string, number | Unlimited>;
@@ -22,11 +23,12 @@ interface Params {
 }
 
 function generateConfig(params: Params): Config {
+  const { groupId, ...consumer } = params;
   return {
     host: KAFKA_HOST_9092,
     consumer: {
-      groupId: 'my-group-id',
-      ...params
+      groupId: groupId ?? 'my-group-id',
+      ...consumer
     }
   };
 }
@@ -630,9 +632,175 @@ describe('consumer', () => {
     );
   });
 
+  describe("Strategy 'at-least-once'", () => {
+    it(
+      'Processes the batch concurrently, like the topic strategy does',
+      async () => {
+        // arrange
+        const topic = `my-random-topic-${getIncrementalId()}`;
+        setConfig(generateConfig({ strategy: 'at-least-once', groupId: `at-least-once-${getIncrementalId()}` }));
+
+        await createTopic(topic);
+
+        let running = 0;
+        let peak = 0;
+        const handler = async (): Promise<void> => {
+          running += 1;
+          peak = Math.max(peak, running);
+          await sleep(1000);
+          running -= 1;
+        };
+
+        // act
+        const consumer = new ConsumerRouter();
+        consumer.add(topic, handler);
+
+        await consumer.start();
+
+        await emit(Array.from({ length: 5 }, (_value, index) => ({ data: { index }, topic })));
+        await sleep(3000);
+
+        // assert: serialised handlers would peak at 1 and take 5s. The offset safety this strategy
+        // adds is only worth having if it does not cost the concurrency of the default strategy.
+        expect(peak).toBeGreaterThan(1);
+
+        await consumer.stop();
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Applies backpressure and stops dispatching once the shutdown starts',
+      async () => {
+        // arrange
+        const topic = `my-random-topic-${getIncrementalId()}`;
+        setConfig(
+          generateConfig({
+            strategy: 'at-least-once',
+            groupId: `at-least-once-${getIncrementalId()}`,
+            maxMessagesPerTopic: 1,
+            shutdownTimeoutMs: 3000
+          })
+        );
+
+        await createTopic(topic);
+
+        const started = jest.fn();
+        let peak = 0;
+        let running = 0;
+        const handler = async (): Promise<void> => {
+          started();
+          running += 1;
+          peak = Math.max(peak, running);
+          await sleep(2000);
+          running -= 1;
+        };
+
+        const consumer = new ConsumerRouter();
+        consumer.add(topic, handler);
+
+        await consumer.start();
+
+        // act: more messages than the limit, so the batch loop has to wait for a slot, and a
+        // shutdown lands while it still has messages left to dispatch.
+        await emit(Array.from({ length: 6 }, (_value, index) => ({ data: { index }, topic })));
+        await handlerToCall(started);
+        // Mid-batch on purpose: with one slot and 2s handlers the loop is still waiting for a slot
+        // when the shutdown starts, which is the moment it has to stop dispatching new work.
+        await sleep(2500);
+        await consumer.stop();
+
+        // assert: never more than the configured slot in flight, and the messages the batch never
+        // got to dispatch keep their offsets, which is what makes them come back.
+        expect(peak).toBe(1);
+        expect(started.mock.calls.length).toBeLessThan(6);
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Skips a message it cannot parse without blocking the ones behind it',
+      async () => {
+        // arrange
+        const topic = `my-random-topic-${getIncrementalId()}`;
+        setConfig(generateConfig({ strategy: 'at-least-once', groupId: `at-least-once-${getIncrementalId()}` }));
+
+        await createTopic(topic);
+
+        const handler = jest.fn();
+
+        const consumer = new ConsumerRouter();
+        consumer.add(topic, handler);
+
+        await consumer.start();
+
+        // act
+        await sendRawMessage(topic, 'not json at all');
+        await emit({ data: { prop: 'a' }, topic });
+
+        // assert: the unparseable message resolves its own offset instead of holding the prefix, so
+        // the good one behind it still runs.
+        await handlerToCall(handler);
+        expect(handler).toHaveBeenCalledTimes(1);
+
+        await consumer.stop();
+      },
+      TEST_TIMEOUT
+    );
+
+    it(
+      'Leaves the offset of a handler it could not finish uncommitted',
+      async () => {
+        // arrange
+        const topic = `my-random-topic-${getIncrementalId()}`;
+        const groupId = `at-least-once-${getIncrementalId()}`;
+        setConfig(generateConfig({ strategy: 'at-least-once', groupId, shutdownTimeoutMs: 2000 }));
+
+        await createTopic(topic);
+
+        const started = jest.fn();
+        const handler = async (): Promise<void> => {
+          started();
+          // Outlives the shutdown budget on purpose: this is the message the process abandons.
+          await sleep(30000);
+        };
+
+        const consumer = new ConsumerRouter();
+        consumer.add(topic, handler);
+
+        await consumer.start();
+
+        const before = await committedOffset(groupId, topic);
+
+        // act
+        await emit({ data: { prop: 'a' }, topic });
+        await handlerToCall(started);
+        await consumer.stop();
+
+        // assert: under the default strategy this offset would already have advanced when the message
+        // was queued, and the message would be gone for good. Here Kafka still owes it, so the pod
+        // that replaces this one picks it up again.
+        expect(await committedOffset(groupId, topic)).toBe(before);
+      },
+      TEST_TIMEOUT
+    );
+  });
+
   describe('Shutdown edge cases', () => {
     beforeEach(() => {
       setConfig({ host: KAFKA_HOST_9092, consumer: { groupId: 'my-group-id' } });
+    });
+
+    it('Keeps draining when a consumer group call fails mid-batch', async () => {
+      // arrange: heartbeat() and commitOffsetsIfNecessary() throw once the group is gone, which is
+      // exactly when a shutdown is draining. Aborting there would strand the drain for no gain.
+      const consumer = new ConsumerRouter();
+      const failing = async (): Promise<void> => {
+        throw new Error('Consumer group was not initialized');
+      };
+
+      // act & assert
+      await expect((consumer as any).ignoringGroupErrors(failing)).resolves.toBeUndefined();
     });
 
     it('Retries the shutdown when a previous stop() failed', async () => {
